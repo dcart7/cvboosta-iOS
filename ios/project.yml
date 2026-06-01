@@ -19,6 +19,7 @@ targets:
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
         API_BASE_URL: http://127.0.0.1:8000
+        WEB_BASE_URL: https://cvboosta.com
         DEMO_FALLBACK_ENABLED: true
         APP_BUNDLE_ID_PLACEHOLDER: com.cvboosta.app
         NSFaceIDUsageDescription: Face ID protects sensitive career data and exported documents.

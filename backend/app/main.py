@@ -4,7 +4,9 @@ from app.api.routes import analytics, applications, auth, mobile, resume
 from app.core.config import settings
 from app.db.session import Base, engine
 
-Base.metadata.create_all(bind=engine)
+if settings.app_env == "dev" and settings.db_auto_create:
+    # Never auto-create tables in production: the website DB is the source of truth.
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.app_name)
 

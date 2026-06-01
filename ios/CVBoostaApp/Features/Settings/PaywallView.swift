@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var restoreMessage: String?
@@ -26,7 +27,8 @@ struct PaywallView: View {
                     plansCard
 
                     PrimaryButton(title: "Continue") {
-                        // Billing integration pending.
+                        // Payments and plan management live on the website.
+                        openURL(AppEnvironment.webBaseURL)
                     }
 
                     SecondaryButton(title: "Restore Purchases") {

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
@@ -93,6 +94,10 @@ struct SettingsView: View {
                         await authViewModel.refreshSharedState()
                     }
                 }
+
+                SecondaryButton(title: "Manage on Website") {
+                    openURL(AppEnvironment.webBaseURL)
+                }
             }
         }
     }
@@ -130,6 +135,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Developer")
                 row("API environment", value: AppEnvironment.apiBaseURL.absoluteString)
+                row("Website", value: AppEnvironment.webBaseURL.absoluteString)
                 row("App version", value: "1.0")
             }
         }

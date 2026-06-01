@@ -53,6 +53,9 @@ async def scan_resume(
 async def scan_resume_file(
     file: UploadFile = File(...),
     target_role: str = Form(...),
+    job_description: str | None = Form(default=None),
+    experience_level: str | None = Form(default=None),
+    target_market: str | None = Form(default=None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ResumeScanResponse:
@@ -79,6 +82,9 @@ async def scan_resume_file(
         resume_text=extracted_text,
         target_role=target_role,
         result=deterministic_result,
+        job_description=job_description,
+        experience_level=experience_level,
+        target_market=target_market,
     )
 
     _persist_scan(

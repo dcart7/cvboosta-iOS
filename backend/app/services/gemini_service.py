@@ -105,6 +105,9 @@ class GeminiService:
         target_role: str,
         resume_text: str,
         deterministic_findings: list[str],
+        job_description: str | None = None,
+        experience_level: str | None = None,
+        target_market: str | None = None,
     ) -> dict[str, Any]:
         fallback = {
             "priority_fixes": [],
@@ -118,6 +121,9 @@ class GeminiService:
             target_role=target_role,
             resume_text=resume_text[:12000],
             deterministic_findings="\n".join(deterministic_findings),
+            job_description=(job_description or "")[:6000],
+            experience_level=experience_level or "",
+            target_market=target_market or "",
         )
 
         result = await self.generate_json(

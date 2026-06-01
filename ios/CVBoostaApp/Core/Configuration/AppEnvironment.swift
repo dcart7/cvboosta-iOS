@@ -17,6 +17,22 @@ enum AppEnvironment {
         return URL(string: "http://127.0.0.1:8000")!
     }
 
+    static var webBaseURL: URL {
+        if let env = ProcessInfo.processInfo.environment["WEB_BASE_URL"],
+           let url = URL(string: env),
+           !env.isEmpty {
+            return url
+        }
+
+        if let value = Bundle.main.object(forInfoDictionaryKey: "WEB_BASE_URL") as? String,
+           let url = URL(string: value),
+           !value.isEmpty {
+            return url
+        }
+
+        return URL(string: "https://cvboosta.com")!
+    }
+
     static var demoFallbackEnabled: Bool {
         if let env = ProcessInfo.processInfo.environment["DEMO_FALLBACK_ENABLED"] {
             return NSString(string: env).boolValue

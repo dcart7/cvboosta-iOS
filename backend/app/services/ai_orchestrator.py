@@ -6,12 +6,23 @@ class AIOrchestrator:
     def __init__(self, gemini_service: GeminiService | None = None) -> None:
         self.gemini_service = gemini_service or GeminiService()
 
-    async def enhance_scan_result(self, resume_text: str, target_role: str, result: ATSResult) -> ATSResult:
+    async def enhance_scan_result(
+        self,
+        resume_text: str,
+        target_role: str,
+        result: ATSResult,
+        job_description: str | None = None,
+        experience_level: str | None = None,
+        target_market: str | None = None,
+    ) -> ATSResult:
         try:
             payload = await self.gemini_service.ats_enhancement(
                 target_role=target_role,
                 resume_text=resume_text,
                 deterministic_findings=[f"{f.category}: {f.suggestion}" for f in result.findings],
+                job_description=job_description,
+                experience_level=experience_level,
+                target_market=target_market,
             )
         except (GeminiUnavailableError, GeminiServiceError):
             return result

@@ -1,10 +1,9 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.db.models import Resume, ResumeScan, ScanFinding, User
+from app.api.routes import resume as resume_routes
+from app.db.models import Resume, ResumeScan, User
 from app.db.session import get_db
 from app.schemas.mobile import (
     ResumeListItem,
@@ -13,10 +12,9 @@ from app.schemas.mobile import (
     TailoringGenerateRequest,
     TailoringGenerateResponse,
 )
-from app.schemas.resume import ResumeScanResponse, ScanFindingDTO
+from app.schemas.resume import ResumeScanRequest, ResumeScanResponse
 from app.services.ai_orchestrator import AIOrchestrator
-from app.services.ats_engine import ATSResult, analyze_resume
-from app.services.pdf_parser import parse_pdf_bytes
+from app.services.ats_engine import analyze_resume
 from app.services.user_state import get_active_subscription, usage_limits_snapshot
 
 router = APIRouter()
@@ -34,53 +32,22 @@ async def scan_resume(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ResumeScanResponse:
-    _enforce_scan_limit(db, user)
-
-    extracted_text: str
-    file_name: str
-
     if file is not None:
-        if file.content_type not in {"application/pdf", "application/octet-stream"}:
-            raise HTTPException(status_code=400, detail="Only PDF uploads are supported.")
-        content = await file.read()
-        if not content:
-            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-        try:
-            extracted_text = parse_pdf_bytes(content)
-        except Exception as error:
-            raise HTTPException(status_code=400, detail="Invalid or unreadable PDF.") from error
+        return await resume_routes.scan_resume_file(
+            file=file,
+            target_role=target_role,
+            job_description=job_description,
+            experience_level=experience_level,
+            target_market=target_market,
+            user=user,
+            db=db,
+        )
 
-        file_name = file.filename or "uploaded-resume.pdf"
-    elif resume_text and resume_text.strip():
-        extracted_text = resume_text.strip()
-        file_name = f"inline-resume-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.txt"
-    else:
-        raise HTTPException(status_code=400, detail="Provide either resume PDF file or resume_text.")
+    if resume_text and resume_text.strip():
+        request = ResumeScanRequest(resume_text=resume_text.strip(), target_role=target_role)
+        return await resume_routes.scan_resume(payload=request, user=user, db=db)
 
-    context_suffix = _build_context_suffix(
-        job_description=job_description,
-        experience_level=experience_level,
-        target_market=target_market,
-    )
-    analysis_input = f"{extracted_text}\n\n{context_suffix}" if context_suffix else extracted_text
-
-    deterministic_result = analyze_resume(analysis_input, target_role)
-    result = await ai_orchestrator.enhance_scan_result(
-        resume_text=analysis_input,
-        target_role=target_role,
-        result=deterministic_result,
-    )
-
-    _persist_scan(
-        db=db,
-        user=user,
-        file_name=file_name,
-        text_content=analysis_input,
-        target_role=target_role,
-        result=result,
-    )
-
-    return _to_scan_response(result)
+    raise HTTPException(status_code=400, detail="Provide either resume PDF file or resume_text.")
 
 
 @router.get("/resumes", response_model=list[ResumeListItem])
@@ -150,8 +117,7 @@ async def generate_tailoring(
     bullet_inputs = bullets[:5] if bullets else [base_resume_text[:180]]
 
     rewrite_outputs = await ai_orchestrator.rewrite_bullets(payload.job_title, bullet_inputs)
-    combined_text = f"{base_resume_text}\n\n{payload.job_description}"
-    analysis = analyze_resume(combined_text, payload.job_title)
+    analysis = analyze_resume(base_resume_text, payload.job_title)
 
     company_suffix = f" for {payload.company_name}" if payload.company_name else ""
     summary = (
@@ -192,92 +158,3 @@ def subscription_status(
         scans_daily_limit=usage.scans_daily_limit,
         scans_remaining_today=usage.scans_remaining_today,
     )
-
-
-def _build_context_suffix(
-    job_description: str | None,
-    experience_level: str | None,
-    target_market: str | None,
-) -> str:
-    parts: list[str] = []
-    if experience_level:
-        parts.append(f"Experience Level: {experience_level}")
-    if target_market:
-        parts.append(f"Target Market: {target_market}")
-    if job_description and job_description.strip():
-        parts.append(f"Job Description: {job_description.strip()}")
-    return "\n".join(parts)
-
-
-def _to_scan_response(result: ATSResult) -> ResumeScanResponse:
-    return ResumeScanResponse(
-        ats_score=result.ats_score,
-        keyword_coverage=result.keyword_coverage,
-        measurable_impact_ratio=result.measurable_impact_ratio,
-        readability_score=result.readability_score,
-        recruiter_signal_score=result.recruiter_signal_score,
-        keyword_gaps=result.keyword_gaps,
-        priority_fixes=result.priority_fixes,
-        weak_bullet_examples=result.weak_bullet_examples,
-        rewrite_suggestions=result.rewrite_suggestions,
-        findings=[
-            ScanFindingDTO(
-                category=f.category,
-                severity=f.severity,
-                message=f.message,
-                suggestion=f.suggestion,
-            )
-            for f in result.findings
-        ],
-    )
-
-
-def _persist_scan(
-    db: Session,
-    user: User,
-    file_name: str,
-    text_content: str,
-    target_role: str,
-    result: ATSResult,
-) -> None:
-    resume = Resume(
-        user_id=user.id,
-        file_name=file_name,
-        text_content=text_content,
-    )
-    db.add(resume)
-    db.flush()
-
-    scan = ResumeScan(
-        resume_id=resume.id,
-        target_role=target_role,
-        ats_score=result.ats_score,
-        keyword_coverage=result.keyword_coverage,
-        measurable_impact_ratio=result.measurable_impact_ratio,
-        readability_score=result.readability_score,
-        recruiter_signal_score=result.recruiter_signal_score,
-    )
-    db.add(scan)
-    db.flush()
-
-    for finding in result.findings:
-        db.add(
-            ScanFinding(
-                scan_id=scan.id,
-                category=finding.category,
-                severity=finding.severity,
-                message=finding.message,
-                suggestion=finding.suggestion,
-            )
-        )
-
-    db.commit()
-
-
-def _enforce_scan_limit(db: Session, user: User) -> None:
-    limits = usage_limits_snapshot(db, user.id)
-    if limits.scans_remaining_today is not None and limits.scans_remaining_today <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Free plan daily scan limit reached.",
-        )

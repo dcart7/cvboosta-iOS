@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct TailoringStudioView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
@@ -50,7 +51,7 @@ struct TailoringStudioView: View {
                         formCard
 
                         PrimaryButton(
-                            title: isGenerating ? "Generating..." : "Generate Tailored Resume",
+                            title: isGenerating ? "Generating..." : "Generate Preview",
                             isLoading: isGenerating,
                             isDisabled: !canSubmit
                         ) {
@@ -77,7 +78,10 @@ struct TailoringStudioView: View {
     private var formCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Resume Tailoring")
+                SectionHeader(
+                    title: "Quick Tailoring",
+                    subtitle: "Get a mobile preview. Finish deep tailoring on the website."
+                )
 
                 Picker("Select saved resume", selection: $selectedResumeID) {
                     Text("Upload new resume").tag(nil as UUID?)
@@ -128,7 +132,10 @@ struct TailoringStudioView: View {
     private func outputCard(_ result: TailoringGenerateResponse) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Tailored output")
+                SectionHeader(
+                    title: "Tailoring Preview",
+                    subtitle: "For full editing, exports, and versions use CVBoosta web."
+                )
 
                 Text("Tailored summary")
                     .font(BoostaType.caption)
@@ -165,19 +172,8 @@ struct TailoringStudioView: View {
 
                 Divider()
 
-                Text("Cover letter option")
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
-                Text(result.coverLetter)
-                    .font(BoostaType.body)
-
-                HStack(spacing: BoostaSpace.sm) {
-                    SecondaryButton(title: "Export") {
-                        HapticsService.success()
-                    }
-                    SecondaryButton(title: "Save version") {
-                        HapticsService.success()
-                    }
+                PrimaryButton(title: "Continue on Web") {
+                    openURL(AppEnvironment.webBaseURL)
                 }
             }
         }

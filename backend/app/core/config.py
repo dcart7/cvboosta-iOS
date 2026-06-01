@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "CVBoosta API"
     app_env: str = "dev"
     database_url: str = "postgresql+psycopg://cvboosta:cvboosta@localhost:5432/cvboosta"
+    db_auto_create: bool = False
     gemini_api_key: str = ""
     gemini_model_fast: str = "gemini-2.5-flash"
     gemini_model_pro: str = "gemini-2.5-pro"

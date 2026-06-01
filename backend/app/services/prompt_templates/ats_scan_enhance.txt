@@ -20,6 +20,12 @@ Rules:
 - rewrite_suggestions: 2-4 realistic rewritten bullets with measurable impact style
 - Keep output grounded in provided resume text
 
+Context (optional):
+- Experience level: {experience_level}
+- Target market: {target_market}
+- Job description (for comparison only, do NOT treat as resume content):
+{job_description}
+
 Resume text:
 {resume_text}
 
