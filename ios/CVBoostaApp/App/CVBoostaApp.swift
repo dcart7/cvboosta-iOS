@@ -10,7 +10,9 @@ struct CVBoostaApp: App {
         let schema = Schema([
             ResumeProfile.self,
             ApplicationRecord.self,
-            ATSInsight.self
+            ATSInsight.self,
+            LatestScanReport.self,
+            SavedTailoringSuggestion.self
         ])
 
         let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
@@ -98,7 +100,7 @@ struct RootTabView: View {
                 }
                 .tag(AppTab.scanner)
 
-            TailoringStudioView()
+            TailoringPreviewView()
                 .tabItem {
                     Label("Tailoring", systemImage: "wand.and.stars")
                 }
@@ -137,7 +139,9 @@ enum PreviewModelContainer {
         let schema = Schema([
             ResumeProfile.self,
             ApplicationRecord.self,
-            ATSInsight.self
+            ATSInsight.self,
+            LatestScanReport.self,
+            SavedTailoringSuggestion.self
         ])
         let configuration = ModelConfiguration(
             schema: schema,

@@ -1,10 +1,14 @@
 import SwiftUI
+import SwiftData
 
 struct ATSResultsView: View {
     @EnvironmentObject private var appRouter: AppRouter
+    @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     let result: ResumeScanResult
+
+    @State private var didPersistLatestScan = false
 
     private struct CategoryScore: Identifiable {
         let id = UUID()
@@ -112,6 +116,38 @@ struct ATSResultsView: View {
             .ignoresSafeArea()
         )
         .navigationTitle("Results")
+        .onAppear {
+            persistLatestScanIfNeeded()
+        }
+    }
+
+    private func persistLatestScanIfNeeded() {
+        guard !didPersistLatestScan else { return }
+        didPersistLatestScan = true
+
+        do {
+            let payload = LatestScanPayload(from: result)
+            let data = try JSONEncoder().encode(payload)
+
+            let descriptor = FetchDescriptor<LatestScanReport>(
+                predicate: #Predicate { $0.id == "latest" }
+            )
+            if let existing = try modelContext.fetch(descriptor).first {
+                existing.updatedAt = payload.updatedAt
+                existing.payloadJSON = data
+            } else {
+                modelContext.insert(
+                    LatestScanReport(
+                        updatedAt: payload.updatedAt,
+                        payloadJSON: data
+                    )
+                )
+            }
+
+            try modelContext.save()
+        } catch {
+            // Best-effort cache for companion features; ignore persistence failures.
+        }
     }
 
     private var overviewCard: some View {
