@@ -1,0 +1,105 @@
+{
+  "Backend Developer": {
+    "keywords": [
+      "api",
+      "microservices",
+      "distributed systems",
+      "postgresql",
+      "redis",
+      "kafka",
+      "ci/cd",
+      "testing",
+      "observability",
+      "docker",
+      "kubernetes",
+      "scalability"
+    ],
+    "expectations": [
+      "ownership of services",
+      "reliability and uptime",
+      "clean architecture",
+      "monitoring and alerting",
+      "incident response"
+    ]
+  },
+  "Data Analyst": {
+    "keywords": [
+      "sql",
+      "python",
+      "tableau",
+      "power bi",
+      "experimentation",
+      "cohort analysis",
+      "forecasting",
+      "data modeling",
+      "dashboards",
+      "stakeholder communication"
+    ],
+    "expectations": [
+      "business insight generation",
+      "clear data storytelling",
+      "metric ownership",
+      "decision support"
+    ]
+  },
+  "Product Manager": {
+    "keywords": [
+      "roadmap",
+      "prioritization",
+      "user research",
+      "kpi",
+      "go-to-market",
+      "cross-functional",
+      "agile",
+      "a/b testing",
+      "retention",
+      "north star metric"
+    ],
+    "expectations": [
+      "problem framing",
+      "stakeholder alignment",
+      "outcome-driven planning",
+      "execution discipline"
+    ]
+  },
+  "DevOps Engineer": {
+    "keywords": [
+      "infrastructure as code",
+      "terraform",
+      "aws",
+      "gcp",
+      "ci/cd",
+      "kubernetes",
+      "helm",
+      "security",
+      "monitoring",
+      "incident management"
+    ],
+    "expectations": [
+      "platform reliability",
+      "deployment speed",
+      "automation",
+      "cost-performance balance"
+    ]
+  },
+  "Marketing Manager": {
+    "keywords": [
+      "campaign strategy",
+      "performance marketing",
+      "cac",
+      "ltv",
+      "seo",
+      "content strategy",
+      "email automation",
+      "brand positioning",
+      "attribution",
+      "funnel optimization"
+    ],
+    "expectations": [
+      "pipeline contribution",
+      "channel optimization",
+      "messaging clarity",
+      "cross-team execution"
+    ]
+  }
+}

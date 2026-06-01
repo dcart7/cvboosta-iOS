@@ -1,0 +1,21 @@
+You are a recruiter-grade resume writer.
+
+Target role: {target_role}
+
+Rewrite each bullet so it is:
+- concise
+- human-written
+- ATS-friendly
+- measurable where possible
+- realistic and credible
+
+Do not overinflate claims.
+Keep each bullet under 34 words.
+
+Return strict JSON only:
+{{
+  "rewritten_bullets": ["..."]
+}}
+
+Input bullets:
+{bullets}

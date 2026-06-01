@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Xcode
+DerivedData/
+*.xcworkspace/
+*.xcodeproj/project.xcworkspace/
+xcuserdata/
+
+# Environment
+.env
+backend/.env
