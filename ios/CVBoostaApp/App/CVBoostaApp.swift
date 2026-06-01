@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct CVBoostaApp: App {
     @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var appRouter = AppRouter()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -31,7 +32,6 @@ struct CVBoostaApp: App {
             )
             return try ModelContainer(for: schema, configurations: configuration)
         } catch {
-            // Fall back to local in-memory container to keep the app and previews usable.
             let fallbackConfig = ModelConfiguration(
                 schema: schema,
                 isStoredInMemoryOnly: true,
@@ -48,6 +48,7 @@ struct CVBoostaApp: App {
         WindowGroup {
             AppRootView()
                 .environmentObject(authViewModel)
+                .environmentObject(appRouter)
                 .task {
                     await authViewModel.bootstrap()
                 }
@@ -73,7 +74,7 @@ struct AppRootView: View {
                 ProgressView("Loading account...")
             }
         case .loggedOut:
-            LoginView()
+            WelcomeView()
         case .loggedIn:
             RootTabView()
         }
@@ -81,13 +82,13 @@ struct AppRootView: View {
 }
 
 struct RootTabView: View {
-    @State private var selectedTab: AppTab = .home
+    @EnvironmentObject private var appRouter: AppRouter
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $appRouter.selectedTab) {
             HomeView()
                 .tabItem {
-                    Label("Home", systemImage: "sparkles")
+                    Label("Home", systemImage: "house")
                 }
                 .tag(AppTab.home)
 
@@ -99,30 +100,32 @@ struct RootTabView: View {
 
             TailoringStudioView()
                 .tabItem {
-                    Label("Tailor", systemImage: "wand.and.stars")
+                    Label("Tailoring", systemImage: "wand.and.stars")
                 }
                 .tag(AppTab.tailoring)
 
-            AnalyticsView()
-                .tabItem {
-                    Label("Analytics", systemImage: "chart.line.uptrend.xyaxis")
-                }
-                .tag(AppTab.analytics)
-
             ApplicationTrackerView()
                 .tabItem {
-                    Label("Tracker", systemImage: "checklist")
+                    Label("Tracker", systemImage: "list.bullet.clipboard")
                 }
                 .tag(AppTab.tracker)
+
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .tag(AppTab.settings)
         }
         .tint(BoostaColor.accent)
     }
 }
+
 #if DEBUG
 struct RootTabView_Previews: PreviewProvider {
     static var previews: some View {
         RootTabView()
             .environmentObject(AuthViewModel())
+            .environmentObject(AppRouter())
             .modelContainer(PreviewModelContainer.shared)
             .previewDisplayName("Root Tab")
     }

@@ -14,8 +14,20 @@ final class GeminiClient: AIService {
         self.authenticatedAPIClient = authenticatedAPIClient
     }
 
-    func scanResumePDF(fileURL: URL, targetRole: String) async throws -> ResumeScanResponse {
-        try await resumeAPIService.scanPDF(fileURL: fileURL, targetRole: targetRole)
+    func scanResumePDF(
+        fileURL: URL,
+        targetRole: String,
+        jobDescription: String?,
+        experienceLevel: String,
+        targetMarket: String
+    ) async throws -> ResumeScanResponse {
+        try await resumeAPIService.scanPDF(
+            fileURL: fileURL,
+            targetRole: targetRole,
+            jobDescription: jobDescription,
+            experienceLevel: experienceLevel,
+            targetMarket: targetMarket
+        )
     }
 
     func rewriteBullets(targetRole: String, bullets: [String]) async throws -> [String] {

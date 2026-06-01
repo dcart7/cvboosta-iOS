@@ -3,25 +3,48 @@ import SwiftUI
 
 @MainActor
 final class ScannerViewModel: ObservableObject {
-    @Published var selectedRole: String = "Backend Developer"
+    enum ExperienceLevel: String, CaseIterable {
+        case intern = "Intern"
+        case junior = "Junior"
+        case midLevel = "Mid-Level"
+        case senior = "Senior"
+        case lead = "Lead"
+    }
+
+    enum TargetMarket: String, CaseIterable {
+        case unitedStates = "United States"
+        case unitedKingdom = "United Kingdom"
+        case europeanUnion = "European Union"
+        case canada = "Canada"
+        case global = "Global"
+    }
+
+    @Published var targetRole: String = ""
+    @Published var jobDescription: String = ""
+    @Published var experienceLevel: ExperienceLevel = .midLevel
+    @Published var targetMarket: TargetMarket = .unitedStates
+
     @Published var selectedFileName: String?
+    @Published private(set) var selectedFileURL: URL?
     @Published var isFileImporterPresented: Bool = false
+
     @Published var isScanning: Bool = false
     @Published var scanProgress: Double = 0
     @Published var progressMessage: String = "Ready"
+    @Published var progressStepIndex: Int = 0
     @Published var errorMessage: String?
     @Published var scanResult: ResumeScanResult?
 
-    let roles: [String] = [
-        "Backend Developer",
-        "Data Analyst",
-        "Product Manager",
-        "DevOps Engineer",
-        "Marketing Manager"
+    let loadingSteps: [String] = [
+        "Reading resume structure",
+        "Checking ATS compatibility",
+        "Finding missing keywords",
+        "Preparing improvement plan"
     ]
 
     private let aiService: AIService
     private let subscriptionService: SubscriptionService
+    private var scanTask: Task<Void, Never>?
 
     init(
         aiService: AIService = GeminiClient(),
@@ -44,28 +67,79 @@ final class ScannerViewModel: ObservableObject {
         await subscriptionService.restorePurchases()
     }
 
+    func analyzeResume() {
+        errorMessage = nil
+
+        guard let fileURL = selectedFileURL else {
+            errorMessage = "Please upload a PDF resume."
+            return
+        }
+
+        let role = targetRole.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !role.isEmpty else {
+            errorMessage = "Target role is required."
+            return
+        }
+
+        scanTask?.cancel()
+        scanTask = Task { [weak self] in
+            guard let self else { return }
+            await self.runScan(pdfURL: fileURL, role: role)
+        }
+    }
+
+    func cancelScan() {
+        scanTask?.cancel()
+        scanTask = nil
+        isScanning = false
+        scanProgress = 0
+        progressMessage = "Canceled"
+
+        if #available(iOS 16.1, *) {
+            Task {
+                await LiveActivityManager.shared.fail()
+            }
+        }
+    }
+
     func handlePickerResult(_ result: Result<URL, Error>) {
         switch result {
         case .success(let url):
-            selectedFileName = url.lastPathComponent
-            Task {
-                await runScan(pdfURL: url)
+            do {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer {
+                    if scoped {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
+                if size > 10 * 1024 * 1024 {
+                    errorMessage = "PDF file must be 10 MB or smaller."
+                    return
+                }
+                selectedFileURL = url
+                selectedFileName = url.lastPathComponent
+                errorMessage = nil
+            } catch {
+                errorMessage = "Unable to read selected PDF."
             }
         case .failure(let error):
             errorMessage = error.localizedDescription
         }
     }
 
-    func runScan(pdfURL: URL) async {
+    private func runScan(pdfURL: URL, role: String) async {
         isScanning = true
-        scanProgress = 0.03
-        progressMessage = "Preparing file"
-        errorMessage = nil
+        scanProgress = 0.08
+        progressMessage = loadingSteps[0]
+        progressStepIndex = 0
 
         await startLiveActivity()
-        await updateProgress(value: 0.18, message: "Reading PDF", eta: "~8s")
 
         do {
+            try Task.checkCancellation()
+
             let scoped = pdfURL.startAccessingSecurityScopedResource()
             defer {
                 if scoped {
@@ -73,16 +147,29 @@ final class ScannerViewModel: ObservableObject {
                 }
             }
 
-            await updateProgress(value: 0.44, message: "Uploading resume", eta: "~6s")
-            let response = try await aiService.scanResumePDF(fileURL: pdfURL, targetRole: selectedRole)
-            await updateProgress(value: 0.82, message: "Analyzing ATS signals", eta: "~2s")
+            await updateProgress(value: 0.25, step: 1, eta: "~8s")
 
-            await completeScan(with: response, isDemo: false)
+            try Task.checkCancellation()
+            let response = try await aiService.scanResumePDF(
+                fileURL: pdfURL,
+                targetRole: role,
+                jobDescription: normalizedJobDescription,
+                experienceLevel: experienceLevel.rawValue,
+                targetMarket: targetMarket.rawValue
+            )
+
+            try Task.checkCancellation()
+            await updateProgress(value: 0.8, step: 2, eta: "~4s")
+            await completeScan(with: response, isDemo: false, role: role)
+        } catch is CancellationError {
+            isScanning = false
+            scanProgress = 0
+            progressMessage = "Canceled"
         } catch {
             if AppEnvironment.demoFallbackEnabled && shouldUseDemoFallback(for: error) {
-                await updateProgress(value: 0.66, message: "Backend unavailable, switching to demo", eta: "~2s")
-                let response = DemoATSService.mockScanResult(for: selectedRole)
-                await completeScan(with: response, isDemo: true)
+                await updateProgress(value: 0.9, step: 3, eta: "~1s")
+                let response = DemoATSService.mockScanResult(for: role)
+                await completeScan(with: response, isDemo: true, role: role)
             } else {
                 isScanning = false
                 scanProgress = 0
@@ -95,11 +182,19 @@ final class ScannerViewModel: ObservableObject {
         }
     }
 
-    private func completeScan(with response: ResumeScanResponse, isDemo: Bool) async {
-        await updateProgress(value: 1.0, message: "Done", eta: "")
+    private func completeScan(with response: ResumeScanResponse, isDemo: Bool, role: String) async {
+        await updateProgress(value: 1.0, step: 3, eta: "")
         HapticsService.success()
 
-        scanResult = ResumeScanResult(response: response, isDemo: isDemo)
+        scanResult = ResumeScanResult(
+            response: response,
+            isDemo: isDemo,
+            resumeName: selectedFileName ?? "Uploaded Resume",
+            targetRole: role,
+            experienceLevel: experienceLevel.rawValue,
+            targetMarket: targetMarket.rawValue
+        )
+
         isScanning = false
         progressMessage = "Ready"
 
@@ -108,14 +203,19 @@ final class ScannerViewModel: ObservableObject {
         }
     }
 
-    private func updateProgress(value: Double, message: String, eta: String) async {
+    private func updateProgress(value: Double, step: Int, eta: String) async {
         withAnimation(BoostaMotion.smooth) {
             scanProgress = value
-            progressMessage = message
+            progressStepIndex = step
+            progressMessage = loadingSteps[min(step, loadingSteps.count - 1)]
         }
 
         if #available(iOS 16.1, *) {
-            await LiveActivityManager.shared.update(progress: value, detail: message, etaText: eta)
+            await LiveActivityManager.shared.update(
+                progress: value,
+                detail: progressMessage,
+                etaText: eta
+            )
         }
     }
 
@@ -126,6 +226,11 @@ final class ScannerViewModel: ObservableObject {
                 detail: selectedFileName ?? "Resume"
             )
         }
+    }
+
+    private var normalizedJobDescription: String? {
+        let value = jobDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 
     private func shouldUseDemoFallback(for error: Error) -> Bool {
@@ -142,5 +247,4 @@ final class ScannerViewModel: ObservableObject {
             return false
         }
     }
-
 }

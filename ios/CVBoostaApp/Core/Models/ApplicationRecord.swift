@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 enum ApplicationStatus: String, Codable, CaseIterable {
-    case draft
+    case saved
     case applied
     case interview
     case offer

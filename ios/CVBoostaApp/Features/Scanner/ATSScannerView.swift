@@ -7,6 +7,10 @@ struct ATSScannerView: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showPaywall = false
 
+    private var canAnalyze: Bool {
+        !viewModel.isScanning && viewModel.selectedFileName != nil && !viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -19,11 +23,34 @@ struct ATSScannerView: View {
 
                 ScrollView {
                     VStack(spacing: BoostaSpace.md) {
-                        scannerCard
-                        statusCard
-                        limitCard
+                        resumeUploadCard
+                        targetRoleCard
+                        jobDescriptionCard
+                        filtersCard
+                        accessCard
+
+                        PrimaryButton(
+                            title: "Analyze Resume",
+                            isLoading: viewModel.isScanning,
+                            isDisabled: !canAnalyze
+                        ) {
+                            HapticsService.impact(.medium)
+                            viewModel.analyzeResume()
+                        }
                     }
                     .padding(BoostaSpace.md)
+                }
+
+                if viewModel.isScanning {
+                    LoadingOverlay(
+                        title: "Analyzing your resume",
+                        steps: viewModel.loadingSteps,
+                        currentStep: viewModel.progressStepIndex,
+                        progress: viewModel.scanProgress,
+                        onCancel: {
+                            viewModel.cancelScan()
+                        }
+                    )
                 }
             }
             .navigationTitle("Scanner")
@@ -67,96 +94,108 @@ struct ATSScannerView: View {
         }
     }
 
-    private var scannerCard: some View {
+    private var resumeUploadCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                Text("ATS Resume Scanner")
-                    .font(BoostaType.title)
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Resume upload", subtitle: "PDF only, up to 10 MB")
 
-                Text("Upload a PDF resume to run a real ATS compatibility scan.")
-                    .font(BoostaType.body)
-                    .foregroundStyle(BoostaColor.secondaryText)
-
-                Picker("Target Role", selection: $viewModel.selectedRole) {
-                    ForEach(viewModel.roles, id: \.self) { role in
-                        Text(role).tag(role)
-                    }
+                SecondaryButton(title: "Upload Resume PDF") {
+                    viewModel.startImport()
                 }
-                .pickerStyle(.menu)
 
                 if let fileName = viewModel.selectedFileName {
                     Label(fileName, systemImage: "doc.richtext")
                         .font(BoostaType.caption)
                         .foregroundStyle(BoostaColor.secondaryText)
                 }
-
-                Button(viewModel.isScanning ? "Scanning..." : "Select PDF and Scan") {
-                    HapticsService.impact(.medium)
-                    viewModel.startImport()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(BoostaColor.accent)
-                .disabled(viewModel.isScanning)
             }
         }
     }
 
-    private var statusCard: some View {
+    private var targetRoleCard: some View {
+        GlassCard {
+            TextInputField(
+                title: "Target role",
+                placeholder: "Backend Developer",
+                text: $viewModel.targetRole,
+                textContentType: .jobTitle
+            )
+        }
+    }
+
+    private var jobDescriptionCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                Text("Scan Status")
-                    .font(BoostaType.section)
-
-                ProgressView(value: viewModel.scanProgress)
-                    .tint(BoostaColor.accent)
-
-                Text(viewModel.progressMessage)
-                    .font(BoostaType.body)
+                SectionHeader(title: "Job description", subtitle: "Optional, recommended 100+ characters")
+                TextEditor(text: $viewModel.jobDescription)
+                    .frame(minHeight: 130)
+                    .padding(BoostaSpace.xs)
+                    .background(Color.white.opacity(0.65))
+                    .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                            .stroke(BoostaColor.glassStroke, lineWidth: 1)
+                    )
+                Text("\(viewModel.jobDescription.count) characters")
+                    .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.danger)
-                }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
 
-    private var limitCard: some View {
+    private var filtersCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                Text("Plan Access")
-                    .font(BoostaType.section)
+                SectionHeader(title: "Experience & market")
+
+                Picker("Experience level", selection: $viewModel.experienceLevel) {
+                    ForEach(ScannerViewModel.ExperienceLevel.allCases, id: \.self) { level in
+                        Text(level.rawValue).tag(level)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Picker("Target country/market", selection: $viewModel.targetMarket) {
+                    ForEach(ScannerViewModel.TargetMarket.allCases, id: \.self) { market in
+                        Text(market.rawValue).tag(market)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+        }
+    }
+
+    private var accessCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Usage")
 
                 if subscriptionService.isPremium {
-                    Text("Premium active: unlimited scans")
+                    Text("Premium active: unlimited ATS scans")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.success)
                 } else {
-                    Text("Free plan: 1 scan/day")
+                    let remaining = authViewModel.me?.usageLimits.scansRemainingToday ?? 0
+                    Text("Free plan remaining today: \(remaining)")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
 
-                    let remaining = authViewModel.me?.usageLimits.scansRemainingToday ?? 0
-                    Text("Scans remaining today: \(remaining)")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
-
                     HStack(spacing: BoostaSpace.sm) {
-                        Button("Go Premium") {
+                        SecondaryButton(title: "Upgrade") {
                             showPaywall = true
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(BoostaColor.accent)
-
-                        Button("Restore") {
+                        SecondaryButton(title: "Restore") {
                             Task {
                                 await viewModel.restorePurchases()
+                                await authViewModel.refreshSharedState()
                             }
                         }
-                        .buttonStyle(.bordered)
                     }
+                }
+
+                if let error = viewModel.errorMessage {
+                    ErrorBanner(message: error)
                 }
             }
         }

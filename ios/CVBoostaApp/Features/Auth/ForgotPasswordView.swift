@@ -3,6 +3,22 @@ import SwiftUI
 struct ForgotPasswordView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @State private var email: String = ""
+    @State private var touchedEmail = false
+
+    private var emailError: String? {
+        guard touchedEmail else { return nil }
+        if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Email is required."
+        }
+        if !email.isValidEmail {
+            return "Enter a valid email address."
+        }
+        return nil
+    }
+
+    private var canSubmit: Bool {
+        emailError == nil && !email.isEmpty
+    }
 
     var body: some View {
         ZStack {
@@ -13,45 +29,55 @@ struct ForgotPasswordView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: BoostaSpace.md) {
-                Text("Reset Password")
-                    .font(BoostaType.title)
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(
+                    title: "Forgot Password",
+                    subtitle: "We will send reset instructions to your email."
+                )
 
                 GlassCard {
                     VStack(spacing: BoostaSpace.sm) {
-                        TextField("Email", text: $email)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                            .autocorrectionDisabled(true)
-                            .padding(10)
-                            .background(Color.white.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        TextInputField(
+                            title: "Email",
+                            placeholder: "you@example.com",
+                            text: $email,
+                            keyboardType: .emailAddress,
+                            textContentType: .emailAddress,
+                            autocapitalization: .never,
+                            errorText: emailError
+                        )
+                        .onChange(of: email) { _, _ in touchedEmail = true }
 
-                        Button(authViewModel.isSubmitting ? "Sending..." : "Send Reset Link") {
+                        PrimaryButton(
+                            title: authViewModel.isSubmitting ? "Sending..." : "Send reset link",
+                            isLoading: authViewModel.isSubmitting,
+                            isDisabled: !canSubmit
+                        ) {
+                            touchedEmail = true
                             Task {
                                 await authViewModel.sendPasswordReset(email: email)
                             }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(BoostaColor.accent)
-                        .disabled(authViewModel.isSubmitting)
                     }
                 }
 
                 if let infoMessage = authViewModel.infoMessage {
-                    Text(infoMessage)
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
+                    GlassCard {
+                        Text(infoMessage)
+                            .font(BoostaType.body)
+                            .foregroundStyle(BoostaColor.primaryText)
+                    }
                 }
 
                 if let errorMessage = authViewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.danger)
+                    ErrorBanner(message: errorMessage)
                 }
+
+                Spacer(minLength: 0)
             }
             .padding(BoostaSpace.md)
         }
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

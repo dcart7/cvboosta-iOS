@@ -1,0 +1,307 @@
+import SwiftUI
+
+struct PrimaryButton: View {
+    let title: String
+    var isLoading: Bool = false
+    var isDisabled: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: BoostaSpace.xs) {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                }
+                Text(title)
+                    .font(BoostaType.bodyStrong)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, BoostaSpace.sm)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .background(isDisabled ? BoostaColor.accent.opacity(0.45) : BoostaColor.accent)
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        .disabled(isLoading || isDisabled)
+        .accessibilityLabel(title)
+    }
+}
+
+struct SecondaryButton: View {
+    let title: String
+    var isDisabled: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(BoostaType.bodyStrong)
+                .foregroundStyle(BoostaColor.primaryText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, BoostaSpace.sm)
+                .background(Color.white.opacity(0.55))
+                .overlay(
+                    RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                        .stroke(BoostaColor.glassStroke, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.6 : 1)
+        .accessibilityLabel(title)
+    }
+}
+
+struct TextInputField: View {
+    let title: String
+    let placeholder: String
+    @Binding var text: String
+    var keyboardType: UIKeyboardType = .default
+    var secure: Bool = false
+    var textContentType: UITextContentType? = nil
+    var autocapitalization: TextInputAutocapitalization = .sentences
+    var errorText: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+
+            Group {
+                if secure {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                        .keyboardType(keyboardType)
+                }
+            }
+            .textInputAutocapitalization(autocapitalization)
+            .autocorrectionDisabled(true)
+            .textContentType(textContentType)
+            .padding(.horizontal, BoostaSpace.sm)
+            .padding(.vertical, 11)
+            .background(Color.white.opacity(0.65))
+            .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                    .stroke(errorText == nil ? BoostaColor.glassStroke : BoostaColor.danger.opacity(0.85), lineWidth: 1)
+            )
+
+            if let errorText {
+                Text(errorText)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.danger)
+            }
+        }
+    }
+}
+
+struct ScoreRing: View {
+    let score: Int
+    var lineWidth: CGFloat = 12
+
+    private var progress: Double {
+        min(max(Double(score) / 100, 0), 1)
+    }
+
+    private var scoreColor: Color {
+        switch score {
+        case 80...100:
+            return BoostaColor.success
+        case 60...79:
+            return BoostaColor.warning
+        default:
+            return BoostaColor.danger
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.35), lineWidth: lineWidth)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(scoreColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 2) {
+                Text("\(score)")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                Text("/100")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+        .accessibilityLabel("ATS score \(score) out of 100")
+    }
+}
+
+enum KeywordStatus {
+    case missing
+    case weak
+    case present
+
+    var title: String {
+        switch self {
+        case .missing: return "Missing"
+        case .weak: return "Weak"
+        case .present: return "Present"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .missing: return BoostaColor.danger
+        case .weak: return BoostaColor.warning
+        case .present: return BoostaColor.success
+        }
+    }
+}
+
+struct KeywordChip: View {
+    let text: String
+    let status: KeywordStatus
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(status.color)
+                .frame(width: 7, height: 7)
+            Text(text)
+                .font(BoostaType.caption)
+        }
+        .padding(.horizontal, BoostaSpace.sm)
+        .padding(.vertical, 7)
+        .background(Color.white.opacity(0.65))
+        .clipShape(Capsule())
+        .accessibilityLabel("\(text), \(status.title)")
+    }
+}
+
+struct ErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: BoostaSpace.xs) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(BoostaColor.danger)
+            Text(message)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.primaryText)
+            Spacer(minLength: 0)
+        }
+        .padding(BoostaSpace.sm)
+        .background(Color.red.opacity(0.11))
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.danger.opacity(0.45), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        .accessibilityLabel(message)
+    }
+}
+
+struct LoadingOverlay: View {
+    let title: String
+    let steps: [String]
+    let currentStep: Int
+    let progress: Double
+    var onCancel: (() -> Void)? = nil
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.2)
+                .ignoresSafeArea()
+
+            GlassCard(padding: BoostaSpace.lg) {
+                VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                    Text(title)
+                        .font(BoostaType.section)
+                    ProgressView(value: progress)
+                        .tint(BoostaColor.accent)
+
+                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                        ForEach(Array(steps.enumerated()), id: \.offset) { idx, item in
+                            HStack(spacing: BoostaSpace.xs) {
+                                Image(systemName: idx <= currentStep ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(idx <= currentStep ? BoostaColor.accent : BoostaColor.secondaryText.opacity(0.5))
+                                Text(item)
+                                    .font(BoostaType.caption)
+                                    .foregroundStyle(BoostaColor.secondaryText)
+                            }
+                        }
+                    }
+
+                    if let onCancel {
+                        SecondaryButton(title: "Cancel", action: onCancel)
+                    }
+                }
+            }
+            .padding(.horizontal, BoostaSpace.md)
+        }
+    }
+}
+
+struct SectionHeader: View {
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.xxs) {
+            Text(title)
+                .font(BoostaType.section)
+                .foregroundStyle(BoostaColor.primaryText)
+            if let subtitle {
+                Text(subtitle)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct EmptyStateView: View {
+    let title: String
+    let message: String
+    let actionTitle: String
+    let action: () -> Void
+
+    var body: some View {
+        GlassCard(padding: BoostaSpace.lg) {
+            VStack(spacing: BoostaSpace.sm) {
+                Image(systemName: "tray")
+                    .font(.system(size: 28))
+                    .foregroundStyle(BoostaColor.secondaryText)
+                Text(title)
+                    .font(BoostaType.section)
+                Text(message)
+                    .multilineTextAlignment(.center)
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                PrimaryButton(title: actionTitle, action: action)
+            }
+        }
+    }
+}
+
+#if DEBUG
+struct UIComponents_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack(spacing: BoostaSpace.md) {
+            PrimaryButton(title: "Primary") {}
+            SecondaryButton(title: "Secondary") {}
+            ScoreRing(score: 78)
+                .frame(width: 120, height: 120)
+            KeywordChip(text: "REST API", status: .missing)
+        }
+        .padding()
+        .background(LinearGradient(colors: [BoostaColor.pageTop, BoostaColor.pageBottom], startPoint: .top, endPoint: .bottom))
+    }
+}
+#endif

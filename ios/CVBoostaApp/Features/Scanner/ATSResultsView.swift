@@ -1,28 +1,105 @@
 import SwiftUI
 
 struct ATSResultsView: View {
+    @EnvironmentObject private var appRouter: AppRouter
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+
     let result: ResumeScanResult
-    @State private var animateScore = false
+
+    private struct CategoryScore: Identifiable {
+        let id = UUID()
+        let title: String
+        let score: Int
+        let explanation: String
+
+        var status: String {
+            switch score {
+            case 80...100: return "Good"
+            case 60...79: return "Needs Work"
+            default: return "Critical"
+            }
+        }
+
+        var color: Color {
+            switch status {
+            case "Good": return BoostaColor.success
+            case "Needs Work": return BoostaColor.warning
+            default: return BoostaColor.danger
+            }
+        }
+    }
+
+    private var categories: [CategoryScore] {
+        [
+            CategoryScore(
+                title: "Structure",
+                score: Int(result.response.readabilityScore * 100),
+                explanation: "Section clarity and ATS section parsing quality."
+            ),
+            CategoryScore(
+                title: "Keywords",
+                score: Int(result.response.keywordCoverage * 100),
+                explanation: "Coverage of expected role-specific terms."
+            ),
+            CategoryScore(
+                title: "Readability",
+                score: Int(result.response.readabilityScore * 100),
+                explanation: "Sentence quality and scannability."
+            ),
+            CategoryScore(
+                title: "Impact",
+                score: Int(result.response.measurableImpactRatio * 100),
+                explanation: "How many bullets show measurable outcomes."
+            ),
+            CategoryScore(
+                title: "Role Match",
+                score: Int(result.response.recruiterSignalScore * 100),
+                explanation: "How well the resume matches target role signals."
+            ),
+        ]
+    }
+
+    private var weakBulletPairs: [(original: String, improved: String)] {
+        zip(result.response.weakBulletExamples, result.response.rewriteSuggestions).map { ($0.0, $0.1) }
+    }
+
+    private var formattingChecks: [(String, Bool)] {
+        [
+            ("File parsing status", result.response.readabilityScore >= 0.55),
+            ("Section detection", result.response.readabilityScore >= 0.65),
+            ("Bullet consistency", result.response.measurableImpactRatio >= 0.45),
+            ("Contact information detection", result.response.atsScore >= 60),
+        ]
+    }
+
+    private var recruiterSignals: [String] {
+        var signals = result.response.findings
+            .sorted(by: { $0.severity > $1.severity })
+            .prefix(3)
+            .map(\.message)
+
+        if signals.isEmpty {
+            signals = [
+                "Add measurable achievements",
+                "Clarify technical impact",
+                "Use more role-specific terminology",
+            ]
+        }
+
+        return signals
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                scoreCard
-                findingsCard
+                overviewCard
+                scoreCategoriesCard
                 priorityFixesCard
                 keywordGapCard
                 weakBulletsCard
-                suggestionsCard
-
-                NavigationLink {
-                    PaywallView()
-                } label: {
-                    Text("Boost fully with CVBoosta")
-                        .font(BoostaType.bodyStrong)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(BoostaColor.accent)
+                formattingCard
+                recruiterSignalCard
+                actionsCard
             }
             .padding(BoostaSpace.md)
         }
@@ -34,73 +111,62 @@ struct ATSResultsView: View {
             )
             .ignoresSafeArea()
         )
-        .navigationTitle("ATS Results")
-        .onAppear {
-            withAnimation(.spring(response: 0.9, dampingFraction: 0.85)) {
-                animateScore = true
-            }
-        }
+        .navigationTitle("Results")
     }
 
-    private var findingsCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                Text("Issues")
-                    .font(BoostaType.section)
-
-                if result.response.findings.isEmpty {
-                    Text("No critical issues detected.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                } else {
-                    ForEach(result.response.findings) { finding in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(finding.message)
-                                .font(BoostaType.bodyStrong)
-                            Text(finding.suggestion)
-                                .font(BoostaType.body)
-                                .foregroundStyle(BoostaColor.secondaryText)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-        }
-    }
-
-    private var scoreCard: some View {
+    private var overviewCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                HStack {
-                    Text("ATS Score")
-                        .font(BoostaType.section)
+                SectionHeader(
+                    title: result.resumeName,
+                    subtitle: "\(result.targetRole) • \(result.experienceLevel) • \(result.targetMarket)"
+                )
 
-                    if result.isDemo {
-                        Text("DEMO")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, BoostaSpace.sm)
-                            .padding(.vertical, BoostaSpace.xxs)
-                            .background(Color.orange.opacity(0.15))
-                            .clipShape(Capsule())
-                    }
-
-                    Spacer()
-                }
-
-                HStack(spacing: BoostaSpace.lg) {
-                    ScoreRingView(score: result.response.atsScore, progress: animateScore ? 1 : 0)
-                        .frame(width: 120, height: 120)
+                HStack(spacing: BoostaSpace.md) {
+                    ScoreRing(score: result.response.atsScore)
+                        .frame(width: 116, height: 116)
 
                     VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                        Text("Keyword coverage: \(Int(result.response.keywordCoverage * 100))%")
-                            .font(BoostaType.body)
-                        Text("Signal quality: \(Int(result.response.recruiterSignalScore * 100))%")
-                            .font(BoostaType.body)
-                        Text("Impact ratio: \(Int(result.response.measurableImpactRatio * 100))%")
-                            .font(BoostaType.body)
+                        Text("Your latest resume score")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                        Text("ATS compatibility: \(result.response.atsScore)/100")
+                            .font(BoostaType.bodyStrong)
+                        if result.isDemo {
+                            Text("Demo mode result")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.warning)
+                        }
                     }
-                    .foregroundStyle(BoostaColor.secondaryText)
+                }
+            }
+        }
+    }
+
+    private var scoreCategoriesCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Score categories")
+                ForEach(categories) { item in
+                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                        HStack {
+                            Text(item.title)
+                                .font(BoostaType.bodyStrong)
+                            Spacer()
+                            Text("\(item.score)")
+                                .font(BoostaType.bodyStrong)
+                            Text(item.status)
+                                .font(BoostaType.caption)
+                                .padding(.horizontal, BoostaSpace.xs)
+                                .padding(.vertical, BoostaSpace.xxs)
+                                .background(item.color.opacity(0.2))
+                                .foregroundStyle(item.color)
+                                .clipShape(Capsule())
+                        }
+                        Text(item.explanation)
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                    }
                 }
             }
         }
@@ -109,11 +175,11 @@ struct ATSResultsView: View {
     private var priorityFixesCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                Text("Priority Fixes")
-                    .font(BoostaType.section)
+                SectionHeader(title: "Priority Fixes")
 
-                ForEach(Array(result.response.priorityFixes.enumerated()), id: \.offset) { idx, item in
-                    HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                let fixes = subscriptionService.isPremium ? result.response.priorityFixes.prefix(5) : result.response.priorityFixes.prefix(3)
+                ForEach(Array(fixes.enumerated()), id: \.offset) { idx, item in
+                    HStack(alignment: .top, spacing: BoostaSpace.xs) {
                         Text("\(idx + 1).")
                             .font(BoostaType.bodyStrong)
                             .foregroundStyle(BoostaColor.accent)
@@ -122,6 +188,12 @@ struct ATSResultsView: View {
                             .foregroundStyle(BoostaColor.secondaryText)
                     }
                 }
+
+                if !subscriptionService.isPremium {
+                    Text("Deep analysis is available in Premium.")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.warning)
+                }
             }
         }
     }
@@ -129,17 +201,17 @@ struct ATSResultsView: View {
     private var keywordGapCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                Text("Keyword Gaps")
-                    .font(BoostaType.section)
+                SectionHeader(title: "Missing Keywords")
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], alignment: .leading, spacing: 8) {
-                    ForEach(result.response.keywordGaps.prefix(12), id: \.self) { keyword in
-                        Text(keyword)
-                            .font(BoostaType.caption)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.55))
-                            .clipShape(Capsule())
+                if result.response.keywordGaps.isEmpty {
+                    Text("No major keyword gaps detected.")
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], alignment: .leading, spacing: 8) {
+                        ForEach(Array(result.response.keywordGaps.prefix(12)), id: \.self) { keyword in
+                            KeywordChip(text: keyword, status: .missing)
+                        }
                     }
                 }
             }
@@ -149,16 +221,43 @@ struct ATSResultsView: View {
     private var weakBulletsCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                Text("Weak Bullet Examples")
-                    .font(BoostaType.section)
+                SectionHeader(title: "Weak Bullets")
 
-                if result.response.weakBulletExamples.isEmpty {
+                if weakBulletPairs.isEmpty {
                     Text("No weak bullets detected in this scan.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    ForEach(result.response.weakBulletExamples, id: \.self) { bullet in
-                        Text("• \(bullet)")
+                    ForEach(Array(weakBulletPairs.prefix(subscriptionService.isPremium ? 5 : 3).enumerated()), id: \.offset) { _, pair in
+                        VStack(alignment: .leading, spacing: BoostaSpace.xxs) {
+                            Text("Original")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                            Text("\"\(pair.original)\"")
+                                .font(BoostaType.body)
+
+                            Text("Improved")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                            Text("\"\(pair.improved)\"")
+                                .font(BoostaType.bodyStrong)
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+            }
+        }
+    }
+
+    private var formattingCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "ATS Formatting")
+                ForEach(Array(formattingChecks.enumerated()), id: \.offset) { _, item in
+                    HStack {
+                        Image(systemName: item.1 ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                            .foregroundStyle(item.1 ? BoostaColor.success : BoostaColor.warning)
+                        Text(item.0)
                             .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
                     }
@@ -167,48 +266,27 @@ struct ATSResultsView: View {
         }
     }
 
-    private var suggestionsCard: some View {
+    private var recruiterSignalCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                Text("Rewrite Suggestions")
-                    .font(BoostaType.section)
-
-                ForEach(result.response.rewriteSuggestions, id: \.self) { suggestion in
-                    Text("• \(suggestion)")
+                SectionHeader(title: "Recruiter Signal")
+                ForEach(recruiterSignals, id: \.self) { signal in
+                    Text("• \(signal)")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 }
             }
         }
     }
-}
 
-private struct ScoreRingView: View {
-    let score: Int
-    let progress: Double
+    private var actionsCard: some View {
+        VStack(spacing: BoostaSpace.sm) {
+            PrimaryButton(title: "Improve This Resume") {
+                appRouter.open(.tailoring)
+            }
 
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.36), lineWidth: 12)
-
-            Circle()
-                .trim(from: 0, to: progress * min(Double(score) / 100, 1.0))
-                .stroke(
-                    AngularGradient(
-                        colors: [Color.blue, Color.cyan, Color.green],
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-
-            VStack(spacing: 2) {
-                Text("\(score)")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                Text("/100")
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
+            SecondaryButton(title: "Save Report") {
+                HapticsService.success()
             }
         }
     }

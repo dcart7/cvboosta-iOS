@@ -48,6 +48,10 @@ struct ResumeScanResponse: Codable, Hashable {
 struct ResumeScanResult: Hashable {
     let response: ResumeScanResponse
     let isDemo: Bool
+    let resumeName: String
+    let targetRole: String
+    let experienceLevel: String
+    let targetMarket: String
 }
 
 struct RewriteRequest: Encodable {

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PaywallView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var restoreMessage: String?
@@ -14,65 +15,97 @@ struct PaywallView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: BoostaSpace.md) {
-                Text("CVBoosta Pro")
-                    .font(BoostaType.title)
+            ScrollView {
+                VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                    SectionHeader(
+                        title: "Unlock your full interview potential.",
+                        subtitle: "Unlimited ATS scans, full tailoring, and advanced keyword intelligence."
+                    )
 
-                if subscriptionService.isPremium {
-                    Text("Premium active")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.success)
-                }
+                    benefitsCard
+                    plansCard
 
-                GlassCard {
-                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                        feature("Unlimited ATS scans")
-                        feature("AI rewrites and tailoring")
-                        feature("Interview prep simulator")
-                        feature("Advanced conversion analytics")
-                        feature("Role intelligence and keyword coverage")
+                    PrimaryButton(title: "Continue") {
+                        // Billing integration pending.
+                    }
+
+                    SecondaryButton(title: "Restore Purchases") {
+                        Task {
+                            await subscriptionService.restorePurchases()
+                            await authViewModel.refreshSharedState()
+                            restoreMessage = subscriptionService.isPremium ? "Purchases restored." : "No purchases found."
+                        }
+                    }
+
+                    SecondaryButton(title: "Maybe Later") {
+                        dismiss()
+                    }
+
+                    if let restoreMessage {
+                        Text(restoreMessage)
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
                     }
                 }
-
-                Button("Sync Subscription Status") {
-                    Task {
-                        await authViewModel.refreshSharedState()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(BoostaColor.accent)
-
-                Button("Restore Purchases") {
-                    Task {
-                        await subscriptionService.restorePurchases()
-                        await authViewModel.refreshSharedState()
-                        restoreMessage = subscriptionService.isPremium ? "Purchases restored." : "No purchases found."
-                    }
-                }
-                .buttonStyle(.bordered)
-
-                if let restoreMessage {
-                    Text(restoreMessage)
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                }
-
-                Text("$12.99 / month, $79.99 / year, $199 lifetime")
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
+                .padding(BoostaSpace.md)
             }
-            .padding(BoostaSpace.md)
+        }
+        .navigationTitle("Premium")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Close") {
+                    dismiss()
+                }
+            }
         }
     }
 
-    private func feature(_ text: String) -> some View {
+    private var benefitsCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                benefit("Unlimited ATS scans")
+                benefit("Full resume tailoring")
+                benefit("AI rewrite suggestions")
+                benefit("Advanced keyword intelligence")
+                benefit("Interview preparation")
+                benefit("Application analytics")
+            }
+        }
+    }
+
+    private var plansCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                Text("Plans")
+                    .font(BoostaType.section)
+
+                planRow("Monthly", "$12.99")
+                planRow("Yearly", "$79.99")
+                planRow("Lifetime", "$199")
+            }
+        }
+    }
+
+    private func benefit(_ text: String) -> some View {
         Label(text, systemImage: "checkmark.seal.fill")
             .font(BoostaType.body)
             .foregroundStyle(BoostaColor.primaryText)
     }
+
+    private func planRow(_ title: String, _ price: String) -> some View {
+        HStack {
+            Text(title)
+                .font(BoostaType.body)
+            Spacer()
+            Text(price)
+                .font(BoostaType.bodyStrong)
+        }
+    }
 }
 
 #Preview {
-    PaywallView()
-        .environmentObject(AuthViewModel())
+    NavigationStack {
+        PaywallView()
+            .environmentObject(AuthViewModel())
+    }
 }

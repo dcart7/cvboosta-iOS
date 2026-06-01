@@ -2,6 +2,53 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
+    @EnvironmentObject private var appRouter: AppRouter
+
+    private var firstName: String {
+        if let raw = authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+            return raw.split(separator: " ").first.map(String.init) ?? raw
+        }
+
+        if let email = authViewModel.me?.user.email, let prefix = email.split(separator: "@").first {
+            return String(prefix)
+        }
+
+        return "there"
+    }
+
+    private var latestScore: Int {
+        authViewModel.me?.scanHistory.first?.atsScore ?? 0
+    }
+
+    private var applicationsCount: Int {
+        authViewModel.me?.applications.count ?? 0
+    }
+
+    private var interviewsCount: Int {
+        authViewModel.me?.applications.filter { $0.status.lowercased() == "interview" }.count ?? 0
+    }
+
+    private var avgScore: Int {
+        guard let scans = authViewModel.me?.scanHistory, !scans.isEmpty else { return 0 }
+        let total = scans.reduce(0) { $0 + $1.atsScore }
+        return total / scans.count
+    }
+
+    private var streakDays: Int {
+        guard let scans = authViewModel.me?.scanHistory else { return 0 }
+        let calendar = Calendar.current
+        let uniqueDays = Set(scans.map { calendar.startOfDay(for: $0.createdAt) })
+        guard !uniqueDays.isEmpty else { return 0 }
+
+        var current = calendar.startOfDay(for: Date())
+        var streak = 0
+        while uniqueDays.contains(current) {
+            streak += 1
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: current) else { break }
+            current = previous
+        }
+        return streak
+    }
 
     var body: some View {
         NavigationStack {
@@ -15,54 +62,49 @@ struct HomeView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                        SectionHeader(
+                            title: "Hi, \(firstName)",
+                            subtitle: "Let’s improve your interview chances today."
+                        )
+
                         heroCard
-                            .staggered(index: 0)
 
-                        insightsRow
-                            .staggered(index: 1)
-
-                        GlassCard {
-                            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                                Text("Resume Weaknesses")
-                                    .font(BoostaType.section)
-                                weakness("Low measurable outcomes in 4 bullets", score: "High")
-                                weakness("Missing role terms: API gateway, CI/CD, observability", score: "High")
-                                weakness("Summary too generic for Product roles", score: "Medium")
-                            }
+                        HStack(spacing: BoostaSpace.sm) {
+                            MetricPill(title: "Applications", value: "\(applicationsCount)", color: BoostaColor.accent)
+                            MetricPill(title: "Interviews", value: "\(interviewsCount)", color: BoostaColor.success)
+                            MetricPill(title: "Avg. ATS", value: avgScore == 0 ? "—" : "\(avgScore)", color: BoostaColor.warning)
                         }
-                        .staggered(index: 2)
 
-                        GlassCard {
-                            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                                Text("Today")
-                                    .font(BoostaType.section)
-                                Text("3 applications sent. 1 interview tomorrow at 13:00.")
-                                    .font(BoostaType.body)
-                                    .foregroundStyle(BoostaColor.secondaryText)
+                        if authViewModel.me?.scanHistory.isEmpty ?? true {
+                            EmptyStateView(
+                                title: "No resume scanned yet",
+                                message: "Upload your resume to get your first ATS score.",
+                                actionTitle: "Start First Scan"
+                            ) {
+                                appRouter.open(.scanner)
                             }
+                        } else {
+                            resumeHealthCard
+                            todayFocusCard
+                            streakCard
+                            recentScanCard
                         }
-                        .staggered(index: 3)
                     }
                     .padding(BoostaSpace.md)
                 }
             }
-            .navigationTitle("CVBoosta")
+            .navigationTitle("Home")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink("Pro") {
-                        PaywallView()
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task {
-                            await authViewModel.logout()
-                        }
+                        appRouter.open(.settings)
                     } label: {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "gearshape")
                     }
-                    .accessibilityLabel("Log out")
                 }
+            }
+            .task {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -70,63 +112,85 @@ struct HomeView: View {
     private var heroCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                Text("Career Command Center")
-                    .font(BoostaType.title)
-                    .foregroundStyle(BoostaColor.primaryText)
+                Text("Your latest resume score")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
 
-                HStack(spacing: BoostaSpace.sm) {
-                    MetricPill(title: "ATS Score", value: "78", color: BoostaColor.success)
-                    MetricPill(title: "Streak", value: "11 days", color: BoostaColor.accent)
-                    MetricPill(title: "Interviews", value: "2 this week", color: BoostaColor.warning)
+                HStack(spacing: BoostaSpace.md) {
+                    ScoreRing(score: latestScore)
+                        .frame(width: 110, height: 110)
+
+                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                        Text(latestScore == 0 ? "No scans yet" : "Current ATS Score")
+                            .font(BoostaType.bodyStrong)
+                        Text(latestScore == 0 ? "Start with one scan to get a baseline." : "Keep refining role keywords and measurable impact.")
+                            .font(BoostaType.body)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                    }
                 }
 
-                Text("Your signal is improving. Tailor 2 more role-specific bullets to cross ATS 82.")
+                PrimaryButton(title: "Scan New Resume") {
+                    appRouter.open(.scanner)
+                }
+            }
+        }
+    }
+
+    private var resumeHealthCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Resume Health")
+                Text("• Improve measurable outcomes in top bullets")
+                Text("• Add role-specific keywords from target jobs")
+                Text("• Strengthen summary with technical impact")
+            }
+            .font(BoostaType.body)
+            .foregroundStyle(BoostaColor.secondaryText)
+        }
+    }
+
+    private var todayFocusCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Today’s Focus")
+                Text("Tailor your resume for one high-priority role and rescan before applying.")
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
+
+                SecondaryButton(title: "Open Tailoring") {
+                    appRouter.open(.tailoring)
+                }
+            }
+        }
+    }
+
+    private var streakCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                SectionHeader(title: "Job Search Streak")
+                Text(streakDays == 0 ? "Start your streak today." : "\(streakDays) active day\(streakDays == 1 ? "" : "s")")
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
             }
         }
     }
 
-    private var insightsRow: some View {
-        HStack(spacing: BoostaSpace.md) {
-            GlassCard {
-                VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                    Text("Role Match")
-                        .font(BoostaType.caption)
-                    Text("Backend Developer")
+    private var recentScanCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                SectionHeader(title: "Recent Scan")
+                if let scan = authViewModel.me?.scanHistory.first {
+                    Text(scan.resumeFileName)
                         .font(BoostaType.bodyStrong)
-                    Text("86%")
-                        .font(BoostaType.section)
-                        .foregroundStyle(BoostaColor.success)
+                    Text(scan.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                }
+
+                SecondaryButton(title: "Open Scanner") {
+                    appRouter.open(.scanner)
                 }
             }
-
-            GlassCard {
-                VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                    Text("Next Interview")
-                        .font(BoostaType.caption)
-                    Text("Tomorrow")
-                        .font(BoostaType.bodyStrong)
-                    Text("13:00")
-                        .font(BoostaType.section)
-                        .foregroundStyle(BoostaColor.accent)
-                }
-            }
-        }
-    }
-
-    private func weakness(_ message: String, score: String) -> some View {
-        HStack {
-            Text(message)
-                .font(BoostaType.body)
-                .foregroundStyle(BoostaColor.secondaryText)
-            Spacer()
-            Text(score)
-                .font(BoostaType.caption)
-                .padding(.horizontal, BoostaSpace.sm)
-                .padding(.vertical, BoostaSpace.xs)
-                .background(Color.white.opacity(0.45))
-                .clipShape(Capsule())
         }
     }
 }
@@ -134,4 +198,5 @@ struct HomeView: View {
 #Preview {
     HomeView()
         .environmentObject(AuthViewModel())
+        .environmentObject(AppRouter())
 }

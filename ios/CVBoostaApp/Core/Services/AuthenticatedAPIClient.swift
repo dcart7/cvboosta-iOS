@@ -30,6 +30,26 @@ final class AuthenticatedAPIClient {
         }
     }
 
+    func patchJSON<T: Decodable, U: Encodable>(path: String, body: U) async throws -> T {
+        try await performAuthorized { accessToken in
+            try await self.apiClient.patchJSON(
+                path: path,
+                body: body,
+                headers: ["Authorization": "Bearer \(accessToken)"]
+            )
+        }
+    }
+
+    func delete(path: String) async throws {
+        _ = try await performAuthorized { accessToken in
+            try await self.apiClient.deleteNoBody(
+                path: path,
+                headers: ["Authorization": "Bearer \(accessToken)"]
+            )
+            return true
+        }
+    }
+
     func uploadMultipart<T: Decodable>(
         path: String,
         fields: [String: String],

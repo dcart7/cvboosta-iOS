@@ -119,6 +119,32 @@ final class APIClient {
         return try decode(T.self, from: data)
     }
 
+    func patchJSON<T: Decodable, U: Encodable>(
+        path: String,
+        body: U,
+        headers: [String: String] = [:]
+    ) async throws -> T {
+        let url = try makeURL(path: path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.timeoutInterval = 30
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        apply(headers: headers, to: &request)
+        request.httpBody = try encoder.encode(body)
+
+        let data = try await perform(request: request)
+        return try decode(T.self, from: data)
+    }
+
+    func deleteNoBody(path: String, headers: [String: String] = [:]) async throws {
+        let url = try makeURL(path: path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = 30
+        apply(headers: headers, to: &request)
+        _ = try await perform(request: request)
+    }
+
     private func makeURL(path: String) throws -> URL {
         let normalized = path.hasPrefix("/") ? String(path.dropFirst()) : path
         guard let url = URL(string: normalized, relativeTo: baseURL)?.absoluteURL else {

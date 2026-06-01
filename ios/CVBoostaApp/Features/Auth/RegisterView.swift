@@ -3,10 +3,71 @@ import SwiftUI
 struct RegisterView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
 
-    @State private var displayName: String = ""
+    @State private var fullName: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var confirmPassword: String = ""
+    @State private var acceptedTerms = false
+    @State private var touched = Set<Field>()
+
+    private enum Field: Hashable {
+        case fullName
+        case email
+        case password
+        case confirmPassword
+        case terms
+    }
+
+    private var fullNameError: String? {
+        guard touched.contains(.fullName) else { return nil }
+        return fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Full name is required." : nil
+    }
+
+    private var emailError: String? {
+        guard touched.contains(.email) else { return nil }
+        if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Email is required."
+        }
+        if !email.isValidEmail {
+            return "Enter a valid email address."
+        }
+        return nil
+    }
+
+    private var passwordError: String? {
+        guard touched.contains(.password) else { return nil }
+        if password.isEmpty {
+            return "Password is required."
+        }
+        if password.count < 8 {
+            return "Password must be at least 8 characters."
+        }
+        return nil
+    }
+
+    private var confirmPasswordError: String? {
+        guard touched.contains(.confirmPassword) else { return nil }
+        if confirmPassword.isEmpty {
+            return "Confirm your password."
+        }
+        if confirmPassword != password {
+            return "Passwords do not match."
+        }
+        return nil
+    }
+
+    private var termsError: String? {
+        guard touched.contains(.terms), !acceptedTerms else { return nil }
+        return "Please accept Terms and Privacy Policy."
+    }
+
+    private var canSubmit: Bool {
+        !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && email.isValidEmail
+            && password.count >= 8
+            && confirmPassword == password
+            && acceptedTerms
+    }
 
     var body: some View {
         ZStack {
@@ -17,59 +78,96 @@ struct RegisterView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: BoostaSpace.md) {
-                Text("Create Account")
-                    .font(BoostaType.title)
+            ScrollView {
+                VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                    SectionHeader(
+                        title: "Create Account",
+                        subtitle: "Use the same account as on the CVBoosta website."
+                    )
 
-                GlassCard {
-                    VStack(spacing: BoostaSpace.sm) {
-                        TextField("Display name (optional)", text: $displayName)
-                            .padding(10)
-                            .background(Color.white.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    GlassCard {
+                        VStack(spacing: BoostaSpace.sm) {
+                            TextInputField(
+                                title: "Full name",
+                                placeholder: "Denys Ivshyn",
+                                text: $fullName,
+                                textContentType: .name,
+                                errorText: fullNameError
+                            )
+                            .onChange(of: fullName) { _, _ in touched.insert(.fullName) }
 
-                        TextField("Email", text: $email)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                            .autocorrectionDisabled(true)
-                            .padding(10)
-                            .background(Color.white.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            TextInputField(
+                                title: "Email",
+                                placeholder: "you@example.com",
+                                text: $email,
+                                keyboardType: .emailAddress,
+                                textContentType: .emailAddress,
+                                autocapitalization: .never,
+                                errorText: emailError
+                            )
+                            .onChange(of: email) { _, _ in touched.insert(.email) }
 
-                        SecureField("Password", text: $password)
-                            .padding(10)
-                            .background(Color.white.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            TextInputField(
+                                title: "Password",
+                                placeholder: "Minimum 8 characters",
+                                text: $password,
+                                secure: true,
+                                textContentType: .newPassword,
+                                autocapitalization: .never,
+                                errorText: passwordError
+                            )
+                            .onChange(of: password) { _, _ in touched.insert(.password) }
 
-                        SecureField("Confirm password", text: $confirmPassword)
-                            .padding(10)
-                            .background(Color.white.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            TextInputField(
+                                title: "Confirm password",
+                                placeholder: "Confirm password",
+                                text: $confirmPassword,
+                                secure: true,
+                                textContentType: .newPassword,
+                                autocapitalization: .never,
+                                errorText: confirmPasswordError
+                            )
+                            .onChange(of: confirmPassword) { _, _ in touched.insert(.confirmPassword) }
 
-                        Button(authViewModel.isSubmitting ? "Creating..." : "Create Account") {
-                            Task {
-                                await authViewModel.register(
-                                    displayName: displayName,
-                                    email: email,
-                                    password: password,
-                                    confirmPassword: confirmPassword
-                                )
+                            Toggle(isOn: $acceptedTerms) {
+                                Text("I agree to the Terms and Privacy Policy")
+                                    .font(BoostaType.caption)
+                                    .foregroundStyle(BoostaColor.primaryText)
+                            }
+                            .onChange(of: acceptedTerms) { _, _ in touched.insert(.terms) }
+                            if let termsError {
+                                Text(termsError)
+                                    .font(BoostaType.caption)
+                                    .foregroundStyle(BoostaColor.danger)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            PrimaryButton(
+                                title: authViewModel.isSubmitting ? "Creating Account..." : "Create Account",
+                                isLoading: authViewModel.isSubmitting,
+                                isDisabled: !canSubmit
+                            ) {
+                                touched = [.fullName, .email, .password, .confirmPassword, .terms]
+                                Task {
+                                    await authViewModel.register(
+                                        displayName: fullName,
+                                        email: email,
+                                        password: password,
+                                        confirmPassword: confirmPassword
+                                    )
+                                }
                             }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(BoostaColor.accent)
-                        .disabled(authViewModel.isSubmitting)
+                    }
+
+                    if let errorMessage = authViewModel.errorMessage {
+                        ErrorBanner(message: errorMessage)
                     }
                 }
-
-                if let errorMessage = authViewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.danger)
-                }
+                .padding(BoostaSpace.md)
             }
-            .padding(BoostaSpace.md)
         }
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
