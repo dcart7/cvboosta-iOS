@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 
 class ApplicationCreate(BaseModel):
-    user_id: UUID
     company: str
     role: str
     status: str = "applied"

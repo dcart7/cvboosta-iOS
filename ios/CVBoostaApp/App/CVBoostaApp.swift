@@ -3,6 +3,8 @@ import SwiftData
 
 @main
 struct CVBoostaApp: App {
+    @StateObject private var authViewModel = AuthViewModel()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             ResumeProfile.self,
@@ -14,7 +16,11 @@ struct CVBoostaApp: App {
 
         do {
             if isPreview {
-                let previewConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                let previewConfig = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: true,
+                    cloudKitDatabase: .none
+                )
                 return try ModelContainer(for: schema, configurations: previewConfig)
             }
 
@@ -26,7 +32,11 @@ struct CVBoostaApp: App {
             return try ModelContainer(for: schema, configurations: configuration)
         } catch {
             // Fall back to local in-memory container to keep the app and previews usable.
-            let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            let fallbackConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
             if let fallback = try? ModelContainer(for: schema, configurations: fallbackConfig) {
                 return fallback
             }
@@ -36,9 +46,37 @@ struct CVBoostaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            AppRootView()
+                .environmentObject(authViewModel)
+                .task {
+                    await authViewModel.bootstrap()
+                }
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+struct AppRootView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
+    var body: some View {
+        switch authViewModel.state {
+        case .loading:
+            ZStack {
+                LinearGradient(
+                    colors: [BoostaColor.pageTop, BoostaColor.pageBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                ProgressView("Loading account...")
+            }
+        case .loggedOut:
+            LoginView()
+        case .loggedIn:
+            RootTabView()
+        }
     }
 }
 
@@ -80,10 +118,16 @@ struct RootTabView: View {
         .tint(BoostaColor.accent)
     }
 }
-#Preview("Root Tab") {
-    RootTabView()
-        .modelContainer(PreviewModelContainer.shared)
+#if DEBUG
+struct RootTabView_Previews: PreviewProvider {
+    static var previews: some View {
+        RootTabView()
+            .environmentObject(AuthViewModel())
+            .modelContainer(PreviewModelContainer.shared)
+            .previewDisplayName("Root Tab")
+    }
 }
+#endif
 
 enum PreviewModelContainer {
     static let shared: ModelContainer = {
@@ -92,8 +136,14 @@ enum PreviewModelContainer {
             ApplicationRecord.self,
             ATSInsight.self
         ])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        return (try? ModelContainer(for: schema, configurations: configuration))
-            ?? (try! ModelContainer(for: schema))
+        let configuration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
+        if let container = try? ModelContainer(for: schema, configurations: configuration) {
+            return container
+        }
+        fatalError("Failed to create PreviewModelContainer")
     }()
 }

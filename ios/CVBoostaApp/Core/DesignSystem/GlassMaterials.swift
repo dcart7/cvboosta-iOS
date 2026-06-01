@@ -1,6 +1,6 @@
 import SwiftUI
 
 enum BoostaGlass {
-    static let background = .ultraThinMaterial
-    static let foreground = .regularMaterial
+    static let background: Material = .ultraThinMaterial
+    static let foreground: Material = .regularMaterial
 }

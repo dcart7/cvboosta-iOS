@@ -38,23 +38,35 @@ final class APIClient {
         self.baseURL = baseURL
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
+        self.decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            if let date = Self.iso8601WithFractional.date(from: value) ?? Self.iso8601.date(from: value) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid ISO8601 date: \(value)"
+            )
+        }
+        self.encoder.dateEncodingStrategy = .iso8601
     }
 
-    func postJSON<T: Decodable, U: Encodable>(path: String, body: U) async throws -> T {
+    func postJSON<T: Decodable, U: Encodable>(
+        path: String,
+        body: U,
+        headers: [String: String] = [:]
+    ) async throws -> T {
         let url = try makeURL(path: path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        apply(headers: headers, to: &request)
         request.httpBody = try encoder.encode(body)
 
         let data = try await perform(request: request)
-
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            throw APIError.decoding(error)
-        }
+        return try decode(T.self, from: data)
     }
 
     func uploadMultipart<T: Decodable>(
@@ -63,7 +75,8 @@ final class APIClient {
         fileFieldName: String,
         fileName: String,
         mimeType: String,
-        fileData: Data
+        fileData: Data,
+        headers: [String: String] = [:]
     ) async throws -> T {
         let url = try makeURL(path: path)
         let boundary = "Boundary-\(UUID().uuidString)"
@@ -72,6 +85,7 @@ final class APIClient {
         request.httpMethod = "POST"
         request.timeoutInterval = 90
         request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        apply(headers: headers, to: &request)
         request.httpBody = makeMultipartBody(
             boundary: boundary,
             fields: fields,
@@ -82,17 +96,38 @@ final class APIClient {
         )
 
         let data = try await perform(request: request)
+        return try decode(T.self, from: data)
+    }
 
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            throw APIError.decoding(error)
-        }
+    func getJSON<T: Decodable>(path: String, headers: [String: String] = [:]) async throws -> T {
+        let url = try makeURL(path: path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 30
+        apply(headers: headers, to: &request)
+        let data = try await perform(request: request)
+        return try decode(T.self, from: data)
+    }
+
+    func postNoBody<T: Decodable>(path: String, headers: [String: String] = [:]) async throws -> T {
+        let url = try makeURL(path: path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        apply(headers: headers, to: &request)
+        let data = try await perform(request: request)
+        return try decode(T.self, from: data)
     }
 
     private func makeURL(path: String) throws -> URL {
         let normalized = path.hasPrefix("/") ? String(path.dropFirst()) : path
         guard let url = URL(string: normalized, relativeTo: baseURL)?.absoluteURL else {
+            throw APIError.invalidURL
+        }
+        let isHTTPS = url.scheme?.lowercased() == "https"
+        let host = url.host?.lowercased()
+        let isLocalhost = host == "localhost" || host == "127.0.0.1" || host == "::1"
+        guard isHTTPS || isLocalhost else {
             throw APIError.invalidURL
         }
         return url
@@ -121,6 +156,20 @@ final class APIClient {
         return data
     }
 
+    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            throw APIError.decoding(error)
+        }
+    }
+
+    private func apply(headers: [String: String], to request: inout URLRequest) {
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+    }
+
     private func makeMultipartBody(
         boundary: String,
         fields: [String: String],
@@ -147,6 +196,20 @@ final class APIClient {
 
         return body
     }
+}
+
+private extension APIClient {
+    static let iso8601: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static let iso8601WithFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 }
 
 private extension Data {

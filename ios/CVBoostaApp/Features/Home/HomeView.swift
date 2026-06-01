@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct HomeView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -50,6 +52,16 @@ struct HomeView: View {
                     NavigationLink("Pro") {
                         PaywallView()
                     }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task {
+                            await authViewModel.logout()
+                        }
+                    } label: {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                    }
+                    .accessibilityLabel("Log out")
                 }
             }
         }
@@ -121,4 +133,5 @@ struct HomeView: View {
 
 #Preview {
     HomeView()
+        .environmentObject(AuthViewModel())
 }

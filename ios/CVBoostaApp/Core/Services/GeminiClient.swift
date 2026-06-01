@@ -4,11 +4,14 @@ import Foundation
 /// The backend is the single Gemini integration point.
 final class GeminiClient: AIService {
     private let resumeAPIService: ResumeAPIServiceProtocol
-    private let apiClient: APIClient
+    private let authenticatedAPIClient: AuthenticatedAPIClient
 
-    init(resumeAPIService: ResumeAPIServiceProtocol = ResumeAPIService(), apiClient: APIClient = .shared) {
+    init(
+        resumeAPIService: ResumeAPIServiceProtocol = ResumeAPIService(),
+        authenticatedAPIClient: AuthenticatedAPIClient = .shared
+    ) {
         self.resumeAPIService = resumeAPIService
-        self.apiClient = apiClient
+        self.authenticatedAPIClient = authenticatedAPIClient
     }
 
     func scanResumePDF(fileURL: URL, targetRole: String) async throws -> ResumeScanResponse {
@@ -16,7 +19,7 @@ final class GeminiClient: AIService {
     }
 
     func rewriteBullets(targetRole: String, bullets: [String]) async throws -> [String] {
-        let response: RewriteResponse = try await apiClient.postJSON(
+        let response: RewriteResponse = try await authenticatedAPIClient.postJSON(
             path: "/v1/resume/rewrite",
             body: RewriteRequest(targetRole: targetRole, bullets: bullets)
         )

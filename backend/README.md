@@ -11,13 +11,23 @@ uvicorn app.main:app --reload
 
 ## Core endpoints
 
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
+- `POST /auth/refresh`
+- `POST /auth/forgot-password`
 - `POST /v1/resume/scan`
 - `POST /v1/resume/scan-file` (multipart PDF upload)
 - `POST /v1/resume/rewrite`
 - `POST /v1/applications`
+- `GET /v1/applications/me`
 - `GET /v1/applications/{user_id}`
+- `GET /v1/analytics/summary/me`
 - `GET /v1/analytics/summary/{user_id}`
 - `GET /health`
+
+All protected endpoints require `Authorization: Bearer <access_token>`.
 
 ## Architecture
 

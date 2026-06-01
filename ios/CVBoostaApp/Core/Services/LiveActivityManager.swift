@@ -43,7 +43,7 @@ final class LiveActivityManager {
 
     func end() async {
         guard let activity = currentActivity else { return }
-        await activity.end(dismissalPolicy: .immediate)
+        await activity.end(nil, dismissalPolicy: .immediate)
         currentActivity = nil
     }
 
@@ -59,7 +59,7 @@ final class LiveActivityManager {
         )
 
         await activity.update(.init(state: completed, staleDate: nil))
-        await activity.end(dismissalPolicy: .default)
+        await activity.end(nil, dismissalPolicy: .default)
         currentActivity = nil
     }
 
@@ -75,7 +75,7 @@ final class LiveActivityManager {
         )
 
         await activity.update(.init(state: failed, staleDate: nil))
-        await activity.end(dismissalPolicy: .default)
+        await activity.end(nil, dismissalPolicy: .default)
         currentActivity = nil
     }
 }

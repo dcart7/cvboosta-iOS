@@ -59,4 +59,5 @@ struct ApplicationTrackerView: View {
 
 #Preview {
     ApplicationTrackerView()
+        .modelContainer(PreviewModelContainer.shared)
 }

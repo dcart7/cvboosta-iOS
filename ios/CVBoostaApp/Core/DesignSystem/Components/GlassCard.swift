@@ -21,3 +21,26 @@ struct GlassCard<Content: View>: View {
             .shadow(color: BoostaColor.glassShadow, radius: 14, x: 0, y: 8)
     }
 }
+#if DEBUG
+struct GlassCard_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            // A neutral background to showcase the glass effect
+            LinearGradient(colors: [Color.blue.opacity(0.25), Color.purple.opacity(0.25)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+
+            GlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Glass Card")
+                        .font(.headline)
+                    Text("This is a preview of the reusable glass card component.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding()
+        }
+        .previewDisplayName("GlassCard")
+    }
+}
+#endif

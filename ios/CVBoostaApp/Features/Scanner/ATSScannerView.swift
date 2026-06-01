@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ATSScannerView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showPaywall = false
@@ -28,6 +29,9 @@ struct ATSScannerView: View {
             .navigationTitle("Scanner")
             .onAppear {
                 viewModel.onAppear()
+                Task {
+                    await authViewModel.refreshSharedState()
+                }
             }
             .fileImporter(
                 isPresented: $viewModel.isFileImporterPresented,
@@ -134,7 +138,7 @@ struct ATSScannerView: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
 
-                    let remaining = viewModel.scanLimitStatus?.scansRemaining ?? 0
+                    let remaining = authViewModel.me?.usageLimits.scansRemainingToday ?? 0
                     Text("Scans remaining today: \(remaining)")
                         .font(BoostaType.caption)
                         .foregroundStyle(BoostaColor.secondaryText)
@@ -161,4 +165,5 @@ struct ATSScannerView: View {
 
 #Preview {
     ATSScannerView()
+        .environmentObject(AuthViewModel())
 }

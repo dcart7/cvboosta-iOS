@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PaywallView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var restoreMessage: String?
 
@@ -33,10 +34,10 @@ struct PaywallView: View {
                     }
                 }
 
-                Button("Start Free Trial") {
-                    HapticsService.success()
-                    // Placeholder until RevenueCat keys and products are wired.
-                    subscriptionService.unlockPremiumForDebug()
+                Button("Sync Subscription Status") {
+                    Task {
+                        await authViewModel.refreshSharedState()
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(BoostaColor.accent)
@@ -44,6 +45,7 @@ struct PaywallView: View {
                 Button("Restore Purchases") {
                     Task {
                         await subscriptionService.restorePurchases()
+                        await authViewModel.refreshSharedState()
                         restoreMessage = subscriptionService.isPremium ? "Purchases restored." : "No purchases found."
                     }
                 }
@@ -72,4 +74,5 @@ struct PaywallView: View {
 
 #Preview {
     PaywallView()
+        .environmentObject(AuthViewModel())
 }

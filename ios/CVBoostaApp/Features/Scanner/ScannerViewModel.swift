@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 @MainActor
 final class ScannerViewModel: ObservableObject {
@@ -10,7 +11,6 @@ final class ScannerViewModel: ObservableObject {
     @Published var progressMessage: String = "Ready"
     @Published var errorMessage: String?
     @Published var scanResult: ResumeScanResult?
-    @Published var scanLimitStatus: ScanLimitStatus?
 
     let roles: [String] = [
         "Backend Developer",
@@ -21,38 +21,27 @@ final class ScannerViewModel: ObservableObject {
     ]
 
     private let aiService: AIService
-    private let scanLimitService: ScanLimitService
     private let subscriptionService: SubscriptionService
 
     init(
         aiService: AIService = GeminiClient(),
-        scanLimitService: ScanLimitService = .shared,
         subscriptionService: SubscriptionService = .shared
     ) {
         self.aiService = aiService
-        self.scanLimitService = scanLimitService
         self.subscriptionService = subscriptionService
     }
 
     func onAppear() {
         subscriptionService.refreshEntitlements()
-        scanLimitStatus = scanLimitService.status(isPremium: subscriptionService.isPremium)
     }
 
     func startImport() {
         errorMessage = nil
-        let status = scanLimitService.status(isPremium: subscriptionService.isPremium)
-        scanLimitStatus = status
-        guard status.canScan else {
-            errorMessage = "Free plan limit reached. You get 1 scan per day."
-            return
-        }
         isFileImporterPresented = true
     }
 
     func restorePurchases() async {
         await subscriptionService.restorePurchases()
-        scanLimitStatus = scanLimitService.status(isPremium: subscriptionService.isPremium)
     }
 
     func handlePickerResult(_ result: Result<URL, Error>) {
@@ -68,14 +57,6 @@ final class ScannerViewModel: ObservableObject {
     }
 
     func runScan(pdfURL: URL) async {
-        let status = scanLimitService.status(isPremium: subscriptionService.isPremium)
-        scanLimitStatus = status
-
-        guard status.canScan else {
-            errorMessage = "Free plan limit reached. You get 1 scan per day."
-            return
-        }
-
         isScanning = true
         scanProgress = 0.03
         progressMessage = "Preparing file"
@@ -96,13 +77,11 @@ final class ScannerViewModel: ObservableObject {
             let response = try await aiService.scanResumePDF(fileURL: pdfURL, targetRole: selectedRole)
             await updateProgress(value: 0.82, message: "Analyzing ATS signals", eta: "~2s")
 
-            scanLimitService.recordScan(isPremium: subscriptionService.isPremium)
             await completeScan(with: response, isDemo: false)
         } catch {
             if AppEnvironment.demoFallbackEnabled && shouldUseDemoFallback(for: error) {
                 await updateProgress(value: 0.66, message: "Backend unavailable, switching to demo", eta: "~2s")
                 let response = DemoATSService.mockScanResult(for: selectedRole)
-                scanLimitService.recordScan(isPremium: subscriptionService.isPremium)
                 await completeScan(with: response, isDemo: true)
             } else {
                 isScanning = false
@@ -114,8 +93,6 @@ final class ScannerViewModel: ObservableObject {
                 }
             }
         }
-
-        scanLimitStatus = scanLimitService.status(isPremium: subscriptionService.isPremium)
     }
 
     private func completeScan(with response: ResumeScanResponse, isDemo: Bool) async {

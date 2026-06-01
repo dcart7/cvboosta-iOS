@@ -5,9 +5,9 @@ protocol ResumeAPIServiceProtocol {
 }
 
 final class ResumeAPIService: ResumeAPIServiceProtocol {
-    private let client: APIClient
+    private let client: AuthenticatedAPIClient
 
-    init(client: APIClient = .shared) {
+    init(client: AuthenticatedAPIClient = .shared) {
         self.client = client
     }
 

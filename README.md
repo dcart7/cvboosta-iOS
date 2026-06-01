@@ -68,6 +68,7 @@ This repository scaffold includes:
 16. App Store production checks: `docs/11-app-store-production-checks.md`
 17. MVP vertical slice runbook: `docs/12-vertical-slice-runbook.md`
 18. Gemini-only AI architecture: `docs/13-gemini-architecture.md`
+19. Unified website+iOS auth setup: `docs/14-unified-auth-setup.md`
 
 ## Quick Start
 

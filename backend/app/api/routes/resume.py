@@ -1,5 +1,11 @@
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from datetime import datetime
 
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user
+from app.db.models import Resume, ResumeScan, ScanFinding, User
+from app.db.session import get_db
 from app.schemas.resume import (
     ResumeScanRequest,
     ResumeScanResponse,
@@ -11,13 +17,19 @@ from app.services.ats_engine import ATSResult, analyze_resume
 from app.services.ai_orchestrator import AIOrchestrator
 from app.services.pdf_parser import parse_pdf_bytes
 from app.services.token_usage_tracker import token_usage_tracker
+from app.services.user_state import usage_limits_snapshot
 
 router = APIRouter()
 ai_orchestrator = AIOrchestrator()
 
 
 @router.post("/scan", response_model=ResumeScanResponse)
-async def scan_resume(payload: ResumeScanRequest) -> ResumeScanResponse:
+async def scan_resume(
+    payload: ResumeScanRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ResumeScanResponse:
+    _enforce_scan_limit(db, user)
     deterministic_result = analyze_resume(payload.resume_text, payload.target_role)
     result = await ai_orchestrator.enhance_scan_result(
         resume_text=payload.resume_text,
@@ -25,11 +37,26 @@ async def scan_resume(payload: ResumeScanRequest) -> ResumeScanResponse:
         result=deterministic_result,
     )
 
+    _persist_scan(
+        db=db,
+        user=user,
+        file_name=f"inline-resume-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.txt",
+        text_content=payload.resume_text,
+        target_role=payload.target_role,
+        result=result,
+    )
+
     return _to_scan_response(result)
 
 
 @router.post("/scan-file", response_model=ResumeScanResponse)
-async def scan_resume_file(file: UploadFile = File(...), target_role: str = Form(...)) -> ResumeScanResponse:
+async def scan_resume_file(
+    file: UploadFile = File(...),
+    target_role: str = Form(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ResumeScanResponse:
+    _enforce_scan_limit(db, user)
     if file.content_type not in {"application/pdf", "application/octet-stream"}:
         raise HTTPException(status_code=400, detail="Only PDF uploads are supported.")
 
@@ -53,11 +80,24 @@ async def scan_resume_file(file: UploadFile = File(...), target_role: str = Form
         target_role=target_role,
         result=deterministic_result,
     )
+
+    _persist_scan(
+        db=db,
+        user=user,
+        file_name=file.filename or "uploaded-resume.pdf",
+        text_content=extracted_text,
+        target_role=target_role,
+        result=result,
+    )
+
     return _to_scan_response(result)
 
 
 @router.post("/rewrite", response_model=RewriteResponse)
-async def rewrite_resume_bullets(payload: RewriteRequest) -> RewriteResponse:
+async def rewrite_resume_bullets(
+    payload: RewriteRequest,
+    _: User = Depends(get_current_user),
+) -> RewriteResponse:
     rewritten = await ai_orchestrator.rewrite_bullets(payload.target_role, payload.bullets)
     return RewriteResponse(rewritten_bullets=rewritten)
 
@@ -86,5 +126,56 @@ def _to_scan_response(result: ATSResult) -> ResumeScanResponse:
 
 
 @router.get("/ai-usage")
-def ai_usage_snapshot() -> dict[str, dict[str, int]]:
+def ai_usage_snapshot(_: User = Depends(get_current_user)) -> dict[str, dict[str, int]]:
     return token_usage_tracker.snapshot()
+
+
+def _persist_scan(
+    db: Session,
+    user: User,
+    file_name: str,
+    text_content: str,
+    target_role: str,
+    result: ATSResult,
+) -> None:
+    resume = Resume(
+        user_id=user.id,
+        file_name=file_name,
+        text_content=text_content,
+    )
+    db.add(resume)
+    db.flush()
+
+    scan = ResumeScan(
+        resume_id=resume.id,
+        target_role=target_role,
+        ats_score=result.ats_score,
+        keyword_coverage=result.keyword_coverage,
+        measurable_impact_ratio=result.measurable_impact_ratio,
+        readability_score=result.readability_score,
+        recruiter_signal_score=result.recruiter_signal_score,
+    )
+    db.add(scan)
+    db.flush()
+
+    for finding in result.findings:
+        db.add(
+            ScanFinding(
+                scan_id=scan.id,
+                category=finding.category,
+                severity=finding.severity,
+                message=finding.message,
+                suggestion=finding.suggestion,
+            )
+        )
+
+    db.commit()
+
+
+def _enforce_scan_limit(db: Session, user: User) -> None:
+    limits = usage_limits_snapshot(db, user.id)
+    if limits.scans_remaining_today is not None and limits.scans_remaining_today <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Free plan daily scan limit reached.",
+        )
