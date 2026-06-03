@@ -79,13 +79,8 @@ final class AuthenticatedAPIClient {
         do {
             return try await operation(accessToken)
         } catch let APIError.server(statusCode, _) where statusCode == 401 {
-            do {
-                let refreshedToken = try await authService.refreshAccessToken()
-                return try await operation(refreshedToken)
-            } catch {
-                await authService.clearSession()
-                throw APIError.server(statusCode: 401, message: "Session expired. Please log in again.")
-            }
+            await authService.clearSession()
+            throw APIError.server(statusCode: 401, message: "Session expired. Please log in again.")
         }
     }
 }

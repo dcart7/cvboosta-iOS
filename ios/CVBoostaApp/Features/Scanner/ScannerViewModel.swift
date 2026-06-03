@@ -42,16 +42,16 @@ final class ScannerViewModel: ObservableObject {
         "Preparing improvement plan"
     ]
 
-    private let aiService: AIService
+    private let atsService: ATSServiceProtocol
     private let subscriptionService: SubscriptionService
     private var scanTask: Task<Void, Never>?
 
     init(
-        aiService: AIService = GeminiClient(),
-        subscriptionService: SubscriptionService = .shared
+        atsService: ATSServiceProtocol? = nil,
+        subscriptionService: SubscriptionService? = nil
     ) {
-        self.aiService = aiService
-        self.subscriptionService = subscriptionService
+        self.atsService = atsService ?? ATSService.shared
+        self.subscriptionService = subscriptionService ?? .shared
     }
 
     func onAppear() {
@@ -150,7 +150,7 @@ final class ScannerViewModel: ObservableObject {
             await updateProgress(value: 0.25, step: 1, eta: "~8s")
 
             try Task.checkCancellation()
-            let response = try await aiService.scanResumePDF(
+            let response = try await atsService.scanResumePDF(
                 fileURL: pdfURL,
                 targetRole: role,
                 jobDescription: normalizedJobDescription,
@@ -166,18 +166,12 @@ final class ScannerViewModel: ObservableObject {
             scanProgress = 0
             progressMessage = "Canceled"
         } catch {
-            if AppEnvironment.demoFallbackEnabled && shouldUseDemoFallback(for: error) {
-                await updateProgress(value: 0.9, step: 3, eta: "~1s")
-                let response = DemoATSService.mockScanResult(for: role)
-                await completeScan(with: response, isDemo: true, role: role)
-            } else {
-                isScanning = false
-                scanProgress = 0
-                progressMessage = "Failed"
-                errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
-                if #available(iOS 16.1, *) {
-                    await LiveActivityManager.shared.fail()
-                }
+            isScanning = false
+            scanProgress = 0
+            progressMessage = "Failed"
+            errorMessage = (error as? APIError)?.errorDescription ?? error.localizedDescription
+            if #available(iOS 16.1, *) {
+                await LiveActivityManager.shared.fail()
             }
         }
     }
@@ -231,20 +225,5 @@ final class ScannerViewModel: ObservableObject {
     private var normalizedJobDescription: String? {
         let value = jobDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
-    }
-
-    private func shouldUseDemoFallback(for error: Error) -> Bool {
-        guard let apiError = error as? APIError else {
-            return false
-        }
-
-        switch apiError {
-        case .transport, .invalidResponse, .invalidURL:
-            return true
-        case .server(let code, _):
-            return code >= 500
-        case .decoding:
-            return false
-        }
     }
 }

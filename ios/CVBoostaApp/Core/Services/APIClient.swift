@@ -62,6 +62,7 @@ final class APIClient {
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
         apply(headers: headers, to: &request)
         request.httpBody = try encoder.encode(body)
 
@@ -85,6 +86,7 @@ final class APIClient {
         request.httpMethod = "POST"
         request.timeoutInterval = 90
         request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
         apply(headers: headers, to: &request)
         request.httpBody = makeMultipartBody(
             boundary: boundary,
@@ -104,6 +106,7 @@ final class APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 30
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
         apply(headers: headers, to: &request)
         let data = try await perform(request: request)
         return try decode(T.self, from: data)
@@ -114,6 +117,7 @@ final class APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 30
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
         apply(headers: headers, to: &request)
         let data = try await perform(request: request)
         return try decode(T.self, from: data)
@@ -129,6 +133,7 @@ final class APIClient {
         request.httpMethod = "PATCH"
         request.timeoutInterval = 30
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
         apply(headers: headers, to: &request)
         request.httpBody = try encoder.encode(body)
 
@@ -141,6 +146,7 @@ final class APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.timeoutInterval = 30
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
         apply(headers: headers, to: &request)
         _ = try await perform(request: request)
     }
@@ -175,7 +181,13 @@ final class APIClient {
 
         guard (200 ... 299).contains(httpResponse.statusCode) else {
             let parsed = try? decoder.decode(APIErrorBody.self, from: data)
-            let message = parsed?.detail ?? "Server error \(httpResponse.statusCode)."
+            let rawMessage = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = parsed?.detail
+                ?? humanReadableServerMessage(
+                    statusCode: httpResponse.statusCode,
+                    body: rawMessage
+                )
             throw APIError.server(statusCode: httpResponse.statusCode, message: message)
         }
 
@@ -194,6 +206,20 @@ final class APIClient {
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
+    }
+
+    private func humanReadableServerMessage(statusCode: Int, body: String?) -> String {
+        if let body {
+            if body.localizedCaseInsensitiveContains("csrf protection") {
+                return "Request reached the website instead of the production API. Check API_BASE_URL."
+            }
+
+            if !body.isEmpty {
+                return body
+            }
+        }
+
+        return "Server error \(statusCode)."
     }
 
     private func makeMultipartBody(

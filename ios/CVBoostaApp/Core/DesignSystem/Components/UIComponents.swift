@@ -16,14 +16,29 @@ struct PrimaryButton: View {
                 }
                 Text(title)
                     .font(BoostaType.bodyStrong)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .opacity(isLoading ? 0 : 0.9)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, BoostaSpace.sm)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                    .fill(
+                        isDisabled
+                        ? AnyShapeStyle(BoostaColor.accent.opacity(0.35))
+                        : AnyShapeStyle(BoostaColor.auroraGradient)
+                    )
+            )
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
-        .background(isDisabled ? BoostaColor.accent.opacity(0.45) : BoostaColor.accent)
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(Color.white.opacity(isDisabled ? 0.08 : 0.18), lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        .shadow(color: BoostaColor.accent.opacity(isDisabled ? 0 : 0.22), radius: 18, x: 0, y: 12)
         .disabled(isLoading || isDisabled)
         .accessibilityLabel(title)
     }
@@ -40,11 +55,11 @@ struct SecondaryButton: View {
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, BoostaSpace.sm)
-                .background(Color.white.opacity(0.55))
+                .padding(.vertical, 14)
+                .background(BoostaColor.surfaceElevated)
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                        .stroke(BoostaColor.glassStroke, lineWidth: 1)
+                        .stroke(BoostaColor.glassStrongStroke, lineWidth: 1)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
@@ -83,13 +98,14 @@ struct TextInputField: View {
             .autocorrectionDisabled(true)
             .textContentType(textContentType)
             .padding(.horizontal, BoostaSpace.sm)
-            .padding(.vertical, 11)
-            .background(Color.white.opacity(0.65))
+            .padding(.vertical, 13)
+            .background(BoostaColor.surfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                     .stroke(errorText == nil ? BoostaColor.glassStroke : BoostaColor.danger.opacity(0.85), lineWidth: 1)
             )
+            .foregroundStyle(BoostaColor.primaryText)
 
             if let errorText {
                 Text(errorText)
@@ -177,7 +193,7 @@ struct KeywordChip: View {
         }
         .padding(.horizontal, BoostaSpace.sm)
         .padding(.vertical, 7)
-        .background(Color.white.opacity(0.65))
+        .background(BoostaColor.surfaceElevated)
         .clipShape(Capsule())
         .accessibilityLabel("\(text), \(status.title)")
     }
@@ -196,7 +212,7 @@ struct ErrorBanner: View {
             Spacer(minLength: 0)
         }
         .padding(BoostaSpace.sm)
-        .background(Color.red.opacity(0.11))
+        .background(BoostaColor.danger.opacity(0.12))
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                 .stroke(BoostaColor.danger.opacity(0.45), lineWidth: 1)

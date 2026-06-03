@@ -1,14 +1,15 @@
 import SwiftUI
+import SwiftData
 
 struct ApplicationTrackerView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
+    @Environment(\.modelContext) private var modelContext
 
-    @State private var applications: [JobApplication] = []
-    @State private var isLoading = false
+    @Query(sort: \ApplicationRecord.appliedAt, order: .reverse)
+    private var applications: [ApplicationRecord]
+
     @State private var errorMessage: String?
     @State private var showAddSheet = false
-
-    private let service = ApplicationAPIService.shared
 
     var body: some View {
         NavigationStack {
@@ -20,9 +21,7 @@ struct ApplicationTrackerView: View {
                 )
                 .ignoresSafeArea()
 
-                if isLoading {
-                    ProgressView("Loading applications...")
-                } else if applications.isEmpty {
+                if applications.isEmpty {
                     VStack {
                         EmptyStateView(
                             title: "No applications yet",
@@ -56,15 +55,10 @@ struct ApplicationTrackerView: View {
             }
             .sheet(isPresented: $showAddSheet) {
                 NavigationStack {
-                    AddApplicationView(resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? []) { payload in
-                        Task {
-                            await createApplication(payload)
-                        }
+                    AddApplicationView(resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? []) { draft in
+                        createApplication(draft)
                     }
                 }
-            }
-            .task {
-                await loadApplications()
             }
             .overlay(alignment: .top) {
                 if let errorMessage {
@@ -76,7 +70,7 @@ struct ApplicationTrackerView: View {
         }
     }
 
-    private func applicationCard(_ app: JobApplication) -> some View {
+    private func applicationCard(_ app: ApplicationRecord) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.xs) {
                 HStack(alignment: .top) {
@@ -90,7 +84,7 @@ struct ApplicationTrackerView: View {
 
                     Spacer()
 
-                    Text(app.status.capitalized)
+                    Text(app.status.rawValue.capitalized)
                         .font(BoostaType.caption)
                         .padding(.horizontal, BoostaSpace.xs)
                         .padding(.vertical, BoostaSpace.xxs)
@@ -115,61 +109,68 @@ struct ApplicationTrackerView: View {
         }
     }
 
-    private func nextStep(for status: String) -> String {
-        switch status.lowercased() {
-        case "saved":
+    private func nextStep(for status: ApplicationStatus) -> String {
+        switch status {
+        case .saved:
             return "Submit application"
-        case "applied":
+        case .applied:
             return "Follow up in 5 days"
-        case "interview":
+        case .interview:
             return "Prepare interview examples"
-        case "offer":
+        case .offer:
             return "Review offer terms"
-        case "rejected":
+        case .rejected:
             return "Retrospective and apply next"
-        default:
-            return "Update application"
         }
     }
 
-    private func loadApplications() async {
-        isLoading = true
-        defer { isLoading = false }
+    private func createApplication(_ draft: NewApplicationDraft) {
+        errorMessage = nil
+
+        let record = ApplicationRecord(
+            company: draft.company,
+            role: draft.role,
+            status: draft.status,
+            appliedAt: draft.appliedAt,
+            source: "iOS",
+            interviewAt: draft.interviewAt,
+            notes: draft.notes,
+            resumeUsed: draft.resumeUsed,
+            jobLink: draft.jobLink,
+            atsScore: nil
+        )
+        modelContext.insert(record)
 
         do {
-            applications = try await service.fetchApplications()
-            errorMessage = nil
-        } catch let apiError as APIError {
-            errorMessage = apiError.errorDescription
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func createApplication(_ payload: CreateApplicationRequest) async {
-        do {
-            let created = try await service.createApplication(payload)
-            applications.insert(created, at: 0)
+            try modelContext.save()
             showAddSheet = false
-            errorMessage = nil
-        } catch let apiError as APIError {
-            errorMessage = apiError.errorDescription
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Could not save application."
         }
     }
+}
+
+struct NewApplicationDraft: Hashable {
+    let company: String
+    let role: String
+    let status: ApplicationStatus
+    let appliedAt: Date
+    let interviewAt: Date?
+    let notes: String?
+    let resumeUsed: String?
+    let jobLink: String?
 }
 
 struct AddApplicationView: View {
     @Environment(\.dismiss) private var dismiss
 
     let resumeNames: [String]
-    let onSave: (CreateApplicationRequest) -> Void
+    let onSave: (NewApplicationDraft) -> Void
 
     @State private var company = ""
     @State private var role = ""
     @State private var jobLink = ""
-    @State private var status: TrackerStatus = .saved
+    @State private var status: ApplicationStatus = .saved
     @State private var appliedAt: Date = .now
     @State private var selectedResume: String = ""
     @State private var notes = ""
@@ -195,11 +196,17 @@ struct AddApplicationView: View {
                     VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                         TextInputField(title: "Company name", placeholder: "Google", text: $company)
                         TextInputField(title: "Job title", placeholder: "Backend Engineer", text: $role)
-                        TextInputField(title: "Job link", placeholder: "https://...", text: $jobLink, keyboardType: .URL, autocapitalization: .never)
+                        TextInputField(
+                            title: "Job link",
+                            placeholder: "https://...",
+                            text: $jobLink,
+                            keyboardType: .URL,
+                            autocapitalization: .never
+                        )
 
                         Picker("Status", selection: $status) {
-                            ForEach(TrackerStatus.allCases, id: \.self) { item in
-                                Text(item.title).tag(item)
+                            ForEach(ApplicationStatus.allCases, id: \.self) { item in
+                                Text(item.rawValue.capitalized).tag(item)
                             }
                         }
                         .pickerStyle(.menu)
@@ -231,18 +238,17 @@ struct AddApplicationView: View {
                         }
 
                         PrimaryButton(title: "Save Application", isDisabled: !canSave) {
-                            let payload = CreateApplicationRequest(
+                            let draft = NewApplicationDraft(
                                 company: company.trimmingCharacters(in: .whitespacesAndNewlines),
                                 role: role.trimmingCharacters(in: .whitespacesAndNewlines),
-                                status: status.rawValue,
-                                source: "iOS",
+                                status: status,
                                 appliedAt: appliedAt,
                                 interviewAt: hasInterviewDate ? interviewDate : nil,
                                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
                                 resumeUsed: selectedResume.isEmpty ? nil : selectedResume,
                                 jobLink: jobLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobLink
                             )
-                            onSave(payload)
+                            onSave(draft)
                         }
                     }
                 }
@@ -258,7 +264,3 @@ struct AddApplicationView: View {
     }
 }
 
-#Preview {
-    ApplicationTrackerView()
-        .environmentObject(AuthViewModel())
-}

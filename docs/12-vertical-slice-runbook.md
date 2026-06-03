@@ -1,33 +1,16 @@
 # 12. MVP Vertical Slice Runbook
 
-## 1) Backend setup
+## 1) Backend
+
+The iOS app uses the production CVBoosta backend (Cloud Run). No backend is run from this repo.
+
+Health check (replace base URL if overridden):
 
 ```bash
-cd backend
-cp .env.example .env
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+curl https://cvboosta-backend-615826584976.europe-west3.run.app/health
 ```
 
-Health check:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-## 2) Backend tests
-
-Because the workspace path includes `[slug]`, run tests from a bracket-free path:
-
-```bash
-rm -rf /private/tmp/cvboosta_test
-mkdir -p /private/tmp/cvboosta_test
-rsync -a backend/ /private/tmp/cvboosta_test/backend/
-cd /private/tmp/cvboosta_test/backend
-PYTHONPATH=. pytest -q
-```
-
-## 3) iOS project generation
+## 2) iOS project generation
 
 If `xcodegen` is missing:
 
@@ -40,17 +23,16 @@ cd ios
 xcodegen generate
 ```
 
-## 4) Xcode build/run
+## 3) Xcode build/run
 
 1. Open generated `CVBoosta.xcodeproj` in Xcode.
 2. Select `CVBoostaApp` scheme.
 3. Set signing team and replace bundle IDs if needed.
 4. Run on iOS 17+ simulator/device.
 5. In Scanner tab:
-   - Tap `Select PDF and Scan`
-   - Choose a PDF from Files
-   - Wait for scan progress + Live Activity
-   - Review ATS results in `ATS Results` screen
+   - Upload a resume PDF
+   - Enter a target role (job description is optional)
+   - Run analysis and review results
 
 Run iOS unit tests:
 
@@ -58,32 +40,19 @@ Run iOS unit tests:
 xcodebuild test -project CVBoosta.xcodeproj -scheme CVBoostaApp -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
-## 5) Smoke test flow
+## 4) Smoke test flow
 
-- Production path:
-  - Backend running
-  - Upload valid resume PDF
-  - Confirm result shows real score and findings
-- Demo fallback path:
-  - Stop backend
-  - Upload PDF again
-  - Confirm result shows `DEMO` badge and mock analysis
-- Free gate:
-  - Scan once as free user
-  - Second scan same day should show limit reached
-- Premium placeholder:
-  - Open paywall and tap `Start Free Trial`
-  - Confirm unlimited scans
+- Login/register
+- Run one scan + confirm result renders
+- Open Tailoring and confirm side-by-side original vs optimized on iPad
+- Verify `/billing/status` reflects the website subscription state for the same user
 
-## 6) Known limitations (current slice)
+## 5) Known limitations (current slice)
 
-- RevenueCat is placeholder logic only (no SDK wiring yet).
-- App icon set is placeholder and must be replaced before release.
-- Local ATS HTTP exceptions are present for localhost development.
-- PDF extraction quality depends on source PDF text layer.
-- iOS unit tests are added but not executed in this environment.
+- Payments and plan management live on the website (Stripe).
+- APNs device-token sync requires a backend endpoint (disabled by default in iOS unless `APNS_REGISTER_PATH` is configured).
 
-## 7) If Xcode Preview does not open
+## 6) If Xcode Preview does not open
 
 1. Ensure full Xcode is selected (not only Command Line Tools):
 

@@ -3,7 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>API_BASE_URL</key>
-	<string>http://127.0.0.1:8000</string>
+	<string>https://cvboosta-backend-615826584976.europe-west3.run.app</string>
+	<key>APP_ENV</key>
+	<string>production</string>
 	<key>APP_BUNDLE_ID_PLACEHOLDER</key>
 	<string>com.cvboosta.app</string>
 	<key>CFBundleDevelopmentRegion</key>
@@ -24,8 +26,6 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>DEMO_FALLBACK_ENABLED</key>
-	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
@@ -48,6 +48,17 @@
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Face ID protects sensitive career data and exported documents.</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

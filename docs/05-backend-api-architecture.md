@@ -1,57 +1,42 @@
 # 05. ATS Backend + API Architecture
 
-## Stack
+## Scope
 
-- FastAPI
-- PostgreSQL
-- SQLAlchemy 2.0
-- Google Gemini API
-- PDF parser (`pypdf`)
+The production backend is hosted separately (Google Cloud Run) and is shared by both the website and the iOS app.
 
-## Service Boundaries
+The canonical API surface is documented via OpenAPI on the production backend:
 
-- `ats_engine.py`: deterministic scoring and finding generation
-- `keyword_intelligence.py`: role keyword/expectation retrieval
-- `gemini_service.py`: Gemini calls, retries, rate limit, fallback models
-- `ai_orchestrator.py`: centralized AI feature orchestration
-- `ai_response_parser.py`: strict JSON extraction for model outputs
-- `token_usage_tracker.py`: token usage accounting
-- `pdf_parser.py`: resume text extraction
-
-## Scoring Model (MVP)
-
-Final ATS score combines:
-
-- Keyword coverage: 40%
-- Measurable impact ratio: 25%
-- Readability: 15%
-- Action-verb strength: 10%
-- Recruiter signal composite: 10%
+- `GET /openapi.json`
+- `GET /docs`
 
 ## API Endpoints
 
-- `POST /v1/resume/scan`
-  - input: resume text + target role
-  - output: ATS score, findings, rewrite suggestions
-- `POST /v1/resume/scan-file`
-  - input: multipart PDF + target role
-  - output: ATS score, issues, keyword gaps, priority fixes
-- `POST /v1/resume/rewrite`
-  - input: bullet list + role
-  - output: rewritten bullets
-- `GET /v1/resume/ai-usage`
-  - output: in-memory Gemini token usage totals
-- `POST /v1/applications`
-  - input: application record
-  - output: persisted entity
-- `GET /v1/applications/{user_id}`
-  - output: user’s application list
-- `GET /v1/analytics/summary/{user_id}`
-  - output: applications total, 7-day velocity, interview rate, conversion rate
+Public:
+
+- `GET /health`
+- `POST /analyze/upload` (parse uploaded CV PDF)
+- `POST /analyze/cv` (analyze CV text)
+- `POST /analyze/job` (analyze job text)
+- `POST /analyze/keywords` (extract job keywords)
+- `POST /analyze/match` (CV↔job keyword match)
+- `GET /demo/optimize` (demo payload)
+
+Authenticated (Bearer token):
+
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/logout`
+- `POST /auth/forgot-password`
+- `GET /billing/status`
+- `POST /optimize`
+- `POST /optimize/cover-letter`
+- `GET /history`
+- `GET /history/{item_id}`
 
 ## Production Readiness Next
 
 - Async job queue for large document analysis
 - Request auth + rate limiting
 - Structured logging + observability dashboards
-- Offline keyword dataset sync from role intelligence CMS (600+ roles)
+- Stable response schemas for endpoints that currently return free-form JSON (e.g. billing status)

@@ -30,22 +30,31 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [BoostaColor.pageTop, BoostaColor.pageBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            AuthBackgroundView()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                    SectionHeader(
-                        title: "Log In",
-                        subtitle: "Use your CVBoosta website account credentials."
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: BoostaSpace.lg) {
+                    BrandMarkView(size: 76)
+                        .staggered(index: 0)
+
+                    AuthHeadlineBlock(
+                        eyebrow: "Welcome back",
+                        title: "Pick up where your best applications start.",
+                        subtitle: "Log in to your real CVBoosta account and continue with ATS analysis, optimization history, and your native workspace."
                     )
+                    .staggered(index: 1)
 
-                    GlassCard {
-                        VStack(spacing: BoostaSpace.sm) {
+                    GlassCard(padding: BoostaSpace.lg) {
+                        VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Log in")
+                                    .font(BoostaType.title)
+                                    .foregroundStyle(BoostaColor.primaryText)
+                                Text("Use your CVBoosta website account credentials.")
+                                    .font(BoostaType.caption)
+                                    .foregroundStyle(BoostaColor.secondaryText)
+                            }
+
                             TextInputField(
                                 title: "Email",
                                 placeholder: "you@example.com",
@@ -69,7 +78,7 @@ struct LoginView: View {
                             .onChange(of: password) { _, _ in touchedPassword = true }
 
                             PrimaryButton(
-                                title: authViewModel.isSubmitting ? "Logging In..." : "Log In",
+                                title: authViewModel.isSubmitting ? "Logging in..." : "Continue to CVBoosta",
                                 isLoading: authViewModel.isSubmitting,
                                 isDisabled: !canSubmit
                             ) {
@@ -79,26 +88,35 @@ struct LoginView: View {
                                     await authViewModel.login(email: email, password: password)
                                 }
                             }
+
+                            if let errorMessage = authViewModel.errorMessage {
+                                ErrorBanner(message: errorMessage)
+                            }
+
+                            HStack(spacing: 14) {
+                                NavigationLink("Forgot password?") {
+                                    ForgotPasswordView()
+                                }
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.accentSecondary)
+
+                                Spacer()
+
+                                NavigationLink("Create account") {
+                                    RegisterView()
+                                }
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.accentSecondary)
+                            }
                         }
                     }
-
-                    if let errorMessage = authViewModel.errorMessage {
-                        ErrorBanner(message: errorMessage)
-                    }
-
-                    NavigationLink("Forgot password?") {
-                        ForgotPasswordView()
-                    }
-                    .font(BoostaType.bodyStrong)
-                    .foregroundStyle(BoostaColor.accent)
-
-                    NavigationLink("Create account") {
-                        RegisterView()
-                    }
-                    .font(BoostaType.bodyStrong)
-                    .foregroundStyle(BoostaColor.accent)
+                    .staggered(index: 2)
                 }
-                .padding(BoostaSpace.md)
+                .padding(.horizontal, BoostaSpace.lg)
+                .padding(.top, BoostaSpace.xl)
+                .padding(.bottom, BoostaSpace.xxl)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
         }
         .navigationBarTitleDisplayMode(.inline)

@@ -1,8 +1,11 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 @main
 struct CVBoostaApp: App {
+    @UIApplicationDelegateAdaptor(CVBoostaAppDelegate.self) private var appDelegate
+
     @StateObject private var authViewModel = AuthViewModel()
     @StateObject private var appRouter = AppRouter()
 
@@ -51,6 +54,7 @@ struct CVBoostaApp: App {
             AppRootView()
                 .environmentObject(authViewModel)
                 .environmentObject(appRouter)
+                .preferredColorScheme(.dark)
                 .task {
                     await authViewModel.bootstrap()
                 }
@@ -66,14 +70,10 @@ struct AppRootView: View {
         switch authViewModel.state {
         case .loading:
             ZStack {
-                LinearGradient(
-                    colors: [BoostaColor.pageTop, BoostaColor.pageBottom],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                AuthBackgroundView()
 
                 ProgressView("Loading account...")
+                    .tint(BoostaColor.accentSecondary)
             }
         case .loggedOut:
             WelcomeView()
@@ -85,8 +85,17 @@ struct AppRootView: View {
 
 struct RootTabView: View {
     @EnvironmentObject private var appRouter: AppRouter
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
+        if UIDevice.current.userInterfaceIdiom == .pad, horizontalSizeClass == .regular {
+            iPadWorkspaceView()
+        } else {
+            phoneTabView
+        }
+    }
+
+    private var phoneTabView: some View {
         TabView(selection: $appRouter.selectedTab) {
             HomeView()
                 .tabItem {

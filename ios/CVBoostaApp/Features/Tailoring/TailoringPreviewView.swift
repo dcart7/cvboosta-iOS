@@ -17,37 +17,11 @@ struct TailoringPreviewView: View {
     private var savedSuggestions: [SavedTailoringSuggestion]
 
     @State private var toastMessage: String?
-    @State private var isOpeningStudio: Bool = false
     @State private var errorMessage: String?
-
-    private let authenticatedClient = AuthenticatedAPIClient.shared
 
     private var latestPayload: LatestScanPayload? {
         guard let data = latestReports.first?.payloadJSON else { return nil }
         return try? JSONDecoder().decode(LatestScanPayload.self, from: data)
-    }
-
-    private var topKeywords: [String] {
-        guard let payload = latestPayload else { return [] }
-        let keywords = payload.response.keywordGaps
-        let limit = subscriptionService.isPremium ? 12 : 6
-        return Array(keywords.prefix(limit))
-    }
-
-    private var bulletPairs: [(original: String, improved: String)] {
-        guard let payload = latestPayload else { return [] }
-        return Array(zip(payload.response.weakBulletExamples, payload.response.rewriteSuggestions))
-    }
-
-    private var quickImprovements: [String] {
-        guard let payload = latestPayload else { return [] }
-        let fixes = payload.response.priorityFixes
-        let limit = subscriptionService.isPremium ? 6 : 3
-        return Array(fixes.prefix(limit))
-    }
-
-    private var topRisk: ATSFinding? {
-        latestPayload?.response.findings.sorted(by: { $0.severity > $1.severity }).first
     }
 
     var body: some View {
@@ -65,12 +39,10 @@ struct TailoringPreviewView: View {
                         headerCard
 
                         if let payload = latestPayload {
-                            atsMatchPreviewCard(payload)
-                            topMissingKeywordsCard(payload)
-                            weakestSectionCard(payload)
-                            atsRiskCard(payload)
-                            quickImprovementsCard(payload)
-                            optimizedBulletsCard(payload)
+                            matchCard(payload)
+                            missingSkillsCard(payload)
+                            recommendationsCard(payload)
+                            optimizedPreviewCard(payload)
                         } else {
                             emptyStateCard
                         }
@@ -81,6 +53,13 @@ struct TailoringPreviewView: View {
                 }
             }
             .navigationTitle("Tailoring")
+            .overlay(alignment: .top) {
+                if let errorMessage {
+                    ErrorBanner(message: errorMessage)
+                        .padding(.horizontal, BoostaSpace.md)
+                        .padding(.top, BoostaSpace.sm)
+                }
+            }
         }
         .overlay(alignment: .top) {
             if let toastMessage {
@@ -104,7 +83,7 @@ struct TailoringPreviewView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
                     title: "Tailoring Preview",
-                    subtitle: "Quick, mobile-first improvements. Continue deep optimization on web."
+                    subtitle: "Quick improvements. Continue deep optimization on web."
                 )
 
                 HStack(alignment: .top, spacing: BoostaSpace.sm) {
@@ -112,6 +91,7 @@ struct TailoringPreviewView: View {
                         Text("Saved suggestions: \(savedSuggestions.count)")
                             .font(BoostaType.caption)
                             .foregroundStyle(BoostaColor.secondaryText)
+
                         Text(subscriptionService.isPremium ? "Premium" : "Free")
                             .font(BoostaType.bodyStrong)
                             .foregroundStyle(subscriptionService.isPremium ? BoostaColor.success : BoostaColor.secondaryText)
@@ -119,45 +99,44 @@ struct TailoringPreviewView: View {
 
                     Spacer()
 
-                    SecondaryButton(title: "Re-run quick scan") {
-                        HapticsService.impact(.light)
-                        appRouter.open(.scanner)
+                    Button {
+                        openURL(fallbackStudioURL())
+                    } label: {
+                        Label("Studio", systemImage: "safari")
+                            .font(BoostaType.bodyStrong)
+                            .foregroundStyle(BoostaColor.accent)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
-    private func atsMatchPreviewCard(_ payload: LatestScanPayload) -> some View {
+    private func matchCard(_ payload: LatestScanPayload) -> some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
-                    title: "ATS Match Preview",
-                    subtitle: "Based on your latest scan"
+                    title: "Latest optimization",
+                    subtitle: payload.updatedAt.formatted(date: .abbreviated, time: .shortened)
                 )
 
                 HStack(spacing: BoostaSpace.md) {
                     ScoreRing(score: payload.response.atsScore)
-                        .frame(width: 108, height: 108)
+                        .frame(width: 94, height: 94)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(payload.resumeName)
                             .font(BoostaType.bodyStrong)
                         Text(payload.targetRole)
                             .font(BoostaType.caption)
                             .foregroundStyle(BoostaColor.secondaryText)
-                        Text(payload.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.secondaryText)
+
+                        if let after = payload.response.matchAfter, after != payload.response.atsScore {
+                            Text("After optimization: \(after)/100")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(after > payload.response.atsScore ? BoostaColor.success : BoostaColor.secondaryText)
+                        }
                     }
-                }
-
-                Divider()
-
-                VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                    metricRow(title: "Keyword coverage", value: payload.response.keywordCoverage)
-                    metricRow(title: "Measurable impact", value: payload.response.measurableImpactRatio)
-                    metricRow(title: "Recruiter signal", value: payload.response.recruiterSignalScore)
                 }
 
                 if payload.isDemo {
@@ -169,105 +148,42 @@ struct TailoringPreviewView: View {
         }
     }
 
-    private func topMissingKeywordsCard(_ payload: LatestScanPayload) -> some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Top Missing Keywords")
+    private func missingSkillsCard(_ payload: LatestScanPayload) -> some View {
+        let limit = subscriptionService.isPremium ? 14 : 8
 
-                if payload.response.keywordGaps.isEmpty {
-                    Text("No major keyword gaps detected.")
+        return GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Missing skills / keywords")
+
+                if payload.response.missingSkills.isEmpty {
+                    Text("No missing skills detected.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], alignment: .leading, spacing: 8) {
-                        ForEach(topKeywords, id: \.self) { keyword in
+                        ForEach(Array(payload.response.missingSkills.prefix(limit)), id: \.self) { keyword in
                             KeywordChip(text: keyword, status: .missing)
                         }
                     }
-
-                    if !subscriptionService.isPremium && payload.response.keywordGaps.count > topKeywords.count {
-                        Text("Upgrade to see the full keyword map.")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.warning)
-                    }
                 }
             }
         }
     }
 
-    private func weakestSectionCard(_ payload: LatestScanPayload) -> some View {
-        let metrics: [(String, Double, String)] = [
-            ("Keywords", payload.response.keywordCoverage, "Add missing role terms to summary + top experience bullets."),
-            ("Impact", payload.response.measurableImpactRatio, "Add numbers, scope, and outcomes to your strongest bullets."),
-            ("Readability", payload.response.readabilityScore, "Shorten sentences and make bullets more scannable."),
-            ("Role Match", payload.response.recruiterSignalScore, "Mirror the job’s core responsibilities and tools."),
-        ]
-
-        let weakest = metrics.min(by: { $0.1 < $1.1 })
+    private func recommendationsCard(_ payload: LatestScanPayload) -> some View {
+        let limit = subscriptionService.isPremium ? 6 : 3
+        let items = Array(payload.response.recommendations.prefix(limit))
 
         return GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Weakest Resume Section")
+                SectionHeader(title: "Recommendations")
 
-                if let weakest {
-                    HStack {
-                        Text(weakest.0)
-                            .font(BoostaType.bodyStrong)
-                        Spacer()
-                        Text("\(Int(weakest.1 * 100))")
-                            .font(BoostaType.bodyStrong)
-                            .foregroundStyle(BoostaColor.warning)
-                    }
-
-                    Text(weakest.2)
+                if items.isEmpty {
+                    Text("No recommendations returned for this optimization.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    Text("Run a scan to identify your weakest area.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                }
-            }
-        }
-    }
-
-    private func atsRiskCard(_ payload: LatestScanPayload) -> some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "ATS Risk Detected")
-
-                if let risk = topRisk {
-                    HStack(alignment: .top, spacing: BoostaSpace.xs) {
-                        Image(systemName: "exclamationmark.shield.fill")
-                            .foregroundStyle(BoostaColor.warning)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(risk.message)
-                                .font(BoostaType.bodyStrong)
-                            Text(risk.suggestion)
-                                .font(BoostaType.body)
-                                .foregroundStyle(BoostaColor.secondaryText)
-                        }
-                    }
-                } else {
-                    Text("No high-severity ATS risks flagged in this scan.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                }
-            }
-        }
-    }
-
-    private func quickImprovementsCard(_ payload: LatestScanPayload) -> some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Quick Improvements")
-
-                if quickImprovements.isEmpty {
-                    Text("No quick wins found. Try scanning with a job description for higher precision.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                } else {
-                    ForEach(Array(quickImprovements.enumerated()), id: \.offset) { idx, item in
+                    ForEach(Array(items.enumerated()), id: \.offset) { idx, item in
                         HStack(alignment: .top, spacing: BoostaSpace.xs) {
                             Text("\(idx + 1).")
                                 .font(BoostaType.bodyStrong)
@@ -282,71 +198,32 @@ struct TailoringPreviewView: View {
         }
     }
 
-    private func optimizedBulletsCard(_ payload: LatestScanPayload) -> some View {
-        let limit = subscriptionService.isPremium ? 4 : 2
-        let pairs = Array(bulletPairs.prefix(limit))
-
-        return GlassCard {
+    private func optimizedPreviewCard(_ payload: LatestScanPayload) -> some View {
+        GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(
-                    title: "Optimized Bullet Previews",
-                    subtitle: "One-tap copy or save for later"
-                )
+                SectionHeader(title: "Optimized resume (preview)")
 
-                if pairs.isEmpty {
-                    Text("Scan a resume to get rewrite previews.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                } else {
-                    ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Weak")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.secondaryText)
-                            Text("\"\(pair.original)\"")
-                                .font(BoostaType.body)
+                Text(payload.response.optimizedCV)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                    .textSelection(.enabled)
+                    .lineLimit(16)
 
-                            Text("Optimized")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.secondaryText)
-
-                            HStack(alignment: .top, spacing: BoostaSpace.sm) {
-                                Text("\"\(pair.improved)\"")
-                                    .font(BoostaType.bodyStrong)
-
-                                Spacer(minLength: 0)
-
-                                Button {
-                                    copyToClipboard(pair.improved)
-                                } label: {
-                                    Image(systemName: "doc.on.doc")
-                                        .foregroundStyle(BoostaColor.accent)
-                                }
-                                .accessibilityLabel("Copy optimized bullet")
-
-                                Button {
-                                    saveSuggestion(text: pair.improved, payload: payload)
-                                } label: {
-                                    Image(systemName: "bookmark")
-                                        .foregroundStyle(BoostaColor.secondaryText)
-                                }
-                                .accessibilityLabel("Save suggestion")
-                            }
-
-                            Divider()
-                                .opacity(0.35)
-                        }
+                HStack(spacing: BoostaSpace.sm) {
+                    SecondaryButton(title: "Copy") {
+                        copyToClipboard(payload.response.optimizedCV)
                     }
 
-                    if !subscriptionService.isPremium && bulletPairs.count > pairs.count {
-                        Text("Upgrade to unlock more rewrite previews.")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.warning)
+                    SecondaryButton(title: "Save") {
+                        saveSuggestion(text: payload.response.optimizedCV, payload: payload)
                     }
                 }
 
-                if let errorMessage {
-                    ErrorBanner(message: errorMessage)
+                if !payload.response.addedKeywords.isEmpty {
+                    let limit = subscriptionService.isPremium ? 10 : 5
+                    Text("Added keywords: \(Array(payload.response.addedKeywords.prefix(limit)).joined(separator: ", "))")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
                 }
             }
         }
@@ -354,15 +231,12 @@ struct TailoringPreviewView: View {
 
     private var emptyStateCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(
-                    title: "No scan yet",
-                    subtitle: "Run a quick ATS scan to unlock tailoring previews."
-                )
-
-                PrimaryButton(title: "Go to Scanner") {
-                    appRouter.open(.scanner)
-                }
+            EmptyStateView(
+                title: "No optimization yet",
+                message: "Run one scan to populate Tailoring with an optimized ATS-friendly version.",
+                actionTitle: "Go to Scanner"
+            ) {
+                appRouter.open(.scanner)
             }
         }
     }
@@ -371,38 +245,18 @@ struct TailoringPreviewView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
-                    title: "Continue Deep Optimization",
-                    subtitle: "Open the full CVBoosta Studio workspace on web."
+                    title: "Continue on CVBoosta Studio",
+                    subtitle: "Deep resume editing, exports, and advanced AI are on web."
                 )
 
-                PrimaryButton(
-                    title: isOpeningStudio ? "Opening..." : "Continue in CVBoosta Studio",
-                    isLoading: isOpeningStudio,
-                    isDisabled: isOpeningStudio
-                ) {
-                    Task { await openStudio() }
+                PrimaryButton(title: "Open Studio") {
+                    openURL(fallbackStudioURL())
                 }
 
-                Text("Mobile stays lightweight by design: previews + quick wins here, power tools on web.")
+                Text("Tip: Use Tailoring on iPad for side-by-side resume comparison.")
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
             }
-        }
-    }
-
-    private func metricRow(title: String, value: Double) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title)
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
-                Spacer()
-                Text("\(Int(value * 100))%")
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
-            }
-            ProgressView(value: min(max(value, 0), 1))
-                .tint(BoostaColor.accent)
         }
     }
 
@@ -429,6 +283,7 @@ struct TailoringPreviewView: View {
 
     private func saveSuggestion(text: String, payload: LatestScanPayload) {
         errorMessage = nil
+
         modelContext.insert(
             SavedTailoringSuggestion(
                 resumeName: payload.resumeName,
@@ -447,15 +302,6 @@ struct TailoringPreviewView: View {
         }
     }
 
-    private struct WebContinueRequest: Encodable {
-        let intent: String
-        let context: String?
-    }
-
-    private struct WebContinueResponse: Decodable {
-        let url: URL
-    }
-
     private func fallbackStudioURL() -> URL {
         var components = URLComponents(url: AppEnvironment.webBaseURL, resolvingAgainstBaseURL: false)
         var items: [URLQueryItem] = [
@@ -469,22 +315,6 @@ struct TailoringPreviewView: View {
 
         components?.queryItems = items
         return components?.url ?? AppEnvironment.webBaseURL
-    }
-
-    private func openStudio() async {
-        isOpeningStudio = true
-        defer { isOpeningStudio = false }
-
-        do {
-            // Optional backend support: returns a short-lived URL that sets a web session and deep-links.
-            let response: WebContinueResponse = try await authenticatedClient.postJSON(
-                path: "/auth/web-continue",
-                body: WebContinueRequest(intent: "tailoring", context: "preview")
-            )
-            openURL(response.url)
-        } catch {
-            openURL(fallbackStudioURL())
-        }
     }
 }
 

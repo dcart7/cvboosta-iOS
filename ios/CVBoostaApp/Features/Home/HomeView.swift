@@ -1,8 +1,12 @@
 import SwiftUI
+import SwiftData
 
 struct HomeView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @EnvironmentObject private var appRouter: AppRouter
+
+    @Query(sort: \ApplicationRecord.appliedAt, order: .reverse)
+    private var trackedApplications: [ApplicationRecord]
 
     private var firstName: String {
         if let raw = authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
@@ -21,11 +25,11 @@ struct HomeView: View {
     }
 
     private var applicationsCount: Int {
-        authViewModel.me?.applications.count ?? 0
+        trackedApplications.count
     }
 
     private var interviewsCount: Int {
-        authViewModel.me?.applications.filter { $0.status.lowercased() == "interview" }.count ?? 0
+        trackedApplications.filter { $0.status == .interview }.count
     }
 
     private var avgScore: Int {

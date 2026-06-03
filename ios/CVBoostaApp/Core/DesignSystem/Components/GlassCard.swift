@@ -18,7 +18,11 @@ struct GlassCard<Content: View>: View {
                     .stroke(BoostaColor.glassStroke, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.lg, style: .continuous))
-            .shadow(color: BoostaColor.glassShadow, radius: 14, x: 0, y: 8)
+            .background(
+                RoundedRectangle(cornerRadius: BoostaRadius.lg, style: .continuous)
+                    .fill(BoostaColor.surface)
+            )
+            .shadow(color: BoostaColor.glassShadow, radius: 22, x: 0, y: 16)
     }
 }
 #if DEBUG

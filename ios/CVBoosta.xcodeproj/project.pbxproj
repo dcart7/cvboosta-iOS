@@ -8,23 +8,24 @@
 
 /* Begin PBXBuildFile section */
 		0092628BF5F7407048583811 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD0066FA7DE85125E77CF5F /* AuthService.swift */; };
-		030921D087EC42CB35869149 /* TailoringAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D131170F679704336EF71D5 /* TailoringAPIService.swift */; };
 		04EBC54D7100FB2509128AC1 /* CVBoostaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AAC93232D43362218F1D58CA /* CVBoostaWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		061CF42B9A0A3E40173204F2 /* HomeWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF43F0E3501A34C986F0A26A /* HomeWorkspaceView_iPad.swift */; };
 		070B1EA94D6533906A97638F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9F8B93F8812D5DC150A93 /* SettingsView.swift */; };
 		0C9D1C9F70BD8C4E5315D318 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */; };
 		13D40C37D6F48C671FF2723C /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3225480D808117E869EEF922 /* AppEnvironment.swift */; };
-		1E195669E43C6D22C4FD651B /* DemoATSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7956C44ABE5A602060118F14 /* DemoATSService.swift */; };
 		20CCFAA2F6F9D1B8F82780C8 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C90AC1E9BA7AAA44DA936C /* LiveActivityManager.swift */; };
 		248A547FF22E32ECEE9BEA6B /* LatestScanReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CE450774353F59B8A313EC /* LatestScanReport.swift */; };
-		258F9D8005B1905C35FCDBBC /* GeminiClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D4F4325ECE0C2B15359ED1 /* GeminiClient.swift */; };
 		30E83BA558E33656C4E983B3 /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF920A666F9E3794A987511 /* GlassCard.swift */; };
+		3F0C480D263F109356543F35 /* ATSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B2CD93E8844AAB384EB734 /* ATSService.swift */; };
 		41DCF74B16E1E911A35CDA6E /* ResumeAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D77990A523F804A6CA8E67 /* ResumeAPIService.swift */; };
 		4876D4EDF81C5F10284E77B8 /* ScanLimitServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DCE2B0E91F4C914AE173C1 /* ScanLimitServiceTests.swift */; };
 		52330AB38A5D1268BB375BD0 /* SiriSuggestionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF9335E5A9024CA3551C605D /* SiriSuggestionService.swift */; };
+		551BA1D43CAEF0F562A1FC3A /* ATSScannerWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18871EDEE83B3D1FBCF14E6C /* ATSScannerWorkspaceView_iPad.swift */; };
 		570D6D6F9D69430B0F1EB0F7 /* SpacingTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C7E4C512D498E4C73AB248E /* SpacingTokens.swift */; };
 		57AB37BAB32F57C14ECA5773 /* TailoringPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDCD7201BEBA420B7D952D38 /* TailoringPreviewView.swift */; };
 		5B7BF584111FCB4ACAB82CB0 /* CVBoostaWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E4B2E4DC9389C29E5CCC947 /* CVBoostaWidgets.swift */; };
 		60C3C6665F7EF5BCA27CE750 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31F4CD620C3CB011E8BA72F7 /* RegisterView.swift */; };
+		62228BC180A66ED6994EA95E /* iPadWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BB165F249CD51F64728635 /* iPadWorkspaceView.swift */; };
 		6772B27B7FE37C62E973C811 /* CVBoostaActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3AEFB9DD06E89CFA436B864 /* CVBoostaActivityAttributes.swift */; };
 		69A0F095B017171229EB43CF /* StringValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 823A00EBF3019571C8987250 /* StringValidation.swift */; };
 		6AC407A631AEEABC16E48A0F /* HapticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D96A48F58F41FE1D68D9D05 /* HapticsService.swift */; };
@@ -33,10 +34,9 @@
 		785A1DF6C39B9A8F2064F8F1 /* MotionCurves.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30DAF36D4C63A14331D4A84A /* MotionCurves.swift */; };
 		7B6B343CDC1573D0277A6ECD /* MetricPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 856917246B5DA81EB8281D6B /* MetricPill.swift */; };
 		7FFA61A01BC4DE357D15CB4F /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D331903CBC87E0E4C13F5CB4 /* ForgotPasswordView.swift */; };
-		827BA221D12DFDA050F67AE9 /* ApplicationAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33DDD7F3081CE8550D611D0 /* ApplicationAPIService.swift */; };
-		86160EEE015C8BA4A406EF4E /* AIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE559EA78BC004DDCC522D73 /* AIService.swift */; };
 		87B51017F8308A9C822616AF /* ScannerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C38EE427CC40866369576E6 /* ScannerViewModel.swift */; };
 		8BD44724D7CA963528D58445 /* ATSResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4EAAE2FB86DDDF0F3433812 /* ATSResultsView.swift */; };
+		90885C66013D29315F43AABB /* ApplicationTrackerWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD204FCF77D50300C7EF080 /* ApplicationTrackerWorkspaceView_iPad.swift */; };
 		93AFB232A76015F3F849088F /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB155C707CFE3972D2BF9EB /* APIClient.swift */; };
 		93AFF08F1B1D4D16487403FA /* CloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 953953FABDC008F39700FB1C /* CloudSyncService.swift */; };
 		94BEA9C9FC785E7D4512064B /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 634616FF81D1E4EEAF7915B1 /* PaywallView.swift */; };
@@ -47,8 +47,11 @@
 		A152D8430B091E3C91537CE2 /* ColorTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BBD2033B98C9305C023DCCD /* ColorTokens.swift */; };
 		A63E460B480AB97B945CA243 /* GlassMaterials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4BACFB7CEBCC84E10D8E01 /* GlassMaterials.swift */; };
 		AB3DAD2C627FED08BEB50360 /* HandoffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEE5A1A839FD6DF6A38FCED8 /* HandoffService.swift */; };
+		B18C4423D5B8D216864B8B8B /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90143F1854555E4E6C9152F /* PushNotificationService.swift */; };
+		B281F85CA144CB2A37ABB7D5 /* CVBoostaAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C576D49EE7F3E3CE2C31EA27 /* CVBoostaAppDelegate.swift */; };
 		B60657164012C785BBCCA612 /* ATSResponseParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF76411B4D790EB18DB72BE /* ATSResponseParsingTests.swift */; };
 		B8081D06BF9D8CD22DF01C5E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA31832DAB32F2F0428FDA6 /* OnboardingView.swift */; };
+		B9095B6DA3D10E22D753047D /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2A9218B2C8FB4577724DE3 /* JSONValue.swift */; };
 		C6724C80800F64DB795246DF /* TypographyTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F01EA905668C7DAA562A63 /* TypographyTokens.swift */; };
 		C8FC740FAFCBBFEEDDA0C3BC /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6FEAA043E841C4669C6C7E /* WelcomeView.swift */; };
 		C9D4D2E2018B77DE5807CCF2 /* CVBoostaLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1461E22841145EB23F015DCE /* CVBoostaLiveActivity.swift */; };
@@ -56,18 +59,23 @@
 		CCB6241CFBD0F5BEB01B2AA2 /* SpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8996014C11088A9C86FE55ED /* SpotlightIndexer.swift */; };
 		CCC26FAB0F5B0ECFD4256308 /* AuthenticatedAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30C72D79AF7BB19AC4D065B /* AuthenticatedAPIClient.swift */; };
 		CD74E13B19CD9BDEF8D38D9E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC8B4C93C4C81B9941D76D27 /* HomeView.swift */; };
+		CFFC982EA13AC3FB9D41C88F /* UserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEE2C3751FEABF09BADBC00 /* UserService.swift */; };
 		D008928BACC9FDFCDDFC8358 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05E24A22597CE21DD408948 /* AuthViewModel.swift */; };
 		D0323505236972FF4A1E9685 /* ResumeProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 678708556F0848D2FE043D46 /* ResumeProfile.swift */; };
 		D2290B91ACA3450054A644A7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 54BC9517B088B54807EB0DB3 /* Assets.xcassets */; };
 		D39FC53469ED995361DE5BFD /* ApplicationTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EEAD106AFAA3B5F5F3B53CC /* ApplicationTrackerView.swift */; };
 		D411FE8E2BEB1DA0D4FFE9B4 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E7201C4EE4AEA49B0E2CD3 /* LoginView.swift */; };
+		DD7638D5E516B0A68419B367 /* SettingsWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1820FD891E24369ACC67E5A7 /* SettingsWorkspaceView_iPad.swift */; };
 		DEE2144B0934F4C27DE6BB8F /* SavedTailoringSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C461E1368094D7C87A817584 /* SavedTailoringSuggestion.swift */; };
 		E66156CD9DFD4716286CFC8C /* CVBoostaActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3AEFB9DD06E89CFA436B864 /* CVBoostaActivityAttributes.swift */; };
+		EE59F786DABB29BB6A50C301 /* TailoringWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB3081B65BD244BECD75FA9 /* TailoringWorkspaceView_iPad.swift */; };
 		EEFA7627DCF9D485B2DDF78C /* ScanLimitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A23540F758E3EDCD837B0B25 /* ScanLimitService.swift */; };
 		EFADC7CD05371A29DCD69497 /* ResumeScanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3449DC2B515C5267FB98594 /* ResumeScanModels.swift */; };
+		F0B505210B255C42915E4782 /* AuthExperienceComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB0485E439E8BE8A7857AD1 /* AuthExperienceComponents.swift */; };
 		F0E065A7DB394ADE2BA765BE /* CVBoostaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC241D9E737EE88C410CEEF0 /* CVBoostaApp.swift */; };
 		F17A72E0157B1775B30B7B7B /* ApplicationRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EEF7C2CB15528A282B8E03 /* ApplicationRecord.swift */; };
 		F72C26EACFDA572428720F4E /* ATSScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27F1E6788856182BDFC2EB9 /* ATSScannerView.swift */; };
+		FA64AC120EDF6D8B05F7F860 /* ResumeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC92A83BB7F7127FA9CDA40 /* ResumeService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -110,7 +118,9 @@
 		12360C6B9C4C8ACCA46372B1 /* ShareService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareService.swift; sourceTree = "<group>"; };
 		1461E22841145EB23F015DCE /* CVBoostaLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaLiveActivity.swift; sourceTree = "<group>"; };
 		14738B86F46E79C7FA758A2C /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
-		23D4F4325ECE0C2B15359ED1 /* GeminiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiClient.swift; sourceTree = "<group>"; };
+		1820FD891E24369ACC67E5A7 /* SettingsWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWorkspaceView_iPad.swift; sourceTree = "<group>"; };
+		18871EDEE83B3D1FBCF14E6C /* ATSScannerWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSScannerWorkspaceView_iPad.swift; sourceTree = "<group>"; };
+		1FB0485E439E8BE8A7857AD1 /* AuthExperienceComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthExperienceComponents.swift; sourceTree = "<group>"; };
 		2BBD2033B98C9305C023DCCD /* ColorTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTokens.swift; sourceTree = "<group>"; };
 		30DAF36D4C63A14331D4A84A /* MotionCurves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionCurves.swift; sourceTree = "<group>"; };
 		31F4CD620C3CB011E8BA72F7 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
@@ -126,29 +136,29 @@
 		678708556F0848D2FE043D46 /* ResumeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeProfile.swift; sourceTree = "<group>"; };
 		67C90AC1E9BA7AAA44DA936C /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		6C38EE427CC40866369576E6 /* ScannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerViewModel.swift; sourceTree = "<group>"; };
-		7956C44ABE5A602060118F14 /* DemoATSService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoATSService.swift; sourceTree = "<group>"; };
 		7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
 		7C6FEAA043E841C4669C6C7E /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		7D96A48F58F41FE1D68D9D05 /* HapticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticsService.swift; sourceTree = "<group>"; };
-		80C953578667D3EAF2E686D5 /* CVBoostaApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CVBoostaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		80C953578667D3EAF2E686D5 /* CVBoostaApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CVBoostaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		81CE450774353F59B8A313EC /* LatestScanReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatestScanReport.swift; sourceTree = "<group>"; };
 		823A00EBF3019571C8987250 /* StringValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringValidation.swift; sourceTree = "<group>"; };
 		83162248824F6AA07FC508C4 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
-		84F84DECE7D45DDC893D1B98 /* CVBoostaAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CVBoostaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		84F84DECE7D45DDC893D1B98 /* CVBoostaAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CVBoostaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		856917246B5DA81EB8281D6B /* MetricPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricPill.swift; sourceTree = "<group>"; };
 		8996014C11088A9C86FE55ED /* SpotlightIndexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndexer.swift; sourceTree = "<group>"; };
+		89B2CD93E8844AAB384EB734 /* ATSService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSService.swift; sourceTree = "<group>"; };
+		8CD204FCF77D50300C7EF080 /* ApplicationTrackerWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationTrackerWorkspaceView_iPad.swift; sourceTree = "<group>"; };
+		8DC92A83BB7F7127FA9CDA40 /* ResumeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeService.swift; sourceTree = "<group>"; };
 		953953FABDC008F39700FB1C /* CloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncService.swift; sourceTree = "<group>"; };
 		9B4B305144B079B4D9636A0A /* UIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIComponents.swift; sourceTree = "<group>"; };
-		9D131170F679704336EF71D5 /* TailoringAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailoringAPIService.swift; sourceTree = "<group>"; };
+		9BB3081B65BD244BECD75FA9 /* TailoringWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailoringWorkspaceView_iPad.swift; sourceTree = "<group>"; };
 		9E4B2E4DC9389C29E5CCC947 /* CVBoostaWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaWidgets.swift; sourceTree = "<group>"; };
 		A23540F758E3EDCD837B0B25 /* ScanLimitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanLimitService.swift; sourceTree = "<group>"; };
-		AAC93232D43362218F1D58CA /* CVBoostaWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CVBoostaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		AE559EA78BC004DDCC522D73 /* AIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIService.swift; sourceTree = "<group>"; };
+		AAC93232D43362218F1D58CA /* CVBoostaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CVBoostaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AEE5A1A839FD6DF6A38FCED8 /* HandoffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffService.swift; sourceTree = "<group>"; };
 		AF9335E5A9024CA3551C605D /* SiriSuggestionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriSuggestionService.swift; sourceTree = "<group>"; };
 		B05E24A22597CE21DD408948 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		B1E7201C4EE4AEA49B0E2CD3 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		B33DDD7F3081CE8550D611D0 /* ApplicationAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationAPIService.swift; sourceTree = "<group>"; };
 		B4EAAE2FB86DDDF0F3433812 /* ATSResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSResultsView.swift; sourceTree = "<group>"; };
 		B7DCE2B0E91F4C914AE173C1 /* ScanLimitServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanLimitServiceTests.swift; sourceTree = "<group>"; };
 		BCD0066FA7DE85125E77CF5F /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
@@ -156,14 +166,20 @@
 		C3449DC2B515C5267FB98594 /* ResumeScanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeScanModels.swift; sourceTree = "<group>"; };
 		C3AEFB9DD06E89CFA436B864 /* CVBoostaActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaActivityAttributes.swift; sourceTree = "<group>"; };
 		C461E1368094D7C87A817584 /* SavedTailoringSuggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedTailoringSuggestion.swift; sourceTree = "<group>"; };
+		C576D49EE7F3E3CE2C31EA27 /* CVBoostaAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaAppDelegate.swift; sourceTree = "<group>"; };
 		CCD474CCF739DCCFBE6AB208 /* ATSInsight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSInsight.swift; sourceTree = "<group>"; };
 		CEF920A666F9E3794A987511 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
+		CF43F0E3501A34C986F0A26A /* HomeWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWorkspaceView_iPad.swift; sourceTree = "<group>"; };
 		D331903CBC87E0E4C13F5CB4 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
 		D9E9F8B93F8812D5DC150A93 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		DEEE2C3751FEABF09BADBC00 /* UserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserService.swift; sourceTree = "<group>"; };
 		E3F7E812A5E5E62EF7F0A245 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		EC2A9218B2C8FB4577724DE3 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
 		EC8B4C93C4C81B9941D76D27 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		F1BB165F249CD51F64728635 /* iPadWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPadWorkspaceView.swift; sourceTree = "<group>"; };
 		F27F1E6788856182BDFC2EB9 /* ATSScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSScannerView.swift; sourceTree = "<group>"; };
 		F30C72D79AF7BB19AC4D065B /* AuthenticatedAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticatedAPIClient.swift; sourceTree = "<group>"; };
+		F90143F1854555E4E6C9152F /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
 		FC241D9E737EE88C410CEEF0 /* CVBoostaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaApp.swift; sourceTree = "<group>"; };
 		FDCD7201BEBA420B7D952D38 /* TailoringPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailoringPreviewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -172,6 +188,7 @@
 		1D664BF9018F13872A1AB487 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
+				1FB0485E439E8BE8A7857AD1 /* AuthExperienceComponents.swift */,
 				D331903CBC87E0E4C13F5CB4 /* ForgotPasswordView.swift */,
 				B1E7201C4EE4AEA49B0E2CD3 /* LoginView.swift */,
 				31F4CD620C3CB011E8BA72F7 /* RegisterView.swift */,
@@ -223,6 +240,8 @@
 			isa = PBXGroup;
 			children = (
 				FC241D9E737EE88C410CEEF0 /* CVBoostaApp.swift */,
+				C576D49EE7F3E3CE2C31EA27 /* CVBoostaAppDelegate.swift */,
+				F1BB165F249CD51F64728635 /* iPadWorkspaceView.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -242,6 +261,7 @@
 			children = (
 				B4EAAE2FB86DDDF0F3433812 /* ATSResultsView.swift */,
 				F27F1E6788856182BDFC2EB9 /* ATSScannerView.swift */,
+				18871EDEE83B3D1FBCF14E6C /* ATSScannerWorkspaceView_iPad.swift */,
 				6C38EE427CC40866369576E6 /* ScannerViewModel.swift */,
 				26C9219CDED0ED9F72271016 /* Models */,
 			);
@@ -266,6 +286,7 @@
 			children = (
 				634616FF81D1E4EEAF7915B1 /* PaywallView.swift */,
 				D9E9F8B93F8812D5DC150A93 /* SettingsView.swift */,
+				1820FD891E24369ACC67E5A7 /* SettingsWorkspaceView_iPad.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -303,6 +324,7 @@
 			isa = PBXGroup;
 			children = (
 				EC8B4C93C4C81B9941D76D27 /* HomeView.swift */,
+				CF43F0E3501A34C986F0A26A /* HomeWorkspaceView_iPad.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -310,27 +332,27 @@
 		8B21BD51F71FCB44CC145BD8 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				AE559EA78BC004DDCC522D73 /* AIService.swift */,
 				5CB155C707CFE3972D2BF9EB /* APIClient.swift */,
-				B33DDD7F3081CE8550D611D0 /* ApplicationAPIService.swift */,
+				89B2CD93E8844AAB384EB734 /* ATSService.swift */,
 				F30C72D79AF7BB19AC4D065B /* AuthenticatedAPIClient.swift */,
 				BCD0066FA7DE85125E77CF5F /* AuthService.swift */,
 				B05E24A22597CE21DD408948 /* AuthViewModel.swift */,
 				953953FABDC008F39700FB1C /* CloudSyncService.swift */,
-				7956C44ABE5A602060118F14 /* DemoATSService.swift */,
-				23D4F4325ECE0C2B15359ED1 /* GeminiClient.swift */,
 				AEE5A1A839FD6DF6A38FCED8 /* HandoffService.swift */,
 				7D96A48F58F41FE1D68D9D05 /* HapticsService.swift */,
+				EC2A9218B2C8FB4577724DE3 /* JSONValue.swift */,
 				83162248824F6AA07FC508C4 /* KeychainService.swift */,
 				67C90AC1E9BA7AAA44DA936C /* LiveActivityManager.swift */,
+				F90143F1854555E4E6C9152F /* PushNotificationService.swift */,
 				09D77990A523F804A6CA8E67 /* ResumeAPIService.swift */,
+				8DC92A83BB7F7127FA9CDA40 /* ResumeService.swift */,
 				A23540F758E3EDCD837B0B25 /* ScanLimitService.swift */,
 				12360C6B9C4C8ACCA46372B1 /* ShareService.swift */,
 				AF9335E5A9024CA3551C605D /* SiriSuggestionService.swift */,
 				8996014C11088A9C86FE55ED /* SpotlightIndexer.swift */,
 				823A00EBF3019571C8987250 /* StringValidation.swift */,
 				7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */,
-				9D131170F679704336EF71D5 /* TailoringAPIService.swift */,
+				DEEE2C3751FEABF09BADBC00 /* UserService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -390,6 +412,7 @@
 			isa = PBXGroup;
 			children = (
 				0EEAD106AFAA3B5F5F3B53CC /* ApplicationTrackerView.swift */,
+				8CD204FCF77D50300C7EF080 /* ApplicationTrackerWorkspaceView_iPad.swift */,
 			);
 			path = Tracker;
 			sourceTree = "<group>";
@@ -419,6 +442,7 @@
 			isa = PBXGroup;
 			children = (
 				FDCD7201BEBA420B7D952D38 /* TailoringPreviewView.swift */,
+				9BB3081B65BD244BECD75FA9 /* TailoringWorkspaceView_iPad.swift */,
 			);
 			path = Tailoring;
 			sourceTree = "<group>";
@@ -491,15 +515,12 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					0943C6844F25629726FD00F9 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					7B99514F0AD346F2B1029996 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					876849D1B625B7D4CE01AB06 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -541,33 +562,36 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				86160EEE015C8BA4A406EF4E /* AIService.swift in Sources */,
 				93AFB232A76015F3F849088F /* APIClient.swift in Sources */,
 				6BAB69BFCD9A74DDFD3E5C6B /* ATSInsight.swift in Sources */,
 				8BD44724D7CA963528D58445 /* ATSResultsView.swift in Sources */,
 				F72C26EACFDA572428720F4E /* ATSScannerView.swift in Sources */,
+				551BA1D43CAEF0F562A1FC3A /* ATSScannerWorkspaceView_iPad.swift in Sources */,
+				3F0C480D263F109356543F35 /* ATSService.swift in Sources */,
 				6FE6173FD52B58F2A4339130 /* AnalyticsView.swift in Sources */,
 				13D40C37D6F48C671FF2723C /* AppEnvironment.swift in Sources */,
 				9540FA4583EDA360686541E1 /* AppRouter.swift in Sources */,
-				827BA221D12DFDA050F67AE9 /* ApplicationAPIService.swift in Sources */,
 				F17A72E0157B1775B30B7B7B /* ApplicationRecord.swift in Sources */,
 				D39FC53469ED995361DE5BFD /* ApplicationTrackerView.swift in Sources */,
+				90885C66013D29315F43AABB /* ApplicationTrackerWorkspaceView_iPad.swift in Sources */,
+				F0B505210B255C42915E4782 /* AuthExperienceComponents.swift in Sources */,
 				0092628BF5F7407048583811 /* AuthService.swift in Sources */,
 				D008928BACC9FDFCDDFC8358 /* AuthViewModel.swift in Sources */,
 				CCC26FAB0F5B0ECFD4256308 /* AuthenticatedAPIClient.swift in Sources */,
 				E66156CD9DFD4716286CFC8C /* CVBoostaActivityAttributes.swift in Sources */,
 				F0E065A7DB394ADE2BA765BE /* CVBoostaApp.swift in Sources */,
+				B281F85CA144CB2A37ABB7D5 /* CVBoostaAppDelegate.swift in Sources */,
 				93AFF08F1B1D4D16487403FA /* CloudSyncService.swift in Sources */,
 				A152D8430B091E3C91537CE2 /* ColorTokens.swift in Sources */,
-				1E195669E43C6D22C4FD651B /* DemoATSService.swift in Sources */,
 				CC05949D60C7B5621E3F9DF7 /* EntranceAnimator.swift in Sources */,
 				7FFA61A01BC4DE357D15CB4F /* ForgotPasswordView.swift in Sources */,
-				258F9D8005B1905C35FCDBBC /* GeminiClient.swift in Sources */,
 				30E83BA558E33656C4E983B3 /* GlassCard.swift in Sources */,
 				A63E460B480AB97B945CA243 /* GlassMaterials.swift in Sources */,
 				AB3DAD2C627FED08BEB50360 /* HandoffService.swift in Sources */,
 				6AC407A631AEEABC16E48A0F /* HapticsService.swift in Sources */,
 				CD74E13B19CD9BDEF8D38D9E /* HomeView.swift in Sources */,
+				061CF42B9A0A3E40173204F2 /* HomeWorkspaceView_iPad.swift in Sources */,
+				B9095B6DA3D10E22D753047D /* JSONValue.swift in Sources */,
 				9E642E1C589A2FBCA2E9DA2C /* KeychainService.swift in Sources */,
 				248A547FF22E32ECEE9BEA6B /* LatestScanReport.swift in Sources */,
 				20CCFAA2F6F9D1B8F82780C8 /* LiveActivityManager.swift in Sources */,
@@ -576,25 +600,30 @@
 				785A1DF6C39B9A8F2064F8F1 /* MotionCurves.swift in Sources */,
 				B8081D06BF9D8CD22DF01C5E /* OnboardingView.swift in Sources */,
 				94BEA9C9FC785E7D4512064B /* PaywallView.swift in Sources */,
+				B18C4423D5B8D216864B8B8B /* PushNotificationService.swift in Sources */,
 				60C3C6665F7EF5BCA27CE750 /* RegisterView.swift in Sources */,
 				41DCF74B16E1E911A35CDA6E /* ResumeAPIService.swift in Sources */,
 				D0323505236972FF4A1E9685 /* ResumeProfile.swift in Sources */,
 				EFADC7CD05371A29DCD69497 /* ResumeScanModels.swift in Sources */,
+				FA64AC120EDF6D8B05F7F860 /* ResumeService.swift in Sources */,
 				DEE2144B0934F4C27DE6BB8F /* SavedTailoringSuggestion.swift in Sources */,
 				EEFA7627DCF9D485B2DDF78C /* ScanLimitService.swift in Sources */,
 				87B51017F8308A9C822616AF /* ScannerViewModel.swift in Sources */,
 				070B1EA94D6533906A97638F /* SettingsView.swift in Sources */,
+				DD7638D5E516B0A68419B367 /* SettingsWorkspaceView_iPad.swift in Sources */,
 				95C4DDF13DD080E97D91F1B2 /* ShareService.swift in Sources */,
 				52330AB38A5D1268BB375BD0 /* SiriSuggestionService.swift in Sources */,
 				570D6D6F9D69430B0F1EB0F7 /* SpacingTokens.swift in Sources */,
 				CCB6241CFBD0F5BEB01B2AA2 /* SpotlightIndexer.swift in Sources */,
 				69A0F095B017171229EB43CF /* StringValidation.swift in Sources */,
 				0C9D1C9F70BD8C4E5315D318 /* SubscriptionService.swift in Sources */,
-				030921D087EC42CB35869149 /* TailoringAPIService.swift in Sources */,
 				57AB37BAB32F57C14ECA5773 /* TailoringPreviewView.swift in Sources */,
+				EE59F786DABB29BB6A50C301 /* TailoringWorkspaceView_iPad.swift in Sources */,
 				C6724C80800F64DB795246DF /* TypographyTokens.swift in Sources */,
 				9BB7DBFC762E3F2A1E51A2B2 /* UIComponents.swift in Sources */,
+				CFFC982EA13AC3FB9D41C88F /* UserService.swift in Sources */,
 				C8FC740FAFCBBFEEDDA0C3BC /* WelcomeView.swift in Sources */,
+				62228BC180A66ED6994EA95E /* iPadWorkspaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -701,7 +730,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G5CT2RF98B;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -719,7 +748,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G5CT2RF98B;
 				INFOPLIST_FILE = CVBoostaWidgetExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -795,7 +824,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G5CT2RF98B;
 				INFOPLIST_FILE = CVBoostaApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -814,7 +843,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G5CT2RF98B;
 				INFOPLIST_FILE = CVBoostaApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -832,7 +861,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G5CT2RF98B;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -850,7 +879,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G5CT2RF98B;
 				INFOPLIST_FILE = CVBoostaWidgetExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

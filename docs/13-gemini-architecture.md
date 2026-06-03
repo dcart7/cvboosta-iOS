@@ -7,20 +7,15 @@ No OpenAI/Anthropic/Cohere/Mistral/local model dependencies are used.
 
 ## Backend AI stack
 
-- `app/services/gemini_service.py`
-  - Gemini API client
-  - retry logic
-  - fallback model routing inside Gemini ecosystem
-  - in-memory rate limiter
-  - timeout handling
-- `app/services/ai_orchestrator.py`
-  - central AI orchestration for scan enhancement and rewrites
-- `app/services/prompt_templates/`
-  - centralized prompt management
-- `app/services/ai_response_parser.py`
-  - strict JSON parsing and fallback extraction
-- `app/services/token_usage_tracker.py`
-  - per-model token usage tracking
+Backend implementation lives in the production backend repo (not in this iOS repo).
+
+Conceptually, the backend AI layer typically includes:
+
+- Gemini API client + retries/timeouts
+- Orchestration layer (scan, optimize, cover letter)
+- Prompt/template management
+- Strict response parsing
+- Usage/rate limiting and logging
 
 ## Models strategy
 
@@ -38,6 +33,5 @@ No OpenAI/Anthropic/Cohere/Mistral/local model dependencies are used.
 
 ## Failure handling
 
-- If Gemini is unavailable or fails, backend falls back to deterministic ATS analysis.
-- Rewrite endpoint degrades to safe deterministic rewrite hints.
-- iOS scanner stays stable and can use demo mode fallback if backend is unavailable.
+- iOS app surfaces backend errors (network/auth) and prompts the user to retry.
+- Backend should return structured errors (`{"detail": "..."}`) for client display.

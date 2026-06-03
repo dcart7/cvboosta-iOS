@@ -176,8 +176,11 @@ struct ATSScannerView: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.success)
                 } else {
-                    let remaining = authViewModel.me?.usageLimits.scansRemainingToday ?? 0
-                    Text("Free plan remaining today: \(remaining)")
+                    if let remaining = authViewModel.me?.usageLimits.scansRemainingToday {
+                        Text("Free plan remaining today: \(remaining)")
+                    } else {
+                        Text("Free plan remaining today: —")
+                    }
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
 

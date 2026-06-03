@@ -1,145 +1,98 @@
 import Foundation
 
+// MARK: - UI-facing snapshots (aggregated from production API)
+
 struct AuthUser: Codable, Hashable {
-    let id: UUID
-    let email: String?
+    let id: Int
+    let email: String
     let displayName: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id
         case email
-        case displayName = "display_name"
+        case displayName = "full_name"
         case createdAt = "created_at"
     }
 }
 
-struct AuthSubscription: Codable, Hashable {
+struct AuthSubscription: Hashable {
     let entitlement: String?
     let isActive: Bool
     let expiresAt: Date?
     let source: String?
-
-    enum CodingKeys: String, CodingKey {
-        case entitlement
-        case isActive = "is_active"
-        case expiresAt = "expires_at"
-        case source
-    }
 }
 
-struct AuthUsageLimits: Codable, Hashable {
+struct AuthUsageLimits: Hashable {
     let plan: String
     let scansDailyLimit: Int?
     let scansUsedToday: Int
     let scansRemainingToday: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case plan
-        case scansDailyLimit = "scans_daily_limit"
-        case scansUsedToday = "scans_used_today"
-        case scansRemainingToday = "scans_remaining_today"
-    }
 }
 
-struct SavedResumeSnapshot: Codable, Hashable, Identifiable {
-    let id: UUID
+struct SavedResumeSnapshot: Hashable, Identifiable {
+    let id: Int
     let fileName: String
     let createdAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case fileName = "file_name"
-        case createdAt = "created_at"
-    }
 }
 
-struct ScanHistorySnapshot: Codable, Hashable, Identifiable {
-    let id: UUID
-    let resumeID: UUID
+struct ScanHistorySnapshot: Hashable, Identifiable {
+    let id: Int
     let resumeFileName: String
     let targetRole: String
     let atsScore: Int
     let createdAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case resumeID = "resume_id"
-        case resumeFileName = "resume_file_name"
-        case targetRole = "target_role"
-        case atsScore = "ats_score"
-        case createdAt = "created_at"
-    }
+    let matchBefore: Int?
+    let matchAfter: Int?
+    let company: String?
 }
 
-struct AccountApplicationSnapshot: Codable, Hashable, Identifiable {
+struct AccountApplicationSnapshot: Hashable, Identifiable {
     let id: UUID
     let company: String
     let role: String
     let status: String
     let source: String?
     let appliedAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case company
-        case role
-        case status
-        case source
-        case appliedAt = "applied_at"
-    }
 }
 
-struct AuthMePayload: Codable, Hashable {
+struct AuthMePayload: Hashable {
     let user: AuthUser
     let subscription: AuthSubscription
     let usageLimits: AuthUsageLimits
     let savedResumes: [SavedResumeSnapshot]
     let scanHistory: [ScanHistorySnapshot]
     let applications: [AccountApplicationSnapshot]
-
-    enum CodingKeys: String, CodingKey {
-        case user
-        case subscription
-        case usageLimits = "usage_limits"
-        case savedResumes = "saved_resumes"
-        case scanHistory = "scan_history"
-        case applications
-    }
 }
 
-struct StoredAuthTokens: Codable {
+struct StoredAuthSession: Codable {
     let accessToken: String
-    let refreshToken: String
     let tokenType: String
-    let expiresIn: Int
 }
 
-private struct AuthEnvelope: Decodable {
+// MARK: - Production API DTOs
+
+private struct AuthResponse: Decodable {
     let accessToken: String
-    let refreshToken: String
-    let tokenType: String
-    let expiresIn: Int
-    let me: AuthMePayload
+    let tokenType: String?
+    let email: String?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
-        case refreshToken = "refresh_token"
         case tokenType = "token_type"
-        case expiresIn = "expires_in"
-        case me
+        case email
     }
 }
 
 private struct RegisterRequestPayload: Encodable {
     let email: String
     let password: String
-    let displayName: String?
+    let fullName: String?
 
     enum CodingKeys: String, CodingKey {
         case email
         case password
-        case displayName = "display_name"
+        case fullName = "full_name"
     }
 }
 
@@ -148,32 +101,32 @@ private struct LoginRequestPayload: Encodable {
     let password: String
 }
 
-private struct RefreshRequestPayload: Encodable {
-    let refreshToken: String
-
-    enum CodingKeys: String, CodingKey {
-        case refreshToken = "refresh_token"
-    }
-}
-
 private struct ForgotPasswordPayload: Encodable {
     let email: String
 }
 
-private struct ForgotPasswordResponsePayload: Decodable {
-    let message: String
+private struct HistoryResponse: Decodable {
+    let items: [HistoryItem]
 }
 
-private struct LogoutRequestPayload: Encodable {
-    let refreshToken: String?
+private struct HistoryItem: Decodable, Hashable, Identifiable {
+    let id: Int
+    let company: String?
+    let role: String?
+    let score: Int
+    let createdAt: Date
+    let matchBefore: Int?
+    let matchAfter: Int?
 
     enum CodingKeys: String, CodingKey {
-        case refreshToken = "refresh_token"
+        case id
+        case company
+        case role
+        case score
+        case createdAt = "created_at"
+        case matchBefore = "match_before"
+        case matchAfter = "match_after"
     }
-}
-
-private struct LogoutResponsePayload: Decodable {
-    let message: String
 }
 
 actor AuthService {
@@ -183,8 +136,7 @@ actor AuthService {
     private let keychain: KeychainService
     private let tokenStorageKey = "cvboosta.auth.tokens"
 
-    private var cachedTokens: StoredAuthTokens?
-    private var refreshTask: Task<StoredAuthTokens, Error>?
+    private var cachedSession: StoredAuthSession?
 
     init(apiClient: APIClient = .shared, keychain: KeychainService = .shared) {
         self.apiClient = apiClient
@@ -192,23 +144,15 @@ actor AuthService {
     }
 
     func restoreSession() async throws -> AuthMePayload? {
-        guard let tokens = try loadTokens() else {
+        guard let session = try loadSession() else {
             return nil
         }
 
         do {
-            return try await fetchMe(accessToken: tokens.accessToken)
+            return try await fetchCurrentSnapshot(accessToken: session.accessToken)
         } catch let APIError.server(statusCode, _) where statusCode == 401 {
-            do {
-                _ = try await refreshTokens()
-                guard let refreshed = cachedTokens else {
-                    return nil
-                }
-                return try await fetchMe(accessToken: refreshed.accessToken)
-            } catch {
-                try clearStoredTokens()
-                return nil
-            }
+            try clearStoredSession()
+            return nil
         }
     }
 
@@ -216,11 +160,11 @@ actor AuthService {
         let payload = RegisterRequestPayload(
             email: email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
             password: password,
-            displayName: displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            fullName: displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        let response: AuthEnvelope = try await apiClient.postJSON(path: "/auth/register", body: payload)
-        try saveTokens(from: response)
-        return response.me
+        let response: AuthResponse = try await apiClient.postJSON(path: "/auth/register", body: payload)
+        try saveSession(from: response)
+        return try await fetchCurrentUserState()
     }
 
     func login(email: String, password: String) async throws -> AuthMePayload {
@@ -228,62 +172,48 @@ actor AuthService {
             email: email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
             password: password
         )
-        let response: AuthEnvelope = try await apiClient.postJSON(path: "/auth/login", body: payload)
-        try saveTokens(from: response)
-        return response.me
+        let response: AuthResponse = try await apiClient.postJSON(path: "/auth/login", body: payload)
+        try saveSession(from: response)
+        return try await fetchCurrentUserState()
     }
 
     func forgotPassword(email: String) async throws -> String {
         let payload = ForgotPasswordPayload(
             email: email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         )
-        let response: ForgotPasswordResponsePayload = try await apiClient.postJSON(
-            path: "/auth/forgot-password",
-            body: payload
-        )
-        return response.message
+        _ = try await apiClient.postJSON(path: "/auth/forgot-password", body: payload) as [String: JSONValue]
+        return "If the email exists, password reset instructions were sent."
     }
 
     func fetchCurrentUserState() async throws -> AuthMePayload {
-        guard let tokens = try loadTokens() else {
+        guard let session = try loadSession() else {
             throw APIError.server(statusCode: 401, message: "Not authenticated.")
         }
 
-        do {
-            return try await fetchMe(accessToken: tokens.accessToken)
-        } catch let APIError.server(statusCode, _) where statusCode == 401 {
-            let newAccess = try await refreshAccessToken()
-            return try await fetchMe(accessToken: newAccess)
-        }
+        return try await fetchCurrentSnapshot(accessToken: session.accessToken)
     }
 
     func currentAccessToken() throws -> String {
-        guard let tokens = try loadTokens() else {
+        guard let session = try loadSession() else {
             throw APIError.server(statusCode: 401, message: "Not authenticated.")
         }
-        return tokens.accessToken
-    }
-
-    func refreshAccessToken() async throws -> String {
-        let tokens = try await refreshTokens()
-        return tokens.accessToken
+        return session.accessToken
     }
 
     func logout() async {
         do {
-            if let tokens = try loadTokens() {
-                let _: LogoutResponsePayload = try await apiClient.postJSON(
+            if let session = try loadSession() {
+                _ = try await apiClient.postNoBody(
                     path: "/auth/logout",
-                    body: LogoutRequestPayload(refreshToken: tokens.refreshToken),
-                    headers: ["Authorization": "Bearer \(tokens.accessToken)"]
-                )
+                    headers: ["Authorization": "Bearer \(session.accessToken)"]
+                ) as [String: String]
             }
         } catch {
             // Best effort remote logout.
         }
 
         do {
-            try clearStoredTokens()
+            try clearStoredSession()
         } catch {
             // Local cleanup should not crash app.
         }
@@ -291,70 +221,148 @@ actor AuthService {
 
     func clearSession() {
         do {
-            try clearStoredTokens()
+            try clearStoredSession()
         } catch {
             // Ignore cleanup failures.
         }
     }
 
-    private func fetchMe(accessToken: String) async throws -> AuthMePayload {
-        try await apiClient.getJSON(
+    private func fetchCurrentSnapshot(accessToken: String) async throws -> AuthMePayload {
+        async let user: AuthUser = apiClient.getJSON(
             path: "/auth/me",
             headers: ["Authorization": "Bearer \(accessToken)"]
         )
-    }
 
-    private func refreshTokens() async throws -> StoredAuthTokens {
-        if let refreshTask {
-            return try await refreshTask.value
-        }
-
-        let task = Task<StoredAuthTokens, Error> {
-            guard let existing = try loadTokens() else {
-                throw APIError.server(statusCode: 401, message: "No refresh token.")
-            }
-            let response: AuthEnvelope = try await apiClient.postJSON(
-                path: "/auth/refresh",
-                body: RefreshRequestPayload(refreshToken: existing.refreshToken)
-            )
-            try saveTokens(from: response)
-            guard let latest = cachedTokens else {
-                throw APIError.invalidResponse
-            }
-            return latest
-        }
-
-        refreshTask = task
-        defer { refreshTask = nil }
-        return try await task.value
-    }
-
-    private func saveTokens(from response: AuthEnvelope) throws {
-        let tokens = StoredAuthTokens(
-            accessToken: response.accessToken,
-            refreshToken: response.refreshToken,
-            tokenType: response.tokenType,
-            expiresIn: response.expiresIn
+        async let history: HistoryResponse = apiClient.getJSON(
+            path: "/history",
+            headers: ["Authorization": "Bearer \(accessToken)"]
         )
-        let data = try JSONEncoder().encode(tokens)
-        try keychain.set(data, for: tokenStorageKey)
-        cachedTokens = tokens
+
+        let billingRaw: [String: JSONValue] = (try? await apiClient.getJSON(
+            path: "/billing/status",
+            headers: ["Authorization": "Bearer \(accessToken)"]
+        )) ?? [:]
+
+        let subscription = Self.mapSubscription(from: billingRaw)
+        let usageLimits = Self.mapUsageLimits(from: billingRaw, subscription: subscription)
+
+        let historyItems = try await history
+        let snapshots: [ScanHistorySnapshot] = historyItems.items.sorted(by: { $0.createdAt > $1.createdAt }).map {
+            ScanHistorySnapshot(
+                id: $0.id,
+                resumeFileName: "CV Optimization",
+                targetRole: $0.role ?? "",
+                atsScore: $0.matchBefore ?? $0.score,
+                createdAt: $0.createdAt,
+                matchBefore: $0.matchBefore,
+                matchAfter: $0.matchAfter,
+                company: $0.company
+            )
+        }
+
+        return AuthMePayload(
+            user: try await user,
+            subscription: subscription,
+            usageLimits: usageLimits,
+            savedResumes: [],
+            scanHistory: snapshots,
+            applications: []
+        )
     }
 
-    private func loadTokens() throws -> StoredAuthTokens? {
-        if let cachedTokens {
-            return cachedTokens
+    private func saveSession(from response: AuthResponse) throws {
+        let session = StoredAuthSession(
+            accessToken: response.accessToken,
+            tokenType: response.tokenType ?? "bearer"
+        )
+        let data = try JSONEncoder().encode(session)
+        try keychain.set(data, for: tokenStorageKey)
+        cachedSession = session
+    }
+
+    private func loadSession() throws -> StoredAuthSession? {
+        if let cachedSession {
+            return cachedSession
         }
         guard let data = try keychain.getData(for: tokenStorageKey) else {
             return nil
         }
-        let tokens = try JSONDecoder().decode(StoredAuthTokens.self, from: data)
-        cachedTokens = tokens
-        return tokens
+        if let session = try? JSONDecoder().decode(StoredAuthSession.self, from: data) {
+            cachedSession = session
+            return session
+        }
+        // Backward compatibility: if old token shape is stored, force re-login.
+        try clearStoredSession()
+        return nil
     }
 
-    private func clearStoredTokens() throws {
-        cachedTokens = nil
+    private func clearStoredSession() throws {
+        cachedSession = nil
         try keychain.delete(tokenStorageKey)
+    }
+}
+
+private extension AuthService {
+    static let iso8601: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static let iso8601WithFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static func mapSubscription(from payload: [String: JSONValue]) -> AuthSubscription {
+        let isActive =
+            payload.bool("is_active")
+            ?? payload.bool("active")
+            ?? (payload.string("status")?.lowercased() == "active")
+            ?? false
+
+        let entitlement =
+            payload.string("entitlement")
+            ?? payload.string("plan")
+            ?? payload.string("tier")
+            ?? (isActive ? "premium" : "free")
+
+        let expiresAt = parseDate(
+            payload.string("expires_at")
+                ?? payload.string("current_period_end")
+                ?? payload.string("renewal_at")
+        )
+
+        let source = payload.string("source") ?? "stripe"
+
+        return AuthSubscription(
+            entitlement: entitlement,
+            isActive: isActive,
+            expiresAt: expiresAt,
+            source: source
+        )
+    }
+
+    static func mapUsageLimits(from payload: [String: JSONValue], subscription: AuthSubscription) -> AuthUsageLimits {
+        let plan = payload.string("plan") ?? payload.string("tier") ?? (subscription.isActive ? "premium" : "free")
+        let limit = payload.int("scans_daily_limit") ?? payload.int("daily_limit")
+        let used = payload.int("scans_used_today") ?? payload.int("used_today") ?? 0
+        let remaining = payload.int("scans_remaining_today") ?? payload.int("remaining_today")
+
+        return AuthUsageLimits(
+            plan: plan,
+            scansDailyLimit: limit,
+            scansUsedToday: used,
+            scansRemainingToday: remaining
+        )
+    }
+
+    static func parseDate(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        if let date = iso8601WithFractional.date(from: value) ?? iso8601.date(from: value) {
+            return date
+        }
+        return nil
     }
 }
