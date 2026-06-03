@@ -54,7 +54,6 @@ struct CVBoostaApp: App {
             AppRootView()
                 .environmentObject(authViewModel)
                 .environmentObject(appRouter)
-                .preferredColorScheme(.dark)
                 .task {
                     await authViewModel.bootstrap()
                 }

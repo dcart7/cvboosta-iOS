@@ -103,33 +103,22 @@ struct RegisterView: View {
     }
 
     private var messagingColumn: some View {
-        VStack(alignment: .leading, spacing: BoostaSpace.lg) {
-            BrandMarkView(size: 82)
+        VStack(alignment: .leading, spacing: BoostaSpace.md) {
+            BrandMarkView(size: 64)
                 .staggered(index: 0)
 
             AuthHeadlineBlock(
-                eyebrow: "Create your edge",
-                title: "Join CVBoosta and make every application smarter.",
-                subtitle: "Create one account and unlock ATS analysis, tailored rewrites, and a calmer, more intentional workflow across your Apple devices."
+                eyebrow: "Create account",
+                title: "Start clean.",
+                subtitle: "One account for web, iPhone, and iPad."
             )
             .staggered(index: 1)
 
-            VStack(spacing: BoostaSpace.sm) {
-                AuthStatPill(title: "Better first impression", detail: "Sharper positioning from the first scan.")
-                AuthStatPill(title: "Less guesswork", detail: "See what recruiters and ATS systems are missing.")
-                AuthStatPill(title: "Faster momentum", detail: "Move from draft CV to targeted application with less friction.")
+            HStack(spacing: BoostaSpace.sm) {
+                AuthStatPill(title: "ATS", detail: "See what to improve.")
+                AuthStatPill(title: "Native", detail: "Minimal, focused flow.")
             }
             .staggered(index: 2)
-
-            AuthStoryCard(
-                title: "What changes after sign up",
-                steps: [
-                    "You stop sending the same generic CV everywhere.",
-                    "You understand which keywords, signals, and framing improve your match.",
-                    "You build a repeatable application workflow instead of rewriting from scratch."
-                ]
-            )
-            .staggered(index: 3)
         }
         .frame(maxWidth: isWideLayout ? 420 : .infinity, alignment: .leading)
     }
@@ -141,7 +130,7 @@ struct RegisterView: View {
                     Text("Create account")
                         .font(BoostaType.title)
                         .foregroundStyle(BoostaColor.primaryText)
-                    Text("Use the same CVBoosta account across web, iPhone, and iPad.")
+                    Text("Use one CVBoosta account everywhere.")
                         .font(BoostaType.caption)
                         .foregroundStyle(BoostaColor.secondaryText)
                 }

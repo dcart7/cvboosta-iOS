@@ -33,20 +33,22 @@ struct BrandMarkView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: size * 0.30, style: .continuous)
-                .fill(BoostaColor.surfaceElevated)
-                .frame(width: size, height: size)
-                .overlay(
-                    RoundedRectangle(cornerRadius: size * 0.30, style: .continuous)
-                        .stroke(BoostaColor.glassStrongStroke, lineWidth: 1)
-                )
+            Circle()
+                .fill(BoostaColor.pageGlow.opacity(0.18))
+                .frame(width: size * 1.08, height: size * 1.08)
+                .blur(radius: glow ? 12 : 0)
 
-            Image("BrandMark")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .padding(size * 0.12)
+            BoostaColor.auroraGradient
                 .frame(width: size, height: size)
+                .mask(
+                    Image("BrandMark")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .compositingGroup()
+                        .colorInvert()
+                        .luminanceToAlpha()
+                )
         }
         .shadow(color: glow ? BoostaColor.accent.opacity(0.22) : .clear, radius: 22, x: 0, y: 10)
     }
@@ -58,7 +60,7 @@ struct AuthHeadlineBlock: View {
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+        VStack(alignment: .leading, spacing: BoostaSpace.xs) {
             Text(eyebrow.uppercased())
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(1.1)
@@ -99,71 +101,6 @@ struct AuthStatPill: View {
                 .stroke(BoostaColor.glassStroke, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
-    }
-}
-
-struct AuthFeatureRow: View {
-    let icon: String
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: BoostaSpace.sm) {
-            ZStack {
-                Circle()
-                    .fill(BoostaColor.surfaceElevated)
-                    .frame(width: 34, height: 34)
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(BoostaColor.accentSecondary)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(BoostaType.bodyStrong)
-                    .foregroundStyle(BoostaColor.primaryText)
-                Text(detail)
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
-            }
-
-            Spacer(minLength: 0)
-        }
-    }
-}
-
-struct AuthStoryCard: View {
-    let title: String
-    let steps: [String]
-
-    var body: some View {
-        GlassCard(padding: BoostaSpace.lg) {
-            VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                Text(title)
-                    .font(BoostaType.section)
-                    .foregroundStyle(BoostaColor.primaryText)
-
-                VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                    ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .center, spacing: BoostaSpace.sm) {
-                            ZStack {
-                                Circle()
-                                    .fill(index == 0 ? BoostaColor.auroraGradient : LinearGradient(colors: [BoostaColor.surfaceElevated, BoostaColor.surface], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                    .frame(width: 28, height: 28)
-                                Text("\(index + 1)")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                            }
-
-                            Text(step)
-                                .font(BoostaType.body)
-                                .foregroundStyle(BoostaColor.secondaryText)
-                        }
-                        .staggered(index: index)
-                    }
-                }
-            }
-        }
     }
 }
 

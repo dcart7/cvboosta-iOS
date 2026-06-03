@@ -34,23 +34,20 @@ struct LoginView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: BoostaSpace.lg) {
-                    BrandMarkView(size: 76)
+                    BrandMarkView(size: 60)
                         .staggered(index: 0)
 
                     AuthHeadlineBlock(
                         eyebrow: "Welcome back",
-                        title: "Pick up where your best applications start.",
-                        subtitle: "Log in to your real CVBoosta account and continue with ATS analysis, optimization history, and your native workspace."
+                        title: "Log in",
+                        subtitle: "Continue with your CVBoosta account."
                     )
                     .staggered(index: 1)
 
                     GlassCard(padding: BoostaSpace.lg) {
                         VStack(alignment: .leading, spacing: BoostaSpace.md) {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Log in")
-                                    .font(BoostaType.title)
-                                    .foregroundStyle(BoostaColor.primaryText)
-                                Text("Use your CVBoosta website account credentials.")
+                                Text("Use your CVBoosta website credentials.")
                                     .font(BoostaType.caption)
                                     .foregroundStyle(BoostaColor.secondaryText)
                             }
@@ -113,9 +110,9 @@ struct LoginView: View {
                     .staggered(index: 2)
                 }
                 .padding(.horizontal, BoostaSpace.lg)
-                .padding(.top, BoostaSpace.xl)
+                .padding(.top, 56)
                 .padding(.bottom, BoostaSpace.xxl)
-                .frame(maxWidth: 620)
+                .frame(maxWidth: 520)
                 .frame(maxWidth: .infinity)
             }
         }
