@@ -7,20 +7,29 @@ struct WelcomeView: View {
                 AuthBackgroundView()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: BoostaSpace.lg) {
+                    VStack(alignment: .leading, spacing: BoostaSpace.md) {
                         heroSection
                             .staggered(index: 0)
 
-                        statGrid
+                        AuthSocialProofRow()
                             .staggered(index: 1)
 
-                        actionSection
+                        statGrid
                             .staggered(index: 2)
+
+                        AuthProductPreviewCard()
+                            .staggered(index: 3)
+
+                        actionSection
+                            .staggered(index: 4)
+
+                        AuthTrustRow()
+                            .staggered(index: 5)
                     }
                     .padding(.horizontal, BoostaSpace.lg)
-                    .padding(.top, 56)
+                    .padding(.top, 44)
                     .padding(.bottom, BoostaSpace.xxl)
-                    .frame(maxWidth: 560)
+                    .frame(maxWidth: 540)
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -29,12 +38,12 @@ struct WelcomeView: View {
 
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-            BrandMarkView(size: 70)
+            BrandMarkView(size: 76)
 
             AuthHeadlineBlock(
-                eyebrow: "CVBoosta",
-                title: "Better CVs. Smarter applications.",
-                subtitle: "ATS analysis and tailoring in a clean native workspace."
+                eyebrow: "Designed for modern hiring",
+                title: "Better applications start here.",
+                subtitle: "Check ATS score, detect keyword gaps, and improve every application with clearer, smarter resume edits."
             )
         }
     }
@@ -42,15 +51,19 @@ struct WelcomeView: View {
     private var statGrid: some View {
         VStack(spacing: 10) {
             HStack(spacing: BoostaSpace.sm) {
-                AuthStatPill(title: "ATS-first", detail: "See gaps before you apply.")
-                AuthStatPill(title: "One account", detail: "Web, iPhone, and iPad.")
+                AuthStatPill(title: "Real ATS matching", detail: "See what hiring systems miss.")
+                AuthStatPill(title: "Tailored per job", detail: "Optimize for each application.")
+            }
+            HStack(spacing: BoostaSpace.sm) {
+                AuthStatPill(title: "AI-powered optimization", detail: "Sharper bullets and stronger keyword alignment.")
+                AuthStatPill(title: "Interview insights", detail: "Surface the strengths recruiters notice first.")
             }
         }
     }
 
     private var actionSection: some View {
         VStack(spacing: BoostaSpace.sm) {
-            AuthPrimaryNavigationButton(title: "Start the CV revolution") {
+            AuthPrimaryNavigationButton(title: "Check ATS Score") {
                 RegisterView()
             }
 

@@ -203,8 +203,23 @@ final class APIClient {
     }
 
     private func apply(headers: [String: String], to request: inout URLRequest) {
+        applyProductionFallbackHeaders(to: &request)
+
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
+        }
+    }
+
+    private func applyProductionFallbackHeaders(to request: inout URLRequest) {
+        guard let url = request.url else { return }
+        guard url.host?.lowercased() == AppEnvironment.apiBaseURL.host?.lowercased() else { return }
+
+        if request.value(forHTTPHeaderField: "Origin") == nil {
+            request.setValue(AppEnvironment.webBaseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")), forHTTPHeaderField: "Origin")
+        }
+
+        if request.value(forHTTPHeaderField: "Referer") == nil {
+            request.setValue(AppEnvironment.webBaseURL.absoluteString + "/", forHTTPHeaderField: "Referer")
         }
     }
 
