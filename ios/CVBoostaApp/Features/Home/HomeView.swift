@@ -8,6 +8,15 @@ struct HomeView: View {
     @Query(sort: \ApplicationRecord.appliedAt, order: .reverse)
     private var trackedApplications: [ApplicationRecord]
 
+    @State private var historyItems: [HistoryListItem] = []
+    @State private var latestHistoryDetail: HistoryDetailResponse?
+    @State private var isLoadingHistory = false
+    @State private var errorMessage: String?
+    @State private var previewDocument: HistoryPDFPreviewDocument?
+    @State private var animateSparkline = false
+
+    private let resumeService = ResumeService.shared
+
     private var firstName: String {
         if let raw = authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
             return raw.split(separator: " ").first.map(String.init) ?? raw
@@ -20,26 +29,29 @@ struct HomeView: View {
         return "there"
     }
 
-    private var latestScore: Int {
-        authViewModel.me?.scanHistory.first?.atsScore ?? 0
+    private var scans: [ScanHistorySnapshot] {
+        authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
-    private var applicationsCount: Int {
-        trackedApplications.count
+    private var careerScore: Int {
+        latestHistoryDetail?.matchAfter ?? scans.last?.matchAfter ?? scans.last?.atsScore ?? 0
     }
 
-    private var interviewsCount: Int {
-        trackedApplications.filter { $0.status == .interview }.count
+    private var responseRate: Int {
+        guard !trackedApplications.isEmpty else { return 0 }
+        let responsive = trackedApplications.filter { $0.status == .interview || $0.status == .offer }.count
+        return Int((Double(responsive) / Double(trackedApplications.count)) * 100)
     }
 
-    private var avgScore: Int {
-        guard let scans = authViewModel.me?.scanHistory, !scans.isEmpty else { return 0 }
-        let total = scans.reduce(0) { $0 + $1.atsScore }
-        return total / scans.count
+    private var weeklyApplications: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        return trackedApplications.filter {
+            calendar.isDate($0.appliedAt, equalTo: now, toGranularity: .weekOfYear)
+        }.count
     }
 
     private var streakDays: Int {
-        guard let scans = authViewModel.me?.scanHistory else { return 0 }
         let calendar = Calendar.current
         let uniqueDays = Set(scans.map { calendar.startOfDay(for: $0.createdAt) })
         guard !uniqueDays.isEmpty else { return 0 }
@@ -54,35 +66,21 @@ struct HomeView: View {
         return streak
     }
 
-    private var interviewProbability: String {
-        switch latestScore {
-        case 80...100: return "Strong"
-        case 65...79: return "Medium"
-        case 1...64: return "Low"
-        default: return "Unknown"
-        }
+    private var trendScores: [Int] {
+        Array(scans.suffix(7).map(\.atsScore))
     }
 
-    private var topBlocker: String {
-        if avgScore >= 80 { return "You need stronger recruiter-facing proof in recent applications." }
-        if avgScore >= 65 { return "Your resume likely misses measurable backend impact in key bullets." }
-        if avgScore > 0 { return "Keyword coverage and impact language are blocking more interviews." }
-        return "Run your first ATS scan to uncover what is blocking interviews."
+    private var missingKeywords: [String] {
+        Array((latestHistoryDetail?.missingSkills ?? []).prefix(3))
     }
 
-    private var weeklyApplications: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        return trackedApplications.filter {
-            calendar.isDate($0.appliedAt, equalTo: now, toGranularity: .weekOfYear)
-        }.count
-    }
-
-    private var responseRate: Int {
-        guard !trackedApplications.isEmpty else { return 0 }
-        let responsiveStatuses: Set<ApplicationStatus> = [.interview, .offer]
-        let responsive = trackedApplications.filter { responsiveStatuses.contains($0.status) }.count
-        return Int((Double(responsive) / Double(trackedApplications.count)) * 100)
+    private var quickInsights: [HomeInsight] {
+        [
+            .init(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", tint: BoostaColor.accent),
+            .init(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", tint: BoostaColor.success),
+            .init(title: "This Week", value: "\(weeklyApplications)", tint: BoostaColor.warning),
+            .init(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", tint: BoostaColor.accentSecondary)
+        ]
     }
 
     var body: some View {
@@ -99,39 +97,26 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: BoostaSpace.md) {
                         SectionHeader(
                             title: "Hi, \(firstName)",
-                            subtitle: "Let’s improve your interview chances today."
+                            subtitle: "Your home base for CVBoosta."
                         )
 
                         heroCard
-
-                        HStack(spacing: BoostaSpace.sm) {
-                            MetricPill(title: "Applications", value: "\(applicationsCount)", color: BoostaColor.accent)
-                            MetricPill(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", color: BoostaColor.success)
-                            MetricPill(title: "Avg. ATS", value: avgScore == 0 ? "—" : "\(avgScore)", color: BoostaColor.warning)
-                        }
-
-                        if authViewModel.me?.scanHistory.isEmpty ?? true {
-                            EmptyStateView(
-                                title: "No resume scanned yet",
-                                message: "Upload your resume to get your first ATS score.",
-                                actionTitle: "Start First Scan"
-                            ) {
-                                appRouter.open(.scanner)
-                            }
-                        } else {
-                            resumeHealthCard
-                            insightCard
-                            todayFocusCard
-                            streakCard
-                            recentScanCard
-                        }
+                        compactStatsCard
+                        recentActivityCard
+                        actionsCard
                     }
                     .padding(BoostaSpace.md)
                 }
             }
             .navigationTitle("Home")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        appRouter.open(.scanner)
+                    } label: {
+                        Image(systemName: "doc.text.magnifyingglass")
+                    }
+
                     Button {
                         appRouter.open(.settings)
                     } label: {
@@ -139,8 +124,22 @@ struct HomeView: View {
                     }
                 }
             }
+            .overlay(alignment: .top) {
+                if let errorMessage {
+                    ErrorBanner(message: errorMessage)
+                        .padding(.horizontal, BoostaSpace.md)
+                        .padding(.top, BoostaSpace.sm)
+                }
+            }
+            .sheet(item: $previewDocument) { document in
+                HistoryPDFPreviewSheet(document: document)
+            }
             .task {
                 await authViewModel.refreshSharedState()
+                await loadSharedHistory()
+                withAnimation(.easeOut(duration: 0.7)) {
+                    animateSparkline = true
+                }
             }
         }
     }
@@ -148,108 +147,262 @@ struct HomeView: View {
     private var heroCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                Text("Career optimization snapshot")
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
+                HStack(alignment: .center, spacing: BoostaSpace.md) {
+                    ScoreRing(score: careerScore)
+                        .frame(width: 108, height: 108)
 
-                HStack(spacing: BoostaSpace.md) {
-                    ScoreRing(score: latestScore)
-                        .frame(width: 110, height: 110)
-
-                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                        Text(latestScore == 0 ? "No scans yet" : "Interview probability: \(interviewProbability)")
-                            .font(BoostaType.bodyStrong)
-                        Text(latestScore == 0 ? "Start with one scan to get a baseline." : topBlocker)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Career snapshot")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                        Text(careerScore == 0 ? "Run your first scan" : "You’re building momentum.")
+                            .font(BoostaType.section)
+                            .foregroundStyle(BoostaColor.primaryText)
+                        Text(summaryText)
                             .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
                     }
                 }
 
-                HStack(spacing: 8) {
-                    KeywordChip(text: "ATS Parsing", status: latestScore >= 80 ? .present : latestScore >= 60 ? .weak : .missing)
-                    KeywordChip(text: "Keyword Match", status: avgScore >= 75 ? .present : avgScore >= 60 ? .weak : .missing)
-                    KeywordChip(text: "Role Alignment", status: applicationsCount > 0 ? .weak : .missing)
+                NavigationLink {
+                    StatisticsView()
+                        .environmentObject(authViewModel)
+                        .environmentObject(appRouter)
+                } label: {
+                    HStack(spacing: BoostaSpace.xs) {
+                        Text("View full statistics")
+                            .font(BoostaType.bodyStrong)
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(BoostaColor.auroraGradient)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                    )
+                    .shadow(color: BoostaColor.accent.opacity(0.18), radius: 18, x: 0, y: 12)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var compactStatsCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "Quick Statistics", subtitle: "Compressed view of your progress")
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
+                    ForEach(quickInsights) { insight in
+                        MetricPill(title: insight.title, value: insight.value, color: insight.tint)
+                    }
                 }
 
-                PrimaryButton(title: "Analyze Resume") {
-                    appRouter.open(.scanner)
+                VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                    HStack {
+                        Text("ATS trend")
+                            .font(BoostaType.bodyStrong)
+                        Spacer()
+                        Text(trendLabel)
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                    }
+
+                    CompactTrendView(scores: trendScores, isAnimated: animateSparkline)
+                        .frame(height: 72)
+
+                    if !missingKeywords.isEmpty {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
+                            ForEach(missingKeywords, id: \.self) { keyword in
+                                KeywordChip(text: keyword, status: .missing)
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    private var resumeHealthCard: some View {
+    private var recentActivityCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Fast wins")
-                Text("• Add metrics to your strongest experience bullets")
-                Text("• Mention target stack keywords from current job descriptions")
-                Text("• Replace generic wording with clear backend impact")
+                SectionHeader(
+                    title: "Recent Activity",
+                    subtitle: isLoadingHistory ? "Syncing browser + app history..." : "Shared account activity"
+                )
+
+                if historyItems.isEmpty {
+                    Text(isLoadingHistory ? "Loading history..." : "Your shared CVBoosta history will appear here.")
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                } else {
+                    ForEach(historyItems.prefix(3)) { item in
+                        Button {
+                            Task {
+                                await openHistoryPDF(for: item)
+                            }
+                        } label: {
+                            HStack(spacing: BoostaSpace.md) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.role ?? "CV Optimization")
+                                        .font(BoostaType.bodyStrong)
+                                        .foregroundStyle(BoostaColor.primaryText)
+                                    Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                        .font(BoostaType.caption)
+                                        .foregroundStyle(BoostaColor.secondaryText)
+                                }
+
+                                Spacer()
+
+                                Text("\(item.matchAfter ?? item.score)")
+                                    .font(BoostaType.bodyStrong)
+                                    .foregroundStyle(BoostaColor.accent)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-            .font(BoostaType.body)
-            .foregroundStyle(BoostaColor.secondaryText)
         }
     }
 
-    private var insightCard: some View {
+    private var actionsCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Live insights", subtitle: "What is most likely blocking interviews")
-
-                Text(topBlocker)
-                    .font(BoostaType.body)
-                    .foregroundStyle(BoostaColor.primaryText)
+                SectionHeader(title: "Next Step", subtitle: "Keep momentum high")
 
                 HStack(spacing: BoostaSpace.sm) {
-                    MetricPill(title: "This week", value: "\(weeklyApplications)", color: BoostaColor.accent)
-                    MetricPill(title: "Missing keywords", value: latestScore == 0 ? "—" : latestScore >= 80 ? "2" : latestScore >= 65 ? "5" : "7", color: BoostaColor.warning)
+                    PrimaryButton(title: "Analyze Resume") {
+                        appRouter.open(.scanner)
+                    }
+
+                    SecondaryButton(title: "Open Tailoring") {
+                        appRouter.open(.tailoring)
+                    }
                 }
             }
         }
     }
 
-    private var todayFocusCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Today’s Focus")
-                Text("Tailor your resume for one high-priority role and rescan before applying.")
-                    .font(BoostaType.body)
-                    .foregroundStyle(BoostaColor.secondaryText)
+    private var summaryText: String {
+        if careerScore == 0 {
+            return "Scan your resume, sync your browser history, and start building a real performance baseline."
+        }
 
-                SecondaryButton(title: "Open Tailoring") {
-                    appRouter.open(.tailoring)
-                }
+        return "\(weeklyApplications) applications this week, \(responseRate == 0 ? "no responses yet" : "\(responseRate)% response rate"), and a \(streakDays == 0 ? "fresh" : "\(streakDays)-day") streak."
+    }
+
+    private var trendLabel: String {
+        guard let first = trendScores.first, let last = trendScores.last, trendScores.count > 1 else {
+            return "Not enough data"
+        }
+        let delta = last - first
+        return delta == 0 ? "Stable" : delta > 0 ? "+\(delta)" : "\(delta)"
+    }
+
+    private func loadSharedHistory() async {
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+
+        do {
+            let items = try await resumeService.history().sorted { $0.createdAt > $1.createdAt }
+            historyItems = items
+            errorMessage = nil
+            if let first = items.first {
+                latestHistoryDetail = try? await resumeService.historyDetail(id: first.id)
             }
+        } catch {
+            errorMessage = "Could not load shared account history."
         }
     }
 
-    private var streakCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                SectionHeader(title: "Job Search Streak")
-                Text(streakDays == 0 ? "Start your streak today." : "\(streakDays) active day\(streakDays == 1 ? "" : "s") • \(weeklyApplications) applications this week")
-                    .font(BoostaType.body)
-                    .foregroundStyle(BoostaColor.secondaryText)
-            }
+    private func openHistoryPDF(for item: HistoryListItem) async {
+        do {
+            let detail = try await resumeService.historyDetail(id: item.id)
+            let url = try SharedHistoryPDFBuilder.makeResumePDF(
+                title: item.role ?? "CV Optimization",
+                subtitle: item.company ?? "CVBoosta",
+                score: detail.matchAfter ?? detail.score,
+                body: detail.optimizedCV
+            )
+            previewDocument = HistoryPDFPreviewDocument(
+                id: item.id,
+                title: item.role ?? "CV Optimization",
+                fileURL: url
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = "Could not open browser-generated PDF in the app."
         }
     }
+}
 
-    private var recentScanCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                SectionHeader(title: "Recent Scan")
-                if let scan = authViewModel.me?.scanHistory.first {
-                    Text(scan.resumeFileName)
-                        .font(BoostaType.bodyStrong)
-                    Text(scan.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                }
+private struct HomeInsight: Identifiable {
+    let id = UUID()
+    let title: String
+    let value: String
+    let tint: Color
+}
 
-                SecondaryButton(title: "Open Scanner") {
-                    appRouter.open(.scanner)
+struct CompactTrendView: View {
+    let scores: [Int]
+    let isAnimated: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            let points = normalizedPoints(in: proxy.size)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                    .fill(BoostaColor.surfaceMuted)
+
+                Path { path in
+                    guard points.count > 1 else { return }
+                    path.move(to: CGPoint(x: points[0].x, y: proxy.size.height - 10))
+                    path.addLine(to: points[0])
+                    for point in points.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                    path.addLine(to: CGPoint(x: points.last?.x ?? 0, y: proxy.size.height - 10))
+                    path.closeSubpath()
                 }
+                .fill(BoostaColor.accent.opacity(0.14))
+                .opacity(isAnimated ? 1 : 0)
+
+                Path { path in
+                    guard points.count > 1 else { return }
+                    path.move(to: points[0])
+                    for point in points.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                }
+                .trim(from: 0, to: isAnimated ? 1 : 0)
+                .stroke(BoostaColor.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                .animation(.easeOut(duration: 0.9), value: isAnimated)
             }
+        }
+        .accessibilityLabel("Compact ATS trend")
+    }
+
+    private func normalizedPoints(in size: CGSize) -> [CGPoint] {
+        guard scores.count > 1 else { return [] }
+        let inset: CGFloat = 10
+        let minScore = CGFloat(scores.min() ?? 0)
+        let maxScore = CGFloat(scores.max() ?? 100)
+        let range = max(maxScore - minScore, 1)
+        let width = max(size.width - inset * 2, 1)
+        let height = max(size.height - inset * 2, 1)
+
+        return scores.enumerated().map { index, score in
+            let x = inset + (CGFloat(index) / CGFloat(max(scores.count - 1, 1))) * width
+            let normalized = (CGFloat(score) - minScore) / range
+            let y = inset + (1 - normalized) * height
+            return CGPoint(x: x, y: y)
         }
     }
 }
@@ -258,4 +411,5 @@ struct HomeView: View {
     HomeView()
         .environmentObject(AuthViewModel())
         .environmentObject(AppRouter())
+        .modelContainer(PreviewModelContainer.shared)
 }

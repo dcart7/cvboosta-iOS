@@ -120,6 +120,8 @@ struct ScoreRing: View {
     let score: Int
     var lineWidth: CGFloat = 12
 
+    @State private var animatedProgress: Double = 0
+
     private var progress: Double {
         min(max(Double(score) / 100, 0), 1)
     }
@@ -141,9 +143,10 @@ struct ScoreRing: View {
                 .stroke(Color.white.opacity(0.35), lineWidth: lineWidth)
 
             Circle()
-                .trim(from: 0, to: progress)
+                .trim(from: 0, to: animatedProgress)
                 .stroke(scoreColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+                .animation(.spring(response: 0.8, dampingFraction: 0.86), value: animatedProgress)
 
             VStack(spacing: 2) {
                 Text("\(score)")
@@ -152,6 +155,12 @@ struct ScoreRing: View {
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
             }
+        }
+        .onAppear {
+            animatedProgress = progress
+        }
+        .onChange(of: score) { _, _ in
+            animatedProgress = progress
         }
         .accessibilityLabel("ATS score \(score) out of 100")
     }

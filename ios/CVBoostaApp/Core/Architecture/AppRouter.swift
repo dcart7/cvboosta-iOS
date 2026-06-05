@@ -11,6 +11,7 @@ final class AppRouter: ObservableObject {
 
 enum AppTab: Hashable {
     case home
+    case statistics
     case scanner
     case tailoring
     case tracker

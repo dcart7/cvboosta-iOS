@@ -19,6 +19,7 @@ struct iPadWorkspaceView: View {
         List {
             Section("Workspace") {
                 sidebarRow(.home, title: "Home", systemImage: "house")
+                sidebarRow(.statistics, title: "Statistics", systemImage: "chart.line.uptrend.xyaxis")
                 sidebarRow(.scanner, title: "Scanner", systemImage: "doc.text.magnifyingglass")
                 sidebarRow(.tailoring, title: "Tailoring", systemImage: "wand.and.stars")
                 sidebarRow(.tracker, title: "Tracker", systemImage: "list.bullet.clipboard")
@@ -38,6 +39,8 @@ struct iPadWorkspaceView: View {
         switch appRouter.selectedTab {
         case .home:
             HomeWorkspaceView_iPad()
+        case .statistics:
+            StatisticsWorkspaceView_iPad()
         case .scanner:
             ATSScannerWorkspaceView_iPad()
         case .tailoring:
