@@ -54,6 +54,37 @@ struct HomeView: View {
         return streak
     }
 
+    private var interviewProbability: String {
+        switch latestScore {
+        case 80...100: return "Strong"
+        case 65...79: return "Medium"
+        case 1...64: return "Low"
+        default: return "Unknown"
+        }
+    }
+
+    private var topBlocker: String {
+        if avgScore >= 80 { return "You need stronger recruiter-facing proof in recent applications." }
+        if avgScore >= 65 { return "Your resume likely misses measurable backend impact in key bullets." }
+        if avgScore > 0 { return "Keyword coverage and impact language are blocking more interviews." }
+        return "Run your first ATS scan to uncover what is blocking interviews."
+    }
+
+    private var weeklyApplications: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        return trackedApplications.filter {
+            calendar.isDate($0.appliedAt, equalTo: now, toGranularity: .weekOfYear)
+        }.count
+    }
+
+    private var responseRate: Int {
+        guard !trackedApplications.isEmpty else { return 0 }
+        let responsiveStatuses: Set<ApplicationStatus> = [.interview, .offer]
+        let responsive = trackedApplications.filter { responsiveStatuses.contains($0.status) }.count
+        return Int((Double(responsive) / Double(trackedApplications.count)) * 100)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -75,7 +106,7 @@ struct HomeView: View {
 
                         HStack(spacing: BoostaSpace.sm) {
                             MetricPill(title: "Applications", value: "\(applicationsCount)", color: BoostaColor.accent)
-                            MetricPill(title: "Interviews", value: "\(interviewsCount)", color: BoostaColor.success)
+                            MetricPill(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", color: BoostaColor.success)
                             MetricPill(title: "Avg. ATS", value: avgScore == 0 ? "—" : "\(avgScore)", color: BoostaColor.warning)
                         }
 
@@ -89,6 +120,7 @@ struct HomeView: View {
                             }
                         } else {
                             resumeHealthCard
+                            insightCard
                             todayFocusCard
                             streakCard
                             recentScanCard
@@ -116,7 +148,7 @@ struct HomeView: View {
     private var heroCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                Text("Your latest resume score")
+                Text("Career optimization snapshot")
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
 
@@ -125,15 +157,21 @@ struct HomeView: View {
                         .frame(width: 110, height: 110)
 
                     VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                        Text(latestScore == 0 ? "No scans yet" : "Current ATS Score")
+                        Text(latestScore == 0 ? "No scans yet" : "Interview probability: \(interviewProbability)")
                             .font(BoostaType.bodyStrong)
-                        Text(latestScore == 0 ? "Start with one scan to get a baseline." : "Keep refining role keywords and measurable impact.")
+                        Text(latestScore == 0 ? "Start with one scan to get a baseline." : topBlocker)
                             .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
                     }
                 }
 
-                PrimaryButton(title: "Scan New Resume") {
+                HStack(spacing: 8) {
+                    KeywordChip(text: "ATS Parsing", status: latestScore >= 80 ? .present : latestScore >= 60 ? .weak : .missing)
+                    KeywordChip(text: "Keyword Match", status: avgScore >= 75 ? .present : avgScore >= 60 ? .weak : .missing)
+                    KeywordChip(text: "Role Alignment", status: applicationsCount > 0 ? .weak : .missing)
+                }
+
+                PrimaryButton(title: "Analyze Resume") {
                     appRouter.open(.scanner)
                 }
             }
@@ -143,13 +181,30 @@ struct HomeView: View {
     private var resumeHealthCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Resume Health")
-                Text("• Improve measurable outcomes in top bullets")
-                Text("• Add role-specific keywords from target jobs")
-                Text("• Strengthen summary with technical impact")
+                SectionHeader(title: "Fast wins")
+                Text("• Add metrics to your strongest experience bullets")
+                Text("• Mention target stack keywords from current job descriptions")
+                Text("• Replace generic wording with clear backend impact")
             }
             .font(BoostaType.body)
             .foregroundStyle(BoostaColor.secondaryText)
+        }
+    }
+
+    private var insightCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Live insights", subtitle: "What is most likely blocking interviews")
+
+                Text(topBlocker)
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.primaryText)
+
+                HStack(spacing: BoostaSpace.sm) {
+                    MetricPill(title: "This week", value: "\(weeklyApplications)", color: BoostaColor.accent)
+                    MetricPill(title: "Missing keywords", value: latestScore == 0 ? "—" : latestScore >= 80 ? "2" : latestScore >= 65 ? "5" : "7", color: BoostaColor.warning)
+                }
+            }
         }
     }
 
@@ -172,7 +227,7 @@ struct HomeView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.xs) {
                 SectionHeader(title: "Job Search Streak")
-                Text(streakDays == 0 ? "Start your streak today." : "\(streakDays) active day\(streakDays == 1 ? "" : "s")")
+                Text(streakDays == 0 ? "Start your streak today." : "\(streakDays) active day\(streakDays == 1 ? "" : "s") • \(weeklyApplications) applications this week")
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
             }

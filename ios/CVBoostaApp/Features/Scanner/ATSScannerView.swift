@@ -23,6 +23,7 @@ struct ATSScannerView: View {
 
                 ScrollView {
                     VStack(spacing: BoostaSpace.md) {
+                        analysisPreviewCard
                         resumeUploadCard
                         targetRoleCard
                         jobDescriptionCard
@@ -112,6 +113,27 @@ struct ATSScannerView: View {
         }
     }
 
+    private var analysisPreviewCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "What we analyze", subtitle: "Fast ATS diagnostics with action-oriented feedback")
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
+                    KeywordChip(text: "ATS Parsing", status: .present)
+                    KeywordChip(text: "Keyword Match", status: .weak)
+                    KeywordChip(text: "Impact Score", status: .present)
+                    KeywordChip(text: "Formatting Risk", status: .missing)
+                    KeywordChip(text: "Role Alignment", status: .weak)
+                    KeywordChip(text: "Readability", status: .present)
+                }
+
+                Text("You get critical issues, fast wins, and higher-impact changes instead of just one ATS number.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+    }
+
     private var targetRoleCard: some View {
         GlassCard {
             TextInputField(
@@ -187,7 +209,7 @@ struct ATSScannerView: View {
                         .foregroundStyle(BoostaColor.secondaryText)
 
                     HStack(spacing: BoostaSpace.sm) {
-                        SecondaryButton(title: "Upgrade") {
+                        PrimaryButton(title: "Upgrade") {
                             showPaywall = true
                         }
                         SecondaryButton(title: "Restore") {

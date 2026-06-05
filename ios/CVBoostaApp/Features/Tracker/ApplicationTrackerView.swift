@@ -11,6 +11,20 @@ struct ApplicationTrackerView: View {
     @State private var errorMessage: String?
     @State private var showAddSheet = false
 
+    private var interviewCount: Int {
+        applications.filter { $0.status == .interview }.count
+    }
+
+    private var offerCount: Int {
+        applications.filter { $0.status == .offer }.count
+    }
+
+    private var responseRate: Int {
+        guard !applications.isEmpty else { return 0 }
+        let responses = applications.filter { $0.status == .interview || $0.status == .offer }.count
+        return Int((Double(responses) / Double(applications.count)) * 100)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -25,7 +39,7 @@ struct ApplicationTrackerView: View {
                     VStack {
                         EmptyStateView(
                             title: "No applications yet",
-                            message: "Track job applications and interviews in one place.",
+                            message: "Turn job hunting into a clear pipeline with stages, notes, and conversion signals.",
                             actionTitle: "Add Application"
                         ) {
                             showAddSheet = true
@@ -35,6 +49,7 @@ struct ApplicationTrackerView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: BoostaSpace.sm) {
+                            pipelineCard
                             ForEach(applications) { app in
                                 applicationCard(app)
                             }
@@ -66,6 +81,24 @@ struct ApplicationTrackerView: View {
                         .padding(.horizontal, BoostaSpace.md)
                         .padding(.top, BoostaSpace.sm)
                 }
+            }
+        }
+    }
+
+    private var pipelineCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Pipeline", subtitle: "Your job hunt operating system")
+
+                HStack(spacing: BoostaSpace.sm) {
+                    MetricPill(title: "Applied", value: "\(applications.count)", color: BoostaColor.accent)
+                    MetricPill(title: "Interviews", value: "\(interviewCount)", color: BoostaColor.warning)
+                    MetricPill(title: "Offers", value: "\(offerCount)", color: BoostaColor.success)
+                }
+
+                Text(responseRate == 0 ? "Start tracking applications to unlock conversion insights." : "Current response rate: \(responseRate)%")
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
             }
         }
     }
@@ -263,4 +296,3 @@ struct AddApplicationView: View {
         }
     }
 }
-

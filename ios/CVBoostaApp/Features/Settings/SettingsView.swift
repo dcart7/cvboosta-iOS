@@ -38,7 +38,6 @@ struct SettingsView: View {
                         subscriptionSection
                         dataSection
                         appSection
-                        developerSection
                     }
                     .padding(BoostaSpace.md)
                 }
@@ -74,6 +73,10 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Subscription")
                 row("Current plan", value: planTitle)
+
+                Text("Unlimited ATS scans, advanced tailoring, AI rewrite suggestions, and deeper interview insights.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
 
                 NavigationLink {
                     PaywallView()
@@ -126,17 +129,6 @@ struct SettingsView: View {
                 row("Privacy Policy", value: "Available")
                 row("Terms of Service", value: "Available")
                 row("Contact Support", value: "support@cvboosta.com")
-            }
-        }
-    }
-
-    private var developerSection: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Developer")
-                row("API environment", value: AppEnvironment.apiBaseURL.absoluteString)
-                row("Website", value: AppEnvironment.webBaseURL.absoluteString)
-                row("App version", value: "1.0")
             }
         }
     }

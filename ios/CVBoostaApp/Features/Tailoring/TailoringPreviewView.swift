@@ -82,8 +82,8 @@ struct TailoringPreviewView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
-                    title: "Tailoring Preview",
-                    subtitle: "Quick improvements. Continue deep optimization on web."
+                    title: "AI Tailoring",
+                    subtitle: "Fast rewrite preview on iPhone. Deep editing stays on web."
                 )
 
                 HStack(alignment: .top, spacing: BoostaSpace.sm) {
@@ -231,12 +231,42 @@ struct TailoringPreviewView: View {
 
     private var emptyStateCard: some View {
         GlassCard {
-            EmptyStateView(
-                title: "No optimization yet",
-                message: "Run one scan to populate Tailoring with an optimized ATS-friendly version.",
-                actionTitle: "Go to Scanner"
-            ) {
-                appRouter.open(.scanner)
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "Before → after preview", subtitle: "What CVBoosta improves")
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Before")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                    Text("Worked on backend services and APIs.")
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                        .padding(.horizontal, BoostaSpace.sm)
+                        .padding(.vertical, 10)
+                        .background(BoostaColor.surfaceMuted)
+                        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("After")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.accentSecondary)
+                    Text("Built scalable backend APIs that reduced response times and improved role-specific keyword match.")
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.primaryText)
+                        .padding(.horizontal, BoostaSpace.sm)
+                        .padding(.vertical, 10)
+                        .background(BoostaColor.surfaceElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+                }
+
+                SecondaryButton(title: "Open Scanner") {
+                    appRouter.open(.scanner)
+                }
             }
         }
     }
