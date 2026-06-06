@@ -30,12 +30,16 @@ struct StatisticsView: View {
         return "there"
     }
 
+    private var sharedHistoryAscending: [HistoryListItem] {
+        historyItems.sorted(by: { $0.createdAt < $1.createdAt })
+    }
+
     private var scans: [ScanHistorySnapshot] {
         authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
     private var latestScore: Int {
-        scans.last?.atsScore ?? 0
+        sharedHistoryAscending.last.map { $0.matchAfter ?? $0.score } ?? scans.last?.atsScore ?? 0
     }
 
     private var careerScore: Int {
@@ -55,19 +59,21 @@ struct StatisticsView: View {
     }
 
     private var avgScore: Int {
-        guard !scans.isEmpty else { return 0 }
-        let total = scans.reduce(0) { $0 + $1.atsScore }
-        return total / scans.count
+        let values = sharedHistoryAscending.map { $0.matchAfter ?? $0.score }
+        guard !values.isEmpty else { return 0 }
+        let total = values.reduce(0, +)
+        return total / values.count
     }
 
     private var monthlyDelta: Int {
-        guard scans.count > 1 else { return 0 }
-        return (scans.last?.atsScore ?? 0) - (scans.first?.atsScore ?? 0)
+        guard sharedHistoryAscending.count > 1 else { return 0 }
+        return (sharedHistoryAscending.last?.matchAfter ?? sharedHistoryAscending.last?.score ?? 0)
+            - (sharedHistoryAscending.first?.matchAfter ?? sharedHistoryAscending.first?.score ?? 0)
     }
 
     private var streakDays: Int {
         let calendar = Calendar.current
-        let uniqueDays = Set(scans.map { calendar.startOfDay(for: $0.createdAt) })
+        let uniqueDays = Set(sharedHistoryAscending.map { calendar.startOfDay(for: $0.createdAt) })
         guard !uniqueDays.isEmpty else { return 0 }
 
         var current = calendar.startOfDay(for: Date())
@@ -91,7 +97,7 @@ struct StatisticsView: View {
     private var scansThisWeek: Int {
         let calendar = Calendar.current
         let now = Date()
-        return scans.filter {
+        return sharedHistoryAscending.filter {
             calendar.isDate($0.createdAt, equalTo: now, toGranularity: .weekOfYear)
         }.count
     }
@@ -114,8 +120,12 @@ struct StatisticsView: View {
     private var trendPoints: [CareerTrendPoint] {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
-        return Array(scans.suffix(6)).enumerated().map { index, scan in
-            CareerTrendPoint(id: index, label: formatter.string(from: scan.createdAt), atsScore: scan.atsScore)
+        return sharedHistoryAscending.enumerated().map { index, item in
+            CareerTrendPoint(
+                id: index,
+                label: formatter.string(from: item.createdAt),
+                atsScore: item.matchAfter ?? item.score
+            )
         }
     }
 

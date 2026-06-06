@@ -42,25 +42,30 @@ struct StatisticsWorkspaceView_iPad: View {
         trackedApplications.filter { $0.status == .interview }.count
     }
 
+    private var sharedHistoryAscending: [HistoryListItem] {
+        historyItems.sorted(by: { $0.createdAt < $1.createdAt })
+    }
+
     private var latestScore: Int {
-        authViewModel.me?.scanHistory.first?.atsScore ?? 0
+        sharedHistoryAscending.last.map { $0.matchAfter ?? $0.score }
+            ?? authViewModel.me?.scanHistory.first?.atsScore
+            ?? 0
     }
 
     private var avgScore: Int {
-        guard let scans = authViewModel.me?.scanHistory, !scans.isEmpty else { return 0 }
-        let total = scans.reduce(0) { $0 + $1.atsScore }
-        return total / scans.count
+        let values = sharedHistoryAscending.map { $0.matchAfter ?? $0.score }
+        guard !values.isEmpty else { return 0 }
+        let total = values.reduce(0, +)
+        return total / values.count
     }
 
     private var atsTrendScores: [Int] {
-        let scans = authViewModel.me?.scanHistory.prefix(12) ?? []
-        return scans.reversed().map(\.atsScore)
+        sharedHistoryAscending.map { $0.matchAfter ?? $0.score }
     }
 
     private var streakDays: Int {
-        guard let scans = authViewModel.me?.scanHistory else { return 0 }
         let calendar = Calendar.current
-        let uniqueDays = Set(scans.map { calendar.startOfDay(for: $0.createdAt) })
+        let uniqueDays = Set(sharedHistoryAscending.map { calendar.startOfDay(for: $0.createdAt) })
         guard !uniqueDays.isEmpty else { return 0 }
 
         var current = calendar.startOfDay(for: Date())
@@ -263,11 +268,11 @@ struct StatisticsWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
                     title: "ATS Trend",
-                    subtitle: atsTrendScores.isEmpty ? "No trend yet" : "Last \(atsTrendScores.count) scans"
+                    subtitle: atsTrendScores.isEmpty ? "No trend yet" : "\(atsTrendScores.count) shared history items"
                 )
 
                 if atsTrendScores.count < 2 {
-                    Text("Scan again to visualize progress over time.")
+                    Text("More shared history will make the full account trend clearer.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {

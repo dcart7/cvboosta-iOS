@@ -19,15 +19,18 @@
     {
       "layers" : [
         {
+          "blend-mode" : "normal",
+          "glass" : true,
           "image-name" : "Image.png",
           "name" : "Image",
+          "opacity" : 1,
           "position-specializations" : [
             {
               "value" : {
                 "scale" : 1,
                 "translation-in-points" : [
                   4,
-                  -20.423173026815675
+                  -2.5403605268156753
                 ]
               }
             },
