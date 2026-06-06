@@ -27,7 +27,7 @@ enum SharedHistoryPDFBuilder {
 
             if let coverLetter = detail.coverLetter, !coverLetter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 layout.drawSection(title: "Cover Letter")
-                layout.drawParagraphs(coverLetter)
+                layout.drawParagraphs(coverLetter, bodyFont: layout.bodyFont)
             }
 
             layout.drawSection(title: "Optimized Resume")

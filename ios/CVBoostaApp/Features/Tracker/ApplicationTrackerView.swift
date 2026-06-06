@@ -284,7 +284,7 @@ struct NewApplicationDraft: Hashable {
     let jobLink: String?
 }
 
-private struct ApplicationEditingContext: Identifiable {
+struct ApplicationEditingContext: Identifiable {
     let id: UUID
     let draft: NewApplicationDraft
 }
