@@ -463,10 +463,21 @@ struct StatisticsWorkspaceView_iPad: View {
     private var sharedHistoryCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(
-                    title: "Shared Account History",
-                    subtitle: isLoadingHistory ? "Syncing web + iPad activity..." : "Browser-generated scans and optimizations"
-                )
+                HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                    SectionHeader(
+                        title: "Shared Account History",
+                        subtitle: isLoadingHistory ? "Syncing web + iPad activity..." : "Browser-generated scans and optimizations"
+                    )
+                    Spacer()
+                    if !historyItems.isEmpty {
+                        NavigationLink("View all") {
+                            AccountHistoryView()
+                        }
+                        .font(BoostaType.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(BoostaColor.accent)
+                    }
+                }
 
                 if historyItems.isEmpty {
                     Text(isLoadingHistory ? "Loading shared history..." : "No history found yet.")

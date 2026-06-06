@@ -429,7 +429,18 @@ struct StatisticsView: View {
     private var historyCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Account History", subtitle: historySubtitle)
+                HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                    SectionHeader(title: "Account History", subtitle: historySubtitle)
+                    Spacer()
+                    if !historyItems.isEmpty {
+                        NavigationLink("View all") {
+                            AccountHistoryView()
+                        }
+                        .font(BoostaType.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(BoostaColor.accent)
+                    }
+                }
 
                 if historyItems.isEmpty {
                     Text(isLoadingHistory ? "Loading shared history..." : "No browser or app history found yet.")

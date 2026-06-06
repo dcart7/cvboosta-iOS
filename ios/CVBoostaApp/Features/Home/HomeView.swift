@@ -14,7 +14,6 @@ struct HomeView: View {
     @State private var errorMessage: String?
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animateSparkline = false
-    @State private var isShowingAllRecentActivity = false
 
     private let resumeService = ResumeService.shared
 
@@ -237,11 +236,11 @@ struct HomeView: View {
                         subtitle: isLoadingHistory ? "Syncing browser + app history..." : "Shared account activity"
                     )
 
-                    if historyItems.count > 3 {
-                        Button(isShowingAllRecentActivity ? "Collapse" : "Show all") {
-                            withAnimation(BoostaMotion.smooth) {
-                                isShowingAllRecentActivity.toggle()
-                            }
+                    Spacer()
+
+                    if !historyItems.isEmpty {
+                        NavigationLink("View all") {
+                            AccountHistoryView()
                         }
                         .font(BoostaType.caption)
                         .buttonStyle(.plain)
@@ -254,7 +253,7 @@ struct HomeView: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    ForEach(historyItems.prefix(isShowingAllRecentActivity ? 10 : 3)) { item in
+                    ForEach(historyItems.prefix(3)) { item in
                         Button {
                             Task {
                                 await openHistoryPDF(for: item)

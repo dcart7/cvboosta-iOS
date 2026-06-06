@@ -16,7 +16,6 @@ struct HomeWorkspaceView_iPad: View {
     @State private var historyErrorMessage: String?
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animateSparkline = false
-    @State private var isShowingAllRecentActivity = false
 
     private let resumeService = ResumeService.shared
 
@@ -199,11 +198,10 @@ struct HomeWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 HStack(alignment: .top, spacing: BoostaSpace.sm) {
                     SectionHeader(title: "Recent Activity", subtitle: isLoadingHistory ? "Syncing shared account..." : "Shared browser + iPad history")
-                    if historyItems.count > 4 {
-                        Button(isShowingAllRecentActivity ? "Collapse" : "Show all") {
-                            withAnimation(BoostaMotion.smooth) {
-                                isShowingAllRecentActivity.toggle()
-                            }
+                    Spacer()
+                    if !historyItems.isEmpty {
+                        NavigationLink("View all") {
+                            AccountHistoryView()
                         }
                         .font(BoostaType.caption)
                         .buttonStyle(.plain)
@@ -216,7 +214,7 @@ struct HomeWorkspaceView_iPad: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    ForEach(historyItems.prefix(isShowingAllRecentActivity ? 10 : 4)) { item in
+                    ForEach(historyItems.prefix(4)) { item in
                         Button {
                             Task {
                                 await openHistoryPDF(for: item)
