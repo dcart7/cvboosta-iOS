@@ -144,6 +144,7 @@ struct TailoringWorkspaceView_iPad: View {
             HStack(alignment: .top, spacing: BoostaSpace.lg) {
                 VStack(alignment: .leading, spacing: BoostaSpace.lg) {
                     originalCard(payload)
+                    diffHighlightsCard(payload)
                     jobContextCard(payload)
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -193,6 +194,28 @@ struct TailoringWorkspaceView_iPad: View {
                     }
                     WorkspaceActionButton(title: "Save", systemImage: "bookmark") {
                         saveSuggestion(text: payload.response.optimizedCV, payload: payload)
+                    }
+                }
+            }
+        }
+    }
+
+    private func diffHighlightsCard(_ payload: LatestScanPayload) -> some View {
+        let before = previewBullets(from: payload.response.originalCVText)
+        let after = previewBullets(from: payload.response.optimizedCV)
+
+        return GlassCard(padding: BoostaSpace.lg) {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Before → after", subtitle: "Quick proof of what changed")
+
+                ForEach(Array(zip(before.indices, before)).prefix(2), id: \.0) { pair in
+                    let index = pair.0
+                    let oldLine = pair.1
+                    VStack(alignment: .leading, spacing: 8) {
+                        TailoringWorkspaceDiffLine(title: "Before", text: oldLine, tint: BoostaColor.secondaryText)
+                        if after.indices.contains(index) {
+                            TailoringWorkspaceDiffLine(title: "After", text: after[index], tint: BoostaColor.success)
+                        }
                     }
                 }
             }
@@ -347,6 +370,52 @@ struct TailoringWorkspaceView_iPad: View {
 
         components?.queryItems = items
         return components?.url ?? AppEnvironment.webBaseURL
+    }
+
+    private func previewBullets(from text: String) -> [String] {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count > 30 }
+
+        if !lines.isEmpty {
+            return Array(lines.prefix(3))
+        }
+
+        return Array(
+            text
+                .components(separatedBy: ". ")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { $0.count > 24 }
+                .prefix(3)
+        )
+    }
+}
+
+private struct TailoringWorkspaceDiffLine: View {
+    let title: String
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(tint)
+
+            Text(text)
+                .font(BoostaType.caption)
+                .foregroundStyle(title == "After" ? BoostaColor.primaryText : BoostaColor.secondaryText)
+                .padding(.horizontal, BoostaSpace.sm)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(title == "After" ? BoostaColor.surfaceElevated : BoostaColor.surfaceMuted)
+                .overlay(
+                    RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                        .stroke(title == "After" ? BoostaColor.glassStroke : .clear, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        }
     }
 }
 

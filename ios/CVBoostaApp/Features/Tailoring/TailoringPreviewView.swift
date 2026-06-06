@@ -40,6 +40,7 @@ struct TailoringPreviewView: View {
 
                         if let payload = latestPayload {
                             matchCard(payload)
+                            tailoringDiffCard(payload)
                             missingSkillsCard(payload)
                             recommendationsCard(payload)
                             optimizedPreviewCard(payload)
@@ -203,11 +204,20 @@ struct TailoringPreviewView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Optimized resume (preview)")
 
-                Text(payload.response.optimizedCV)
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
-                    .textSelection(.enabled)
-                    .lineLimit(16)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(previewBullets(from: payload.response.optimizedCV), id: \.self) { bullet in
+                        HStack(alignment: .top, spacing: BoostaSpace.xs) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(BoostaColor.success)
+                                .padding(.top, 2)
+                            Text(bullet)
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
 
                 HStack(spacing: BoostaSpace.sm) {
                     SecondaryButton(title: "Copy") {
@@ -221,9 +231,69 @@ struct TailoringPreviewView: View {
 
                 if !payload.response.addedKeywords.isEmpty {
                     let limit = subscriptionService.isPremium ? 10 : 5
-                    Text("Added keywords: \(Array(payload.response.addedKeywords.prefix(limit)).joined(separator: ", "))")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Inserted keywords")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
+                            ForEach(Array(payload.response.addedKeywords.prefix(limit)), id: \.self) { keyword in
+                                KeywordChip(text: keyword, status: .present)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tailoringDiffCard(_ payload: LatestScanPayload) -> some View {
+        let before = previewBullets(from: payload.response.originalCVText)
+        let after = previewBullets(from: payload.response.optimizedCV)
+        let weakPhrases = weakPhrases(in: payload.response.originalCVText)
+
+        return GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "What changed", subtitle: "See AI value before you open Studio")
+
+                ForEach(Array(zip(before.indices, before)).prefix(2), id: \.0) { pair in
+                    let index = pair.0
+                    let oldLine = pair.1
+                    VStack(alignment: .leading, spacing: 8) {
+                        TailoringDiffLine(label: "Before", text: oldLine, tint: BoostaColor.secondaryText, symbol: "minus.circle.fill")
+
+                        if after.indices.contains(index) {
+                            TailoringDiffLine(label: "After", text: after[index], tint: BoostaColor.success, symbol: "plus.circle.fill")
+                        }
+                    }
+                }
+
+                if !payload.response.addedKeywords.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Boosted with ATS keywords")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
+                            ForEach(Array(payload.response.addedKeywords.prefix(6)), id: \.self) { keyword in
+                                KeywordChip(text: keyword, status: .present)
+                            }
+                        }
+                    }
+                }
+
+                if !weakPhrases.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Weak phrases replaced")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                            ForEach(weakPhrases, id: \.self) { phrase in
+                                KeywordChip(text: phrase, status: .missing)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -345,6 +415,69 @@ struct TailoringPreviewView: View {
 
         components?.queryItems = items
         return components?.url ?? AppEnvironment.webBaseURL
+    }
+
+    private func previewBullets(from text: String) -> [String] {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count > 30 }
+
+        if !lines.isEmpty {
+            return Array(lines.prefix(3))
+        }
+
+        let sentences = text
+            .components(separatedBy: ". ")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count > 24 }
+
+        return Array(sentences.prefix(3))
+    }
+
+    private func weakPhrases(in text: String) -> [String] {
+        let lowered = text.lowercased()
+        let candidates = [
+            "worked on",
+            "responsible for",
+            "helped with",
+            "involved in",
+            "participated in"
+        ]
+        return candidates.filter { lowered.contains($0) }
+    }
+}
+
+private struct TailoringDiffLine: View {
+    let label: String
+    let text: String
+    let tint: Color
+    let symbol: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(BoostaType.caption)
+                .foregroundStyle(tint)
+
+            HStack(alignment: .top, spacing: BoostaSpace.xs) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(tint)
+                    .padding(.top, 2)
+                Text(text)
+                    .font(BoostaType.body)
+                    .foregroundStyle(label == "After" ? BoostaColor.primaryText : BoostaColor.secondaryText)
+            }
+            .padding(.horizontal, BoostaSpace.sm)
+            .padding(.vertical, 10)
+            .background(label == "After" ? BoostaColor.surfaceElevated : BoostaColor.surfaceMuted)
+            .overlay(
+                RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                    .stroke(label == "After" ? BoostaColor.glassStroke : .clear, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        }
     }
 }
 

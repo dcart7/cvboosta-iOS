@@ -15,6 +15,7 @@ struct StatisticsView: View {
     @State private var errorMessage: String?
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animatedTrendCount = 0
+    @State private var selectedSection: StatisticsSection = .overview
 
     private let resumeService = ResumeService.shared
 
@@ -34,16 +35,25 @@ struct StatisticsView: View {
         historyItems.sorted(by: { $0.createdAt < $1.createdAt })
     }
 
+    private func normalizedATSScore(_ raw: Int) -> Int {
+        if raw > 100 {
+            return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
+        }
+        return min(max(raw, 0), 100)
+    }
+
     private var scans: [ScanHistorySnapshot] {
         authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
     private var latestScore: Int {
-        sharedHistoryAscending.last.map { $0.matchAfter ?? $0.score } ?? scans.last?.atsScore ?? 0
+        sharedHistoryAscending.last.map { normalizedATSScore($0.matchAfter ?? $0.score) }
+            ?? scans.last.map { normalizedATSScore($0.matchAfter ?? $0.atsScore) }
+            ?? 0
     }
 
     private var careerScore: Int {
-        latestHistoryDetail?.matchAfter ?? latestScore
+        normalizedATSScore(latestHistoryDetail?.matchAfter ?? latestScore)
     }
 
     private var applicationsCount: Int {
@@ -59,7 +69,7 @@ struct StatisticsView: View {
     }
 
     private var avgScore: Int {
-        let values = sharedHistoryAscending.map { $0.matchAfter ?? $0.score }
+        let values = sharedHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
         guard !values.isEmpty else { return 0 }
         let total = values.reduce(0, +)
         return total / values.count
@@ -67,8 +77,8 @@ struct StatisticsView: View {
 
     private var monthlyDelta: Int {
         guard sharedHistoryAscending.count > 1 else { return 0 }
-        return (sharedHistoryAscending.last?.matchAfter ?? sharedHistoryAscending.last?.score ?? 0)
-            - (sharedHistoryAscending.first?.matchAfter ?? sharedHistoryAscending.first?.score ?? 0)
+        return normalizedATSScore(sharedHistoryAscending.last?.matchAfter ?? sharedHistoryAscending.last?.score ?? 0)
+            - normalizedATSScore(sharedHistoryAscending.first?.matchAfter ?? sharedHistoryAscending.first?.score ?? 0)
     }
 
     private var streakDays: Int {
@@ -124,8 +134,23 @@ struct StatisticsView: View {
             CareerTrendPoint(
                 id: index,
                 label: formatter.string(from: item.createdAt),
-                atsScore: item.matchAfter ?? item.score
+                atsScore: normalizedATSScore(item.matchAfter ?? item.score)
             )
+        }
+    }
+
+    private var trendInsight: String {
+        guard let first = trendPoints.first, let last = trendPoints.last, trendPoints.count > 1 else {
+            return "Your trend will become more useful as more account history builds up."
+        }
+
+        let delta = last.atsScore - first.atsScore
+        if delta > 0 {
+            return "Your resume consistency improved over the tracked history."
+        } else if delta < 0 {
+            return "Your latest runs are softer than your earlier baseline — worth rescanning after tailoring."
+        } else {
+            return "Your ATS performance is stable across recent account history."
         }
     }
 
@@ -178,6 +203,26 @@ struct StatisticsView: View {
         isLoadingHistory ? "Syncing browser + app activity..." : "Shared account history from CVBoosta web and iOS"
     }
 
+    private var monthlyDeltaDescription: String {
+        if monthlyDelta == 0 {
+            return "No monthly trend yet"
+        }
+        if monthlyDelta > 0 {
+            return "+\(monthlyDelta) stronger than your first tracked version"
+        }
+        return "Latest version is \(abs(monthlyDelta)) points below your strongest baseline"
+    }
+
+    private var monthlyTrendLabel: String {
+        if monthlyDelta == 0 {
+            return "Stable"
+        }
+        if monthlyDelta > 0 {
+            return "+\(monthlyDelta) from first run"
+        }
+        return "Down \(abs(monthlyDelta)) vs best baseline"
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -195,15 +240,9 @@ struct StatisticsView: View {
                             subtitle: "Your career intelligence center."
                         )
 
+                        sectionPicker
                         heroCard
-                        trendCard
-                        funnelCard
-                        responseRateCard
-                        breakdownCard
-                        keywordsCard
-                        aiInsightsCard
-                        streakCard
-                        weeklySummaryCard
+                        sectionContent
                         historyCard
                     }
                     .padding(BoostaSpace.md)
@@ -243,6 +282,37 @@ struct StatisticsView: View {
         }
     }
 
+    private var sectionPicker: some View {
+        Picker("Statistics section", selection: $selectedSection) {
+            ForEach(StatisticsSection.allCases) { section in
+                Text(section.title).tag(section)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch selectedSection {
+        case .overview:
+            responseRateCard
+            streakCard
+            weeklySummaryCard
+        case .ats:
+            trendCard
+            breakdownCard
+            keywordsCard
+        case .funnel:
+            funnelCard
+            responseRateCard
+            streakCard
+        case .insights:
+            aiInsightsCard
+            keywordsCard
+            weeklySummaryCard
+        }
+    }
+
     private var heroCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
@@ -263,7 +333,7 @@ struct StatisticsView: View {
                         Text("Interview rate: \(responseRate == 0 ? "—" : "\(responseRate)%") • Resume strength: \(interviewProbability)")
                             .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
-                        Text(monthlyDelta == 0 ? "No monthly trend yet" : "\(monthlyDelta > 0 ? "+" : "")\(monthlyDelta) this month")
+                        Text(monthlyDeltaDescription)
                             .font(BoostaType.caption)
                             .foregroundStyle(monthlyDelta >= 0 ? BoostaColor.success : BoostaColor.warning)
                     }
@@ -285,22 +355,84 @@ struct StatisticsView: View {
     private var trendCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Performance Over Time", subtitle: "ATS score progression")
+                HStack(alignment: .top, spacing: BoostaSpace.md) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ATS Performance")
+                            .font(BoostaType.section)
+                            .foregroundStyle(BoostaColor.primaryText)
+                        Text(trendPoints.isEmpty ? "No trend yet" : "\(trendPoints.count) history items tracked")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(careerScore == 0 ? "—" : "\(careerScore)")
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .foregroundStyle(BoostaColor.primaryText)
+                        Text(monthlyTrendLabel)
+                            .font(BoostaType.caption)
+                            .foregroundStyle(monthlyDelta >= 0 ? BoostaColor.success : BoostaColor.warning)
+                    }
+                }
 
                 if trendPoints.count < 2 {
-                    Text("Scan more resumes to visualize progress over time.")
+                    Text("More shared history will make this performance trend meaningful.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
                     Chart(Array(trendPoints.prefix(max(animatedTrendCount, 0)))) { point in
                         LineMark(x: .value("Date", point.label), y: .value("ATS", point.atsScore))
                             .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                             .foregroundStyle(BoostaColor.accent)
 
                         AreaMark(x: .value("Date", point.label), y: .value("ATS", point.atsScore))
-                            .foregroundStyle(BoostaColor.accent.opacity(0.12))
+                            .foregroundStyle(
+                                .linearGradient(
+                                    colors: [BoostaColor.accent.opacity(0.18), BoostaColor.accent.opacity(0.02)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+
+                        PointMark(x: .value("Date", point.label), y: .value("ATS", point.atsScore))
+                            .foregroundStyle(BoostaColor.accent)
+                            .symbolSize(point.id == trendPoints.count - 1 ? 36 : 14)
+                    }
+                    .chartYScale(domain: 0...100)
+                    .chartYAxis {
+                        AxisMarks(position: .leading, values: [0, 50, 100]) { value in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.8))
+                                .foregroundStyle(Color.white.opacity(0.08))
+                            AxisValueLabel {
+                                if let intValue = value.as(Int.self) {
+                                    Text("\(intValue)")
+                                        .font(BoostaType.caption)
+                                        .foregroundStyle(BoostaColor.secondaryText)
+                                }
+                            }
+                        }
+                    }
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: min(max(trendPoints.count, 2), 5))) { value in
+                            AxisGridLine().foregroundStyle(.clear)
+                            AxisTick().foregroundStyle(Color.white.opacity(0.16))
+                            AxisValueLabel {
+                                if let stringValue = value.as(String.self) {
+                                    Text(stringValue)
+                                        .font(BoostaType.caption)
+                                        .foregroundStyle(BoostaColor.secondaryText)
+                                }
+                            }
+                        }
                     }
                     .frame(height: 180)
+
+                    Text(trendInsight)
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
                 }
             }
         }
@@ -429,7 +561,7 @@ struct StatisticsView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Weekly Report", subtitle: "Progress, momentum, control")
 
-                Text("ATS \(monthlyDelta >= 0 ? "+" : "")\(monthlyDelta), \(weeklyApplications) applications sent, \(interviewsCount) interviews in pipeline, \(weeklyKeywordsImproved) keywords improved.")
+                Text(weeklySummaryText)
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
             }
@@ -536,6 +668,33 @@ struct StatisticsView: View {
                 animatedTrendCount = index
                 try? await Task.sleep(for: .milliseconds(90))
             }
+        }
+    }
+}
+
+private extension StatisticsView {
+    var weeklySummaryText: String {
+        let atsLine = monthlyDelta >= 0
+            ? "ATS is up \(monthlyDelta)"
+            : "ATS is \(abs(monthlyDelta)) below your strongest baseline"
+        return "\(atsLine), \(weeklyApplications) applications sent, \(interviewsCount) interviews in pipeline, \(weeklyKeywordsImproved) keywords improved."
+    }
+}
+
+private enum StatisticsSection: String, CaseIterable, Identifiable {
+    case overview
+    case ats
+    case funnel
+    case insights
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .overview: return "Overview"
+        case .ats: return "ATS"
+        case .funnel: return "Funnel"
+        case .insights: return "Insights"
         }
     }
 }

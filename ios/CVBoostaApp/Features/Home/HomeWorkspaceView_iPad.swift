@@ -35,8 +35,19 @@ struct HomeWorkspaceView_iPad: View {
         authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
+    private func normalizedATSScore(_ raw: Int) -> Int {
+        if raw > 100 {
+            return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
+        }
+        return min(max(raw, 0), 100)
+    }
+
     private var careerScore: Int {
-        latestHistoryDetail?.matchAfter ?? scans.last?.matchAfter ?? scans.last?.atsScore ?? 0
+        normalizedATSScore(latestHistoryDetail?.matchAfter ?? scans.last?.matchAfter ?? scans.last?.atsScore ?? 0)
+    }
+
+    private var momentumScore: Int {
+        min(100, max(0, Int(Double(careerScore) * 0.55) + min(weeklyApplications * 8, 24) + min(responseRate / 2, 18) + min(bodyKeywords.count * 4, 16)))
     }
 
     private var weeklyApplications: Int {
@@ -54,11 +65,48 @@ struct HomeWorkspaceView_iPad: View {
     }
 
     private var trendScores: [Int] {
-        Array(scans.suffix(7).map(\.atsScore))
+        Array(scans.suffix(7).map { normalizedATSScore($0.matchAfter ?? $0.atsScore) })
     }
 
     private var bodyKeywords: [String] {
         Array((latestHistoryDetail?.missingSkills ?? []).prefix(4))
+    }
+
+    private var overdueFollowUps: Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return trackedApplications.filter { app in
+            app.status == .applied
+                && calendar.date(byAdding: .day, value: 5, to: calendar.startOfDay(for: app.appliedAt)).map { $0 <= today } == true
+        }.count
+    }
+
+    private var upcomingInterviews: Int {
+        let now = Date()
+        guard let sevenDays = Calendar.current.date(byAdding: .day, value: 7, to: now) else { return 0 }
+        return trackedApplications.filter { app in
+            guard app.status == .interview, let interviewAt = app.interviewAt else { return false }
+            return interviewAt >= now && interviewAt <= sevenDays
+        }.count
+    }
+
+    private var todayItems: [HomeWorkspaceTodayItem] {
+        var items: [HomeWorkspaceTodayItem] = []
+
+        if overdueFollowUps > 0 {
+            items.append(.init(title: "Follow up today", detail: "\(overdueFollowUps) applications are ready for a recruiter nudge.", tint: BoostaColor.warning))
+        }
+        if upcomingInterviews > 0 {
+            items.append(.init(title: "Interview prep", detail: "\(upcomingInterviews) interviews are coming up this week.", tint: BoostaColor.success))
+        }
+        if !bodyKeywords.isEmpty {
+            items.append(.init(title: "Keyword gaps", detail: "Add \(bodyKeywords.prefix(2).joined(separator: ", ")) to role-specific bullets.", tint: BoostaColor.accent))
+        }
+        if items.isEmpty {
+            items.append(.init(title: "Keep momentum", detail: careerScore == 0 ? "Run your first ATS scan to create a benchmark." : "Open statistics or tailoring to keep improving.", tint: BoostaColor.accentSecondary))
+        }
+
+        return Array(items.prefix(3))
     }
 
     var body: some View {
@@ -133,6 +181,7 @@ struct HomeWorkspaceView_iPad: View {
                 .gridCellColumns(columns.count)
 
             quickStatsCard
+            todayCard
             recentActivityCard
 
             actionsCard
@@ -150,7 +199,7 @@ struct HomeWorkspaceView_iPad: View {
                     Text("Welcome back, \(firstName)")
                         .font(BoostaType.title)
                         .foregroundStyle(BoostaColor.primaryText)
-                    Text("This is your compact workspace. Review the essentials here, then open full statistics when you want the deeper career dashboard.")
+                    Text("Career momentum: \(momentumScore == 0 ? "Start your baseline" : "\(momentumScore)/100") • review today's actions, then jump into the deeper dashboard.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
 
@@ -175,8 +224,8 @@ struct HomeWorkspaceView_iPad: View {
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
                     HomeStatCard(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", color: BoostaColor.accent)
+                    HomeStatCard(title: "Momentum", value: momentumScore == 0 ? "—" : "\(momentumScore)", color: BoostaColor.accentSecondary)
                     HomeStatCard(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", color: BoostaColor.success)
-                    HomeStatCard(title: "This Week", value: "\(weeklyApplications)", color: BoostaColor.warning)
                 }
 
                 CompactTrendView(scores: trendScores, isAnimated: animateSparkline)
@@ -188,6 +237,45 @@ struct HomeWorkspaceView_iPad: View {
                             KeywordChip(text: keyword, status: .missing)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private var todayCard: some View {
+        GlassCard(padding: BoostaSpace.lg) {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "Today", subtitle: "The next actions that move your search forward")
+
+                ForEach(todayItems) { item in
+                    HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                        Circle()
+                            .fill(item.tint.opacity(0.18))
+                            .frame(width: 36, height: 36)
+                            .overlay {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(item.tint)
+                            }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title)
+                                .font(BoostaType.bodyStrong)
+                                .foregroundStyle(BoostaColor.primaryText)
+                            Text(item.detail)
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(BoostaSpace.sm)
+                    .background(Color.white.opacity(0.55))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                            .stroke(BoostaColor.glassStroke, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                 }
             }
         }
@@ -294,6 +382,13 @@ struct HomeWorkspaceView_iPad: View {
             historyErrorMessage = "Could not open browser-generated PDF in the app."
         }
     }
+}
+
+private struct HomeWorkspaceTodayItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let detail: String
+    let tint: Color
 }
 
 private struct WorkspaceCTAButton: View {

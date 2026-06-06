@@ -81,7 +81,7 @@ struct SettingsView: View {
                 SectionHeader(title: "Subscription")
                 row("Current plan", value: planTitle)
 
-                Text("Unlimited ATS scans, advanced tailoring, AI rewrite suggestions, and deeper interview insights.")
+                Text("Unlock unlimited scans, deeper ATS intelligence, AI rewrite power, interview prediction signals, and stronger recruiter visibility.")
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
 

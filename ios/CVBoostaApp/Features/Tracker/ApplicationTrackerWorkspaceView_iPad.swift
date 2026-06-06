@@ -30,6 +30,14 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         ]
     }
 
+    private var priorityCounts: [(title: String, value: Int, color: Color)] {
+        [
+            ("Urgent", applications.filter { priority(for: $0) == .urgent }.count, BoostaColor.danger),
+            ("Follow up", applications.filter { priority(for: $0) == .followUp }.count, BoostaColor.warning),
+            ("Interview soon", applications.filter { priority(for: $0) == .interviewSoon }.count, BoostaColor.accentSecondary),
+        ]
+    }
+
     private var widgetSyncSignature: [String] {
         applications.map { "\($0.id.uuidString)-\($0.status.rawValue)-\($0.appliedAt.timeIntervalSince1970)" }
     }
@@ -171,6 +179,12 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                         MetricPill(title: item.title, value: "\(item.value)", color: item.color)
                     }
                 }
+
+                HStack(spacing: BoostaSpace.sm) {
+                    ForEach(Array(priorityCounts.enumerated()), id: \.offset) { _, item in
+                        MetricPill(title: item.title, value: "\(item.value)", color: item.color)
+                    }
+                }
             }
         }
     }
@@ -197,6 +211,8 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     }
 
     private func applicationRow(_ app: ApplicationRecord, isSelected: Bool) -> some View {
+        let priority = priority(for: app)
+
         HStack(alignment: .top, spacing: BoostaSpace.sm) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.company)
@@ -210,12 +226,8 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .trailing, spacing: 6) {
-                Text(app.status.rawValue.capitalized)
-                    .font(BoostaType.caption)
-                    .padding(.horizontal, BoostaSpace.xs)
-                    .padding(.vertical, BoostaSpace.xxs)
-                    .background(Color.white.opacity(0.65))
-                    .clipShape(Capsule())
+                statusPill(app.status.rawValue, tint: statusColor(for: app.status))
+                statusPill(priority.title, tint: priority.color)
 
                 Text(app.appliedAt.formatted(date: .abbreviated, time: .omitted))
                     .font(BoostaType.caption)
@@ -257,7 +269,8 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 SectionHeader(title: app.company, subtitle: app.role)
 
                 HStack(spacing: BoostaSpace.sm) {
-                    statusPill(app.status.rawValue)
+                    statusPill(app.status.rawValue, tint: statusColor(for: app.status))
+                    statusPill(priority(for: app).title, tint: priority(for: app).color)
 
                     if let score = app.atsScore {
                         Text("ATS \(score)")
@@ -271,6 +284,16 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
                 WorkspaceActionButton(title: "Edit Application", systemImage: "pencil") {
                     editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                }
+
+                HStack(spacing: BoostaSpace.sm) {
+                    WorkspaceActionButton(title: "Advance", systemImage: "arrow.right") {
+                        updateStatus(id: app.id, to: nextStatus(after: app.status))
+                    }
+
+                    WorkspaceActionButton(title: "Mark Interview", systemImage: "calendar") {
+                        updateStatus(id: app.id, to: .interview)
+                    }
                 }
 
                 Divider()
@@ -297,7 +320,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Next step")
-                Text(nextStep(for: app.status))
+                Text(nextStep(for: app))
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
             }
@@ -316,12 +339,13 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         }
     }
 
-    private func statusPill(_ status: String) -> some View {
+    private func statusPill(_ status: String, tint: Color) -> some View {
         Text(status.capitalized)
             .font(BoostaType.caption)
+            .foregroundStyle(tint)
             .padding(.horizontal, BoostaSpace.xs)
             .padding(.vertical, BoostaSpace.xxs)
-            .background(Color.white.opacity(0.65))
+            .background(tint.opacity(0.12))
             .clipShape(Capsule())
     }
 
@@ -338,18 +362,63 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         }
     }
 
-    private func nextStep(for status: ApplicationStatus) -> String {
+    private func nextStep(for app: ApplicationRecord) -> String {
+        switch priority(for: app) {
+        case .urgent:
+            return "Act today while the opportunity is hot."
+        case .followUp:
+            return "Send a concise recruiter follow-up and refresh your role keywords."
+        case .interviewSoon:
+            return "Turn your strongest bullets into interview stories."
+        case .steady:
+            switch app.status {
+            case .saved: return "Tailor this resume before applying."
+            case .applied: return "Monitor recruiter response and prepare a follow-up."
+            case .interview: return "Sharpen examples, metrics, and company-specific answers."
+            case .offer: return "Review compensation and compare against your goals."
+            case .rejected: return "Archive learnings and move the next role forward."
+            }
+        case .archived:
+            return "Keep this for context, but focus daily energy on active pipeline work."
+        }
+    }
+
+    private func priority(for app: ApplicationRecord) -> TrackerPriority {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        if app.status == .offer { return .urgent }
+        if app.status == .rejected { return .archived }
+        if app.status == .interview,
+           let interviewAt = app.interviewAt,
+           interviewAt <= (calendar.date(byAdding: .day, value: 3, to: today) ?? today) {
+            return .interviewSoon
+        }
+        if app.status == .applied,
+           let followUpDate = calendar.date(byAdding: .day, value: 5, to: calendar.startOfDay(for: app.appliedAt)),
+           followUpDate <= today {
+            return .followUp
+        }
+        return .steady
+    }
+
+    private func statusColor(for status: ApplicationStatus) -> Color {
         switch status {
-        case .saved:
-            return "Submit application"
-        case .applied:
-            return "Follow up in 5 days"
-        case .interview:
-            return "Prepare interview examples"
-        case .offer:
-            return "Review offer terms"
-        case .rejected:
-            return "Retrospective and apply next"
+        case .saved: return BoostaColor.secondaryText
+        case .applied: return BoostaColor.accent
+        case .interview: return BoostaColor.warning
+        case .offer: return BoostaColor.success
+        case .rejected: return BoostaColor.danger
+        }
+    }
+
+    private func nextStatus(after status: ApplicationStatus) -> ApplicationStatus {
+        switch status {
+        case .saved: return .applied
+        case .applied: return .interview
+        case .interview: return .offer
+        case .offer: return .offer
+        case .rejected: return .rejected
         }
     }
 
@@ -401,6 +470,18 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         }
     }
 
+    private func updateStatus(id: UUID, to status: ApplicationStatus) {
+        guard let record = applications.first(where: { $0.id == id }) else { return }
+        record.status = status
+
+        do {
+            try modelContext.save()
+            widgetSyncService.mergeLocalApplications(applications)
+        } catch {
+            // Local-only tracker: ignore save failure, user can retry.
+        }
+    }
+
     private func deleteApplication(id: UUID) {
         guard let record = applications.first(where: { $0.id == id }) else { return }
         modelContext.delete(record)
@@ -428,6 +509,34 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             resumeUsed: app.resumeUsed,
             jobLink: app.jobLink
         )
+    }
+}
+
+private enum TrackerPriority: String {
+    case urgent
+    case followUp
+    case interviewSoon
+    case steady
+    case archived
+
+    var title: String {
+        switch self {
+        case .urgent: return "Urgent"
+        case .followUp: return "Follow up"
+        case .interviewSoon: return "Interview soon"
+        case .steady: return "Active"
+        case .archived: return "Archived"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .urgent: return BoostaColor.danger
+        case .followUp: return BoostaColor.warning
+        case .interviewSoon: return BoostaColor.accentSecondary
+        case .steady: return BoostaColor.accent
+        case .archived: return BoostaColor.secondaryText
+        }
     }
 }
 

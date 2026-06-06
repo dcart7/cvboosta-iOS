@@ -33,8 +33,19 @@ struct HomeView: View {
         authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
+    private func normalizedATSScore(_ raw: Int) -> Int {
+        if raw > 100 {
+            return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
+        }
+        return min(max(raw, 0), 100)
+    }
+
     private var careerScore: Int {
-        latestHistoryDetail?.matchAfter ?? scans.last?.matchAfter ?? scans.last?.atsScore ?? 0
+        normalizedATSScore(latestHistoryDetail?.matchAfter ?? scans.last?.matchAfter ?? scans.last?.atsScore ?? 0)
+    }
+
+    private var momentumScore: Int {
+        min(100, max(0, Int(Double(careerScore) * 0.55) + min(weeklyApplications * 8, 24) + min(streakDays * 4, 16) + min(responseRate / 2, 18)))
     }
 
     private var responseRate: Int {
@@ -67,18 +78,110 @@ struct HomeView: View {
     }
 
     private var trendScores: [Int] {
-        Array(scans.suffix(7).map(\.atsScore))
+        Array(scans.suffix(7).map { normalizedATSScore($0.matchAfter ?? $0.atsScore) })
     }
 
     private var missingKeywords: [String] {
         Array((latestHistoryDetail?.missingSkills ?? []).prefix(3))
     }
 
+    private var overdueFollowUps: Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return trackedApplications.filter { app in
+            app.status == .applied
+                && calendar.date(byAdding: .day, value: 5, to: calendar.startOfDay(for: app.appliedAt)).map { $0 <= today } == true
+        }.count
+    }
+
+    private var upcomingInterviews: Int {
+        let now = Date()
+        guard let sevenDays = Calendar.current.date(byAdding: .day, value: 7, to: now) else { return 0 }
+        return trackedApplications.filter { app in
+            guard app.status == .interview, let interviewAt = app.interviewAt else { return false }
+            return interviewAt >= now && interviewAt <= sevenDays
+        }.count
+    }
+
+    private var momentumTier: String {
+        switch momentumScore {
+        case 85...100: return "Interview Ready"
+        case 70...84: return "Recruiter Visible"
+        case 50...69: return "Momentum Building"
+        case 1...49: return "Baseline Building"
+        default: return "Start Strong"
+        }
+    }
+
+    private var momentumSummary: String {
+        if careerScore == 0 {
+            return "Run your first ATS scan to unlock your career momentum baseline."
+        }
+        if overdueFollowUps > 0 {
+            return "\(overdueFollowUps) follow-up\(overdueFollowUps == 1 ? "" : "s") can lift your response rate today."
+        }
+        if upcomingInterviews > 0 {
+            return "\(upcomingInterviews) interview\(upcomingInterviews == 1 ? "" : "s") need prep soon — your pipeline is moving."
+        }
+        if !missingKeywords.isEmpty {
+            return "You can raise visibility by closing \(missingKeywords.count) keyword gap\(missingKeywords.count == 1 ? "" : "s")."
+        }
+        return "Momentum is healthy — keep scanning and applying to hold recruiter visibility."
+    }
+
+    private var todayActions: [TodayAction] {
+        var items: [TodayAction] = []
+
+        if overdueFollowUps > 0 {
+            items.append(
+                TodayAction(
+                    title: "Follow up today",
+                    detail: "\(overdueFollowUps) application\(overdueFollowUps == 1 ? "" : "s") are ready for a recruiter nudge.",
+                    tint: BoostaColor.warning
+                )
+            )
+        }
+
+        if !missingKeywords.isEmpty {
+            items.append(
+                TodayAction(
+                    title: "Close ATS gaps",
+                    detail: "Add \(missingKeywords.prefix(2).joined(separator: ", ")) to role-specific bullets.",
+                    tint: BoostaColor.accent
+                )
+            )
+        }
+
+        if upcomingInterviews > 0 {
+            items.append(
+                TodayAction(
+                    title: "Prepare interviews",
+                    detail: "\(upcomingInterviews) interview\(upcomingInterviews == 1 ? "" : "s") are scheduled in the next 7 days.",
+                    tint: BoostaColor.success
+                )
+            )
+        }
+
+        if items.isEmpty {
+            items.append(
+                TodayAction(
+                    title: "Keep momentum alive",
+                    detail: careerScore == 0
+                        ? "Start with one ATS scan to create your first benchmark."
+                        : "Scan one role-specific resume variation to keep improving consistency.",
+                    tint: BoostaColor.accentSecondary
+                )
+            )
+        }
+
+        return Array(items.prefix(3))
+    }
+
     private var quickInsights: [HomeInsight] {
         [
             .init(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", tint: BoostaColor.accent),
+            .init(title: "Momentum", value: momentumScore == 0 ? "—" : "\(momentumScore)", tint: BoostaColor.accentSecondary),
             .init(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", tint: BoostaColor.success),
-            .init(title: "This Week", value: "\(weeklyApplications)", tint: BoostaColor.warning),
             .init(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", tint: BoostaColor.accentSecondary)
         ]
     }
@@ -101,6 +204,7 @@ struct HomeView: View {
                         )
 
                         heroCard
+                        todayCard
                         compactStatsCard
                         recentActivityCard
                         actionsCard
@@ -152,13 +256,13 @@ struct HomeView: View {
                         .frame(width: 108, height: 108)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Career snapshot")
+                        Text("Career Momentum")
                             .font(BoostaType.caption)
                             .foregroundStyle(BoostaColor.secondaryText)
-                        Text(careerScore == 0 ? "Run your first scan" : "You’re building momentum.")
+                        Text(momentumScore == 0 ? "Start your baseline" : "\(momentumScore)/100 • \(momentumTier)")
                             .font(BoostaType.section)
                             .foregroundStyle(BoostaColor.primaryText)
-                        Text(summaryText)
+                        Text(momentumSummary)
                             .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
                     }
@@ -187,6 +291,30 @@ struct HomeView: View {
                     .shadow(color: BoostaColor.accent.opacity(0.18), radius: 18, x: 0, y: 12)
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var todayCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "Today", subtitle: "What moves your search forward right now")
+
+                VStack(spacing: BoostaSpace.sm) {
+                    ForEach(todayActions) { action in
+                        TodayActionRow(action: action)
+                    }
+                }
+
+                HStack(spacing: BoostaSpace.sm) {
+                    SecondaryButton(title: "Open Tracker") {
+                        appRouter.open(.tracker)
+                    }
+
+                    SecondaryButton(title: "Check ATS Score") {
+                        appRouter.open(.scanner)
+                    }
+                }
             }
         }
     }
@@ -287,7 +415,7 @@ struct HomeView: View {
     private var actionsCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Next Step", subtitle: "Keep momentum high")
+                SectionHeader(title: "Career OS", subtitle: "Scanner → Tailor → Apply → Track → Improve")
 
                 HStack(spacing: BoostaSpace.sm) {
                     PrimaryButton(title: "Analyze Resume") {
@@ -302,20 +430,14 @@ struct HomeView: View {
         }
     }
 
-    private var summaryText: String {
-        if careerScore == 0 {
-            return "Scan your resume, sync your browser history, and start building a real performance baseline."
-        }
-
-        return "\(weeklyApplications) applications this week, \(responseRate == 0 ? "no responses yet" : "\(responseRate)% response rate"), and a \(streakDays == 0 ? "fresh" : "\(streakDays)-day") streak."
-    }
-
     private var trendLabel: String {
         guard let first = trendScores.first, let last = trendScores.last, trendScores.count > 1 else {
             return "Not enough data"
         }
         let delta = last - first
-        return delta == 0 ? "Stable" : delta > 0 ? "+\(delta)" : "\(delta)"
+        if delta > 0 { return "+\(delta) improving" }
+        if delta < 0 { return "Rescan advised" }
+        return "Stable"
     }
 
     private func loadSharedHistory() async {
@@ -360,6 +482,13 @@ private struct HomeInsight: Identifiable {
     let tint: Color
 }
 
+private struct TodayAction: Identifiable {
+    let id = UUID()
+    let title: String
+    let detail: String
+    let tint: Color
+}
+
 struct HomeStatCard: View {
     let title: String
     let value: String
@@ -379,6 +508,41 @@ struct HomeStatCard: View {
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .padding(BoostaSpace.sm)
+        .background(Color.white.opacity(0.55))
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+    }
+}
+
+private struct TodayActionRow: View {
+    let action: TodayAction
+
+    var body: some View {
+        HStack(alignment: .top, spacing: BoostaSpace.sm) {
+            Circle()
+                .fill(action.tint.opacity(0.18))
+                .frame(width: 34, height: 34)
+                .overlay {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(action.tint)
+                }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(action.title)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                Text(action.detail)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+        }
         .padding(BoostaSpace.sm)
         .background(Color.white.opacity(0.55))
         .overlay(

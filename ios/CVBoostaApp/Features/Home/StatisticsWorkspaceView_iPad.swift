@@ -19,6 +19,7 @@ struct StatisticsWorkspaceView_iPad: View {
     @State private var isLoadingHistory = false
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var historyErrorMessage: String?
+    @State private var selectedSection: StatisticsWorkspaceSection = .overview
 
     private let resumeService = ResumeService.shared
 
@@ -46,21 +47,28 @@ struct StatisticsWorkspaceView_iPad: View {
         historyItems.sorted(by: { $0.createdAt < $1.createdAt })
     }
 
+    private func normalizedATSScore(_ raw: Int) -> Int {
+        if raw > 100 {
+            return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
+        }
+        return min(max(raw, 0), 100)
+    }
+
     private var latestScore: Int {
-        sharedHistoryAscending.last.map { $0.matchAfter ?? $0.score }
-            ?? authViewModel.me?.scanHistory.first?.atsScore
+        sharedHistoryAscending.last.map { normalizedATSScore($0.matchAfter ?? $0.score) }
+            ?? authViewModel.me?.scanHistory.first.map { normalizedATSScore($0.matchAfter ?? $0.atsScore) }
             ?? 0
     }
 
     private var avgScore: Int {
-        let values = sharedHistoryAscending.map { $0.matchAfter ?? $0.score }
+        let values = sharedHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
         guard !values.isEmpty else { return 0 }
         let total = values.reduce(0, +)
         return total / values.count
     }
 
     private var atsTrendScores: [Int] {
-        sharedHistoryAscending.map { $0.matchAfter ?? $0.score }
+        sharedHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
     }
 
     private var streakDays: Int {
@@ -162,24 +170,10 @@ struct StatisticsWorkspaceView_iPad: View {
             headerCard
                 .gridCellColumns(columnCount)
 
-            overviewCard
-                .gridCellColumns(min(2, columnCount))
+            sectionPicker
+                .gridCellColumns(columnCount)
 
-            atsTrendCard
-            interviewPipelineCard
-
-            if latestPayload != nil || latestHistoryDetail != nil {
-                insightsCard
-                    .gridCellColumns(columnCount)
-            } else {
-                emptyStateCard
-                    .gridCellColumns(columnCount)
-            }
-
-            streakCard
-            recentScanCard
-            sharedHistoryCard
-            weeklySummaryCard
+            visibleCards(for: columnCount)
         }
         .animation(BoostaMotion.smooth, value: columnCount)
     }
@@ -220,6 +214,54 @@ struct StatisticsWorkspaceView_iPad: View {
                     }
                 }
             }
+        }
+    }
+
+    private var sectionPicker: some View {
+        Picker("Statistics section", selection: $selectedSection) {
+            ForEach(StatisticsWorkspaceSection.allCases) { section in
+                Text(section.title).tag(section)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder
+    private func visibleCards(for columnCount: Int) -> some View {
+        switch selectedSection {
+        case .overview:
+            overviewCard
+                .gridCellColumns(min(2, columnCount))
+            streakCard
+            weeklySummaryCard
+            sharedHistoryCard
+        case .ats:
+            overviewCard
+                .gridCellColumns(min(2, columnCount))
+            atsTrendCard
+            if latestPayload != nil || latestHistoryDetail != nil {
+                insightsCard
+                    .gridCellColumns(columnCount)
+            } else {
+                emptyStateCard
+                    .gridCellColumns(columnCount)
+            }
+            recentScanCard
+        case .funnel:
+            interviewPipelineCard
+            streakCard
+            weeklySummaryCard
+            sharedHistoryCard
+        case .insights:
+            if latestPayload != nil || latestHistoryDetail != nil {
+                insightsCard
+                    .gridCellColumns(columnCount)
+            } else {
+                emptyStateCard
+                    .gridCellColumns(columnCount)
+            }
+            recentScanCard
+            sharedHistoryCard
         }
     }
 
@@ -288,13 +330,32 @@ struct StatisticsWorkspaceView_iPad: View {
 
                         if let first = atsTrendScores.first, let last = atsTrendScores.last {
                             let delta = last - first
-                            Text(delta == 0 ? "±0" : (delta > 0 ? "+\(delta)" : "\(delta)"))
+                            Text(deltaLabel(delta))
                                 .font(BoostaType.caption)
                                 .foregroundStyle(delta >= 0 ? BoostaColor.success : BoostaColor.warning)
                         }
                     }
+
+                    Text(trendInsight)
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
                 }
             }
+        }
+    }
+
+    private var trendInsight: String {
+        guard let first = atsTrendScores.first, let last = atsTrendScores.last, atsTrendScores.count > 1 else {
+            return "Your trend becomes more valuable as shared account history grows."
+        }
+
+        let delta = last - first
+        if delta > 0 {
+            return "Your ATS performance is improving across the full shared history."
+        } else if delta < 0 {
+            return "Recent history is softer than your earlier baseline — worth revisiting targeting and tailoring."
+        } else {
+            return "ATS performance is stable across your shared account history."
         }
     }
 
@@ -533,7 +594,7 @@ struct StatisticsWorkspaceView_iPad: View {
                     return last - first
                 }()
 
-                Text("ATS \(latestDelta >= 0 ? "+" : "")\(latestDelta), \(applicationsCount) tracked applications, \(interviewsCount) interviews in pipeline, \(keywordsImproved) keywords improved.")
+                Text(weeklySummaryText(delta: latestDelta, keywordsImproved: keywordsImproved))
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
             }
@@ -579,6 +640,19 @@ struct StatisticsWorkspaceView_iPad: View {
                 .foregroundStyle(BoostaColor.secondaryText)
             Spacer(minLength: 0)
         }
+    }
+
+    private func deltaLabel(_ delta: Int) -> String {
+        if delta == 0 { return "Stable" }
+        if delta > 0 { return "+\(delta)" }
+        return "Rescan advised"
+    }
+
+    private func weeklySummaryText(delta: Int, keywordsImproved: Int) -> String {
+        let atsSummary = delta >= 0
+            ? "ATS is up \(delta)"
+            : "ATS is \(abs(delta)) below your strongest baseline"
+        return "\(atsSummary), \(applicationsCount) tracked applications, \(interviewsCount) interviews in pipeline, \(keywordsImproved) keywords improved."
     }
 
     private func loadSharedHistory() async {
@@ -638,6 +712,24 @@ private struct WorkspaceActionButton: View {
         .buttonStyle(.plain)
         .hoverEffect(.lift)
         .accessibilityLabel(title)
+    }
+}
+
+private enum StatisticsWorkspaceSection: String, CaseIterable, Identifiable {
+    case overview
+    case ats
+    case funnel
+    case insights
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .overview: return "Overview"
+        case .ats: return "ATS"
+        case .funnel: return "Funnel"
+        case .insights: return "Insights"
+        }
     }
 }
 
