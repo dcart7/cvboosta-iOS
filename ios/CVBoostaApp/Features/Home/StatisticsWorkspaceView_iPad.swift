@@ -585,10 +585,8 @@ struct StatisticsWorkspaceView_iPad: View {
         do {
             let detail = try await resumeService.historyDetail(id: item.id)
             let url = try SharedHistoryPDFBuilder.makeResumePDF(
-                title: item.role ?? "CV Optimization",
-                subtitle: item.company ?? "CVBoosta",
-                score: detail.matchAfter ?? detail.score,
-                body: detail.optimizedCV
+                item: item,
+                detail: detail
             )
             previewDocument = HistoryPDFPreviewDocument(
                 id: item.id,

@@ -16,6 +16,7 @@ struct HomeWorkspaceView_iPad: View {
     @State private var historyErrorMessage: String?
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animateSparkline = false
+    @State private var isShowingAllRecentActivity = false
 
     private let resumeService = ResumeService.shared
 
@@ -173,10 +174,10 @@ struct HomeWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "Compact Statistics", subtitle: "A compressed read of your current momentum")
 
-                HStack(spacing: BoostaSpace.sm) {
-                    MetricPill(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", color: BoostaColor.accent)
-                    MetricPill(title: "Response", value: responseRate == 0 ? "—" : "\(responseRate)%", color: BoostaColor.success)
-                    MetricPill(title: "This Week", value: "\(weeklyApplications)", color: BoostaColor.warning)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
+                    HomeStatCard(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", color: BoostaColor.accent)
+                    HomeStatCard(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", color: BoostaColor.success)
+                    HomeStatCard(title: "This Week", value: "\(weeklyApplications)", color: BoostaColor.warning)
                 }
 
                 CompactTrendView(scores: trendScores, isAnimated: animateSparkline)
@@ -196,14 +197,26 @@ struct HomeWorkspaceView_iPad: View {
     private var recentActivityCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Recent Activity", subtitle: isLoadingHistory ? "Syncing shared account..." : "Shared browser + iPad history")
+                HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                    SectionHeader(title: "Recent Activity", subtitle: isLoadingHistory ? "Syncing shared account..." : "Shared browser + iPad history")
+                    if historyItems.count > 4 {
+                        Button(isShowingAllRecentActivity ? "Collapse" : "Show all") {
+                            withAnimation(BoostaMotion.smooth) {
+                                isShowingAllRecentActivity.toggle()
+                            }
+                        }
+                        .font(BoostaType.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(BoostaColor.accent)
+                    }
+                }
 
                 if historyItems.isEmpty {
                     Text(isLoadingHistory ? "Loading history..." : "No shared history yet.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    ForEach(historyItems.prefix(4)) { item in
+                    ForEach(historyItems.prefix(isShowingAllRecentActivity ? 10 : 4)) { item in
                         Button {
                             Task {
                                 await openHistoryPDF(for: item)
@@ -274,10 +287,8 @@ struct HomeWorkspaceView_iPad: View {
         do {
             let detail = try await resumeService.historyDetail(id: item.id)
             let url = try SharedHistoryPDFBuilder.makeResumePDF(
-                title: item.role ?? "CV Optimization",
-                subtitle: item.company ?? "CVBoosta",
-                score: detail.matchAfter ?? detail.score,
-                body: detail.optimizedCV
+                item: item,
+                detail: detail
             )
             previewDocument = HistoryPDFPreviewDocument(id: item.id, title: item.role ?? "CV Optimization", fileURL: url)
             historyErrorMessage = nil

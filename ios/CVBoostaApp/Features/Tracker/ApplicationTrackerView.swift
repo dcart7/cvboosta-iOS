@@ -10,6 +10,9 @@ struct ApplicationTrackerView: View {
 
     @State private var errorMessage: String?
     @State private var showAddSheet = false
+    @State private var editingContext: ApplicationEditingContext?
+
+    private let widgetSyncService = WidgetSyncService.shared
 
     private var interviewCount: Int {
         applications.filter { $0.status == .interview }.count
@@ -23,6 +26,10 @@ struct ApplicationTrackerView: View {
         guard !applications.isEmpty else { return 0 }
         let responses = applications.filter { $0.status == .interview || $0.status == .offer }.count
         return Int((Double(responses) / Double(applications.count)) * 100)
+    }
+
+    private var widgetSyncSignature: [String] {
+        applications.map { "\($0.id.uuidString)-\($0.status.rawValue)-\($0.appliedAt.timeIntervalSince1970)" }
     }
 
     var body: some View {
@@ -75,12 +82,34 @@ struct ApplicationTrackerView: View {
                     }
                 }
             }
+            .sheet(item: $editingContext) { context in
+                NavigationStack {
+                    AddApplicationView(
+                        resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        initialDraft: context.draft,
+                        saveTitle: "Save Changes",
+                        showsDelete: true,
+                        onSave: { draft in
+                            updateApplication(id: context.id, with: draft)
+                        },
+                        onDelete: {
+                            deleteApplication(id: context.id)
+                        }
+                    )
+                }
+            }
             .overlay(alignment: .top) {
                 if let errorMessage {
                     ErrorBanner(message: errorMessage)
                         .padding(.horizontal, BoostaSpace.md)
                         .padding(.top, BoostaSpace.sm)
                 }
+            }
+            .onAppear {
+                widgetSyncService.mergeLocalApplications(applications)
+            }
+            .onChange(of: widgetSyncSignature) { _, _ in
+                widgetSyncService.mergeLocalApplications(applications)
             }
         }
     }
@@ -117,12 +146,23 @@ struct ApplicationTrackerView: View {
 
                     Spacer()
 
-                    Text(app.status.rawValue.capitalized)
-                        .font(BoostaType.caption)
-                        .padding(.horizontal, BoostaSpace.xs)
-                        .padding(.vertical, BoostaSpace.xxs)
-                        .background(Color.white.opacity(0.65))
-                        .clipShape(Capsule())
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Text(app.status.rawValue.capitalized)
+                            .font(BoostaType.caption)
+                            .padding(.horizontal, BoostaSpace.xs)
+                            .padding(.vertical, BoostaSpace.xxs)
+                            .background(Color.white.opacity(0.65))
+                            .clipShape(Capsule())
+
+                        Button {
+                            editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
                 HStack {
@@ -176,10 +216,60 @@ struct ApplicationTrackerView: View {
 
         do {
             try modelContext.save()
+            widgetSyncService.mergeLocalApplications(applications)
             showAddSheet = false
         } catch {
             errorMessage = "Could not save application."
         }
+    }
+
+    private func updateApplication(id: UUID, with draft: NewApplicationDraft) {
+        guard let record = applications.first(where: { $0.id == id }) else { return }
+        errorMessage = nil
+
+        record.company = draft.company
+        record.role = draft.role
+        record.status = draft.status
+        record.appliedAt = draft.appliedAt
+        record.interviewAt = draft.interviewAt
+        record.notes = draft.notes
+        record.resumeUsed = draft.resumeUsed
+        record.jobLink = draft.jobLink
+
+        do {
+            try modelContext.save()
+            widgetSyncService.mergeLocalApplications(applications)
+            editingContext = nil
+        } catch {
+            errorMessage = "Could not update application."
+        }
+    }
+
+    private func deleteApplication(id: UUID) {
+        guard let record = applications.first(where: { $0.id == id }) else { return }
+        errorMessage = nil
+        modelContext.delete(record)
+
+        do {
+            try modelContext.save()
+            widgetSyncService.mergeLocalApplications(applications.filter { $0.id != id })
+            editingContext = nil
+        } catch {
+            errorMessage = "Could not delete application."
+        }
+    }
+
+    private func makeDraft(from app: ApplicationRecord) -> NewApplicationDraft {
+        NewApplicationDraft(
+            company: app.company,
+            role: app.role,
+            status: app.status,
+            appliedAt: app.appliedAt,
+            interviewAt: app.interviewAt,
+            notes: app.notes,
+            resumeUsed: app.resumeUsed,
+            jobLink: app.jobLink
+        )
     }
 }
 
@@ -194,11 +284,19 @@ struct NewApplicationDraft: Hashable {
     let jobLink: String?
 }
 
+private struct ApplicationEditingContext: Identifiable {
+    let id: UUID
+    let draft: NewApplicationDraft
+}
+
 struct AddApplicationView: View {
     @Environment(\.dismiss) private var dismiss
 
     let resumeNames: [String]
+    let saveTitle: String
+    let showsDelete: Bool
     let onSave: (NewApplicationDraft) -> Void
+    var onDelete: (() -> Void)? = nil
 
     @State private var company = ""
     @State private var role = ""
@@ -209,6 +307,31 @@ struct AddApplicationView: View {
     @State private var notes = ""
     @State private var hasInterviewDate = false
     @State private var interviewDate: Date = .now
+
+    init(
+        resumeNames: [String],
+        initialDraft: NewApplicationDraft? = nil,
+        saveTitle: String = "Save Application",
+        showsDelete: Bool = false,
+        onSave: @escaping (NewApplicationDraft) -> Void,
+        onDelete: (() -> Void)? = nil
+    ) {
+        self.resumeNames = resumeNames
+        self.saveTitle = saveTitle
+        self.showsDelete = showsDelete
+        self.onSave = onSave
+        self.onDelete = onDelete
+
+        _company = State(initialValue: initialDraft?.company ?? "")
+        _role = State(initialValue: initialDraft?.role ?? "")
+        _jobLink = State(initialValue: initialDraft?.jobLink ?? "")
+        _status = State(initialValue: initialDraft?.status ?? .saved)
+        _appliedAt = State(initialValue: initialDraft?.appliedAt ?? .now)
+        _selectedResume = State(initialValue: initialDraft?.resumeUsed ?? "")
+        _notes = State(initialValue: initialDraft?.notes ?? "")
+        _hasInterviewDate = State(initialValue: initialDraft?.interviewAt != nil)
+        _interviewDate = State(initialValue: initialDraft?.interviewAt ?? .now)
+    }
 
     private var canSave: Bool {
         !company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -270,7 +393,7 @@ struct AddApplicationView: View {
                             DatePicker("Interview", selection: $interviewDate)
                         }
 
-                        PrimaryButton(title: "Save Application", isDisabled: !canSave) {
+                        PrimaryButton(title: saveTitle, isDisabled: !canSave) {
                             let draft = NewApplicationDraft(
                                 company: company.trimmingCharacters(in: .whitespacesAndNewlines),
                                 role: role.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -283,12 +406,19 @@ struct AddApplicationView: View {
                             )
                             onSave(draft)
                         }
+
+                        if showsDelete, let onDelete {
+                            SecondaryButton(title: "Delete Application") {
+                                onDelete()
+                            }
+                            .foregroundStyle(BoostaColor.danger)
+                        }
                     }
                 }
                 .padding(BoostaSpace.md)
             }
         }
-        .navigationTitle("Add Application")
+        .navigationTitle(showsDelete ? "Edit Application" : "Add Application")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Close") { dismiss() }

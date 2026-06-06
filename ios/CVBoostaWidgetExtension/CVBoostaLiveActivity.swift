@@ -6,14 +6,14 @@ struct CVBoostaLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: CVBoostaActivityAttributes.self) { context in
             lockScreenView(context)
-                .activityBackgroundTint(Color(red: 0.93, green: 0.96, blue: 1.0))
-                .activitySystemActionForegroundColor(.black)
+                .activityBackgroundTint(Color(red: 0.08, green: 0.13, blue: 0.28))
+                .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label("CV", systemImage: "sparkles")
+                    Label("CVBoosta", systemImage: "sparkles")
                         .font(.caption)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.cyan)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(percentText(context.state.progress))
@@ -33,11 +33,11 @@ struct CVBoostaLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     ProgressView(value: context.state.progress)
-                        .tint(.blue)
+                        .tint(.cyan)
                 }
             } compactLeading: {
                 Image(systemName: "sparkles")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(.cyan)
             } compactTrailing: {
                 Text(percentText(context.state.progress))
                     .font(.caption2.weight(.semibold))
@@ -51,31 +51,32 @@ struct CVBoostaLiveActivity: Widget {
     }
 
     private func lockScreenView(_ context: ActivityViewContext<CVBoostaActivityAttributes>) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(context.state.title)
-                    .font(.headline)
-                Spacer()
-                Text(percentText(context.state.progress))
-                    .font(.headline)
-                    .foregroundStyle(.green)
-            }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(context.state.title)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Text(percentText(context.state.progress))
+                        .font(.headline)
+                        .foregroundStyle(.green)
+                }
 
-            ProgressView(value: context.state.progress)
-                .tint(.blue)
+                ProgressView(value: context.state.progress)
+                    .tint(.cyan)
 
-            HStack {
-                Text(context.state.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(context.state.etaText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text(context.state.detail)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.8))
+                    Spacer()
+                    Text(context.state.etaText)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.65))
+                }
             }
+            .padding(.vertical, 8)
         }
-        .padding(.vertical, 8)
-    }
 
     private func percentText(_ value: Double) -> String {
         "\(Int(value * 100))%"

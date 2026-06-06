@@ -12,6 +12,9 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
     @State private var selectedApplicationID: UUID?
     @State private var showAddSheet = false
+    @State private var editingContext: ApplicationEditingContext?
+
+    private let widgetSyncService = WidgetSyncService.shared
 
     private var selectedApplication: ApplicationRecord? {
         guard let id = selectedApplicationID else { return applications.first }
@@ -25,6 +28,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             ("Interview", applications.filter { $0.status == .interview }.count, BoostaColor.success),
             ("Offer", applications.filter { $0.status == .offer }.count, BoostaColor.warning),
         ]
+    }
+
+    private var widgetSyncSignature: [String] {
+        applications.map { "\($0.id.uuidString)-\($0.status.rawValue)-\($0.appliedAt.timeIntervalSince1970)" }
     }
 
     var body: some View {
@@ -92,10 +99,30 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     }
                 }
             }
+            .sheet(item: $editingContext) { context in
+                NavigationStack {
+                    AddApplicationView(
+                        resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        initialDraft: context.draft,
+                        saveTitle: "Save Changes",
+                        showsDelete: true,
+                        onSave: { draft in
+                            updateApplication(id: context.id, with: draft)
+                        },
+                        onDelete: {
+                            deleteApplication(id: context.id)
+                        }
+                    )
+                }
+            }
             .onAppear {
                 if selectedApplicationID == nil {
                     selectedApplicationID = applications.first?.id
                 }
+                widgetSyncService.mergeLocalApplications(applications)
+            }
+            .onChange(of: widgetSyncSignature) { _, _ in
+                widgetSyncService.mergeLocalApplications(applications)
             }
         }
     }
@@ -242,6 +269,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     }
                 }
 
+                WorkspaceActionButton(title: "Edit Application", systemImage: "pencil") {
+                    editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                }
+
                 Divider()
                     .opacity(0.35)
 
@@ -343,9 +374,60 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             if selectedApplicationID == nil {
                 selectedApplicationID = record.id
             }
+            widgetSyncService.mergeLocalApplications(applications)
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
         }
+    }
+
+    private func updateApplication(id: UUID, with draft: NewApplicationDraft) {
+        guard let record = applications.first(where: { $0.id == id }) else { return }
+
+        record.company = draft.company
+        record.role = draft.role
+        record.status = draft.status
+        record.appliedAt = draft.appliedAt
+        record.interviewAt = draft.interviewAt
+        record.notes = draft.notes
+        record.resumeUsed = draft.resumeUsed
+        record.jobLink = draft.jobLink
+
+        do {
+            try modelContext.save()
+            widgetSyncService.mergeLocalApplications(applications)
+            editingContext = nil
+        } catch {
+            // Local-only tracker: ignore save failure, user can retry.
+        }
+    }
+
+    private func deleteApplication(id: UUID) {
+        guard let record = applications.first(where: { $0.id == id }) else { return }
+        modelContext.delete(record)
+
+        do {
+            try modelContext.save()
+            widgetSyncService.mergeLocalApplications(applications.filter { $0.id != id })
+            editingContext = nil
+            if selectedApplicationID == id {
+                selectedApplicationID = applications.first(where: { $0.id != id })?.id
+            }
+        } catch {
+            // Local-only tracker: ignore save failure, user can retry.
+        }
+    }
+
+    private func makeDraft(from app: ApplicationRecord) -> NewApplicationDraft {
+        NewApplicationDraft(
+            company: app.company,
+            role: app.role,
+            status: app.status,
+            appliedAt: app.appliedAt,
+            interviewAt: app.interviewAt,
+            notes: app.notes,
+            resumeUsed: app.resumeUsed,
+            jobLink: app.jobLink
+        )
     }
 }
 

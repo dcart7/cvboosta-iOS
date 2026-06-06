@@ -1,9 +1,15 @@
 import SwiftUI
+import SwiftData
 
 struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @Query private var trackedApplications: [ApplicationRecord]
+    @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
+    @AppStorage(AppPreferenceKeys.notificationsEnabled) private var notificationsEnabled = true
+    @AppStorage(AppPreferenceKeys.hapticsEnabled) private var hapticsEnabled = true
+    @AppStorage(AppPreferenceKeys.biometricsEnabled) private var biometricsEnabled = true
 
     private var userName: String {
         authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
@@ -37,6 +43,7 @@ struct SettingsView: View {
                         accountSection
                         subscriptionSection
                         dataSection
+                        preferencesSection
                         appSection
                     }
                     .padding(BoostaSpace.md)
@@ -111,6 +118,7 @@ struct SettingsView: View {
                 SectionHeader(title: "Data")
                 row("Resume history", value: "\(authViewModel.me?.savedResumes.count ?? 0)")
                 row("Scan history", value: "\(authViewModel.me?.scanHistory.count ?? 0)")
+                row("Applications", value: "\(trackedApplications.count)")
 
                 SecondaryButton(title: "Delete Account") {
                     // Backend endpoint is not implemented yet.
@@ -120,15 +128,49 @@ struct SettingsView: View {
         }
     }
 
+    private var preferencesSection: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Preferences")
+
+                VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                    Text("Appearance")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+
+                    Picker("Appearance", selection: $appearanceMode) {
+                        ForEach(AppAppearancePreference.allCases) { appearance in
+                            Text(appearance.title).tag(appearance.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                ToggleRow(title: "Notifications", subtitle: "Career reminders and follow-up nudges", isOn: $notificationsEnabled)
+                ToggleRow(title: "Haptics", subtitle: "Keep subtle feedback during scans and actions", isOn: $hapticsEnabled)
+                ToggleRow(title: "Biometric Lock", subtitle: "Protect sensitive resume and account data", isOn: $biometricsEnabled)
+            }
+        }
+    }
+
     private var appSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "App")
-                row("Appearance", value: "System")
-                row("Notifications", value: "Enabled")
-                row("Privacy Policy", value: "Available")
-                row("Terms of Service", value: "Available")
+                row("Version", value: "1.0")
                 row("Contact Support", value: "support@cvboosta.com")
+
+                SecondaryButton(title: "Open Privacy Policy") {
+                    openURL(AppEnvironment.webBaseURL.appending(path: "privacy-policy"))
+                }
+
+                SecondaryButton(title: "Open Terms of Service") {
+                    openURL(AppEnvironment.webBaseURL.appending(path: "terms-of-service"))
+                }
+
+                SecondaryButton(title: "Open Website Dashboard") {
+                    openURL(AppEnvironment.webBaseURL)
+                }
             }
         }
     }
@@ -144,6 +186,26 @@ struct SettingsView: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .multilineTextAlignment(.trailing)
         }
+    }
+}
+
+private struct ToggleRow: View {
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                Text(subtitle)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+        .tint(BoostaColor.accent)
     }
 }
 

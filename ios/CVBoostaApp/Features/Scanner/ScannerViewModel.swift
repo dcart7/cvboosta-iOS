@@ -44,14 +44,17 @@ final class ScannerViewModel: ObservableObject {
 
     private let atsService: ATSServiceProtocol
     private let subscriptionService: SubscriptionService
+    private let widgetSyncService: WidgetSyncService
     private var scanTask: Task<Void, Never>?
 
     init(
         atsService: ATSServiceProtocol? = nil,
-        subscriptionService: SubscriptionService? = nil
+        subscriptionService: SubscriptionService? = nil,
+        widgetSyncService: WidgetSyncService? = nil
     ) {
         self.atsService = atsService ?? ATSService.shared
         self.subscriptionService = subscriptionService ?? .shared
+        self.widgetSyncService = widgetSyncService ?? .shared
     }
 
     func onAppear() {
@@ -188,6 +191,9 @@ final class ScannerViewModel: ObservableObject {
             experienceLevel: experienceLevel.rawValue,
             targetMarket: targetMarket.rawValue
         )
+        if let scanResult {
+            widgetSyncService.mergeLatestScan(result: scanResult)
+        }
 
         isScanning = false
         progressMessage = "Ready"

@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var errorMessage: String?
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animateSparkline = false
+    @State private var isShowingAllRecentActivity = false
 
     private let resumeService = ResumeService.shared
 
@@ -198,7 +199,7 @@ struct HomeView: View {
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
                     ForEach(quickInsights) { insight in
-                        MetricPill(title: insight.title, value: insight.value, color: insight.tint)
+                        HomeStatCard(title: insight.title, value: insight.value, color: insight.tint)
                     }
                 }
 
@@ -230,17 +231,30 @@ struct HomeView: View {
     private var recentActivityCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(
-                    title: "Recent Activity",
-                    subtitle: isLoadingHistory ? "Syncing browser + app history..." : "Shared account activity"
-                )
+                HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                    SectionHeader(
+                        title: "Recent Activity",
+                        subtitle: isLoadingHistory ? "Syncing browser + app history..." : "Shared account activity"
+                    )
+
+                    if historyItems.count > 3 {
+                        Button(isShowingAllRecentActivity ? "Collapse" : "Show all") {
+                            withAnimation(BoostaMotion.smooth) {
+                                isShowingAllRecentActivity.toggle()
+                            }
+                        }
+                        .font(BoostaType.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(BoostaColor.accent)
+                    }
+                }
 
                 if historyItems.isEmpty {
                     Text(isLoadingHistory ? "Loading history..." : "Your shared CVBoosta history will appear here.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    ForEach(historyItems.prefix(3)) { item in
+                    ForEach(historyItems.prefix(isShowingAllRecentActivity ? 10 : 3)) { item in
                         Button {
                             Task {
                                 await openHistoryPDF(for: item)
@@ -325,10 +339,8 @@ struct HomeView: View {
         do {
             let detail = try await resumeService.historyDetail(id: item.id)
             let url = try SharedHistoryPDFBuilder.makeResumePDF(
-                title: item.role ?? "CV Optimization",
-                subtitle: item.company ?? "CVBoosta",
-                score: detail.matchAfter ?? detail.score,
-                body: detail.optimizedCV
+                item: item,
+                detail: detail
             )
             previewDocument = HistoryPDFPreviewDocument(
                 id: item.id,
@@ -347,6 +359,35 @@ private struct HomeInsight: Identifiable {
     let title: String
     let value: String
     let tint: Color
+}
+
+struct HomeStatCard: View {
+    let title: String
+    let value: String
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+
+            Spacer(minLength: 0)
+
+            Text(value)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .padding(BoostaSpace.sm)
+        .background(Color.white.opacity(0.55))
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+    }
 }
 
 struct CompactTrendView: View {

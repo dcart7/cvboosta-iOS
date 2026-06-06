@@ -8,6 +8,10 @@ struct SettingsWorkspaceView_iPad: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @Query private var trackedApplications: [ApplicationRecord]
+    @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
+    @AppStorage(AppPreferenceKeys.notificationsEnabled) private var notificationsEnabled = true
+    @AppStorage(AppPreferenceKeys.hapticsEnabled) private var hapticsEnabled = true
+    @AppStorage(AppPreferenceKeys.biometricsEnabled) private var biometricsEnabled = true
 
     @State private var showPaywall = false
 
@@ -95,8 +99,8 @@ struct SettingsWorkspaceView_iPad: View {
 
             subscriptionCard
             dataCard
+            preferencesCard
             appCard
-            developerCard
         }
         .animation(BoostaMotion.smooth, value: columnCount)
     }
@@ -114,7 +118,7 @@ struct SettingsWorkspaceView_iPad: View {
                     Text("Account & App")
                         .font(BoostaType.title)
                         .foregroundStyle(BoostaColor.primaryText)
-                    Text("Manage your plan, data, and app environment. Optimized for iPad.")
+                    Text("Manage your plan, privacy, appearance, and workflow preferences.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 }
@@ -193,6 +197,9 @@ struct SettingsWorkspaceView_iPad: View {
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
 
+                infoRow("Scan history", value: "\(authViewModel.me?.scanHistory.count ?? 0)")
+                infoRow("Applications", value: "\(trackedApplications.count)")
+
                 SecondaryButton(title: "Delete Account") {
                     // Backend endpoint is not implemented yet.
                 }
@@ -202,24 +209,46 @@ struct SettingsWorkspaceView_iPad: View {
         }
     }
 
-    private var appCard: some View {
+    private var preferencesCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "App")
-                infoRow("Appearance", value: "System")
-                infoRow("Notifications", value: "Enabled")
-                infoRow("Support", value: "support@cvboosta.com")
-                infoRow("Version", value: "1.0")
+                SectionHeader(title: "Preferences")
+
+                Picker("Appearance", selection: $appearanceMode) {
+                    ForEach(AppAppearancePreference.allCases) { appearance in
+                        Text(appearance.title).tag(appearance.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                settingsToggle("Notifications", subtitle: "Career reminders and follow-up nudges", isOn: $notificationsEnabled)
+                settingsToggle("Haptics", subtitle: "Subtle feedback during scans and actions", isOn: $hapticsEnabled)
+                settingsToggle("Biometric Lock", subtitle: "Protect account and resume data", isOn: $biometricsEnabled)
             }
         }
     }
 
-    private var developerCard: some View {
+    private var appCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Developer")
-                infoRow("API environment", value: AppEnvironment.apiBaseURL.absoluteString)
-                infoRow("Website", value: AppEnvironment.webBaseURL.absoluteString)
+                SectionHeader(title: "App")
+                infoRow("Support", value: "support@cvboosta.com")
+                infoRow("Version", value: "1.0")
+
+                SecondaryButton(title: "Open Privacy Policy") {
+                    openURL(AppEnvironment.webBaseURL.appending(path: "privacy-policy"))
+                }
+                .hoverEffect(.highlight)
+
+                SecondaryButton(title: "Open Terms of Service") {
+                    openURL(AppEnvironment.webBaseURL.appending(path: "terms-of-service"))
+                }
+                .hoverEffect(.highlight)
+
+                SecondaryButton(title: "Open Website Dashboard") {
+                    openURL(AppEnvironment.webBaseURL)
+                }
+                .hoverEffect(.highlight)
             }
         }
     }
@@ -235,6 +264,23 @@ struct SettingsWorkspaceView_iPad: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .multilineTextAlignment(.trailing)
         }
+    }
+}
+
+extension SettingsWorkspaceView_iPad {
+    @ViewBuilder
+    private func settingsToggle(_ title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                Text(subtitle)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+        .tint(BoostaColor.accent)
     }
 }
 

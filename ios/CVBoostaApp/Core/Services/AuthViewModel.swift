@@ -17,15 +17,18 @@ final class AuthViewModel: ObservableObject {
     private let authService: AuthService
     private let subscriptionService: SubscriptionService
     private let pushNotificationService: PushNotificationService
+    private let widgetSyncService: WidgetSyncService
 
     init(
         authService: AuthService? = nil,
         subscriptionService: SubscriptionService? = nil,
-        pushNotificationService: PushNotificationService? = nil
+        pushNotificationService: PushNotificationService? = nil,
+        widgetSyncService: WidgetSyncService? = nil
     ) {
         self.authService = authService ?? .shared
         self.subscriptionService = subscriptionService ?? .shared
         self.pushNotificationService = pushNotificationService ?? .shared
+        self.widgetSyncService = widgetSyncService ?? .shared
     }
 
     func bootstrap() async {
@@ -113,6 +116,7 @@ final class AuthViewModel: ObservableObject {
         me = snapshot
         subscriptionService.applyBackendSubscription(snapshot.subscription)
         subscriptionService.applyBackendUsageLimits(snapshot.usageLimits)
+        widgetSyncService.applyAuthenticatedSnapshot(snapshot)
         errorMessage = nil
         infoMessage = nil
         state = .loggedIn
@@ -126,6 +130,7 @@ final class AuthViewModel: ObservableObject {
     private func applyLoggedOutState() {
         me = nil
         subscriptionService.reset()
+        widgetSyncService.clear()
         errorMessage = nil
         infoMessage = nil
         state = .loggedOut

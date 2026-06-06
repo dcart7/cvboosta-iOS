@@ -64,21 +64,25 @@ struct CVBoostaApp: App {
 
 struct AppRootView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
+    @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
 
     var body: some View {
-        switch authViewModel.state {
-        case .loading:
-            ZStack {
-                AuthBackgroundView()
+        Group {
+            switch authViewModel.state {
+            case .loading:
+                ZStack {
+                    AuthBackgroundView()
 
-                ProgressView("Loading account...")
-                    .tint(BoostaColor.accentSecondary)
+                    ProgressView("Loading account...")
+                        .tint(BoostaColor.accentSecondary)
+                }
+            case .loggedOut:
+                WelcomeView()
+            case .loggedIn:
+                RootTabView()
             }
-        case .loggedOut:
-            WelcomeView()
-        case .loggedIn:
-            RootTabView()
         }
+        .preferredColorScheme(AppAppearancePreference(rawValue: appearanceMode)?.colorScheme)
     }
 }
 
