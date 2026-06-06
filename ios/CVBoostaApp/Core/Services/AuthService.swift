@@ -316,11 +316,12 @@ private extension AuthService {
     }()
 
     static func mapSubscription(from payload: [String: JSONValue]) -> AuthSubscription {
-        let isActive =
-            payload.bool("is_active")
-            ?? payload.bool("active")
-            ?? (payload.string("status")?.lowercased() == "active")
-            ?? false
+        let isActive: Bool
+        if let direct = payload.bool("is_active") ?? payload.bool("active") {
+            isActive = direct
+        } else {
+            isActive = payload.string("status")?.lowercased() == "active"
+        }
 
         let entitlement =
             payload.string("entitlement")

@@ -86,11 +86,12 @@ final class SubscriptionService: ObservableObject {
         do {
             let payload: [String: JSONValue] = try await client.getJSON(path: "/billing/status")
 
-            let active =
-                payload.bool("is_active")
-                ?? payload.bool("active")
-                ?? (payload.string("status")?.lowercased() == "active")
-                ?? false
+            let active: Bool
+            if let direct = payload.bool("is_active") ?? payload.bool("active") {
+                active = direct
+            } else {
+                active = payload.string("status")?.lowercased() == "active"
+            }
 
             let planName =
                 payload.string("entitlement")
