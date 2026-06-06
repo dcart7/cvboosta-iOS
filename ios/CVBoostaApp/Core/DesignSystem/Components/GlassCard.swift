@@ -13,6 +13,16 @@ struct GlassCard<Content: View>: View {
         content
             .padding(padding)
             .background(BoostaGlass.background)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.16),
+                        Color.white.opacity(0.04)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: BoostaRadius.lg)
                     .stroke(BoostaColor.glassStroke, lineWidth: 1)
@@ -22,7 +32,7 @@ struct GlassCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: BoostaRadius.lg, style: .continuous)
                     .fill(BoostaColor.surface)
             )
-            .shadow(color: BoostaColor.glassShadow, radius: 22, x: 0, y: 16)
+            .shadow(color: BoostaColor.glassShadow, radius: 20, x: 0, y: 8)
     }
 }
 #if DEBUG

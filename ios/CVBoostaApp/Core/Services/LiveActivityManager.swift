@@ -63,6 +63,24 @@ final class LiveActivityManager {
         currentActivity = nil
     }
 
+    func celebrateDailyStreak(dayCount: Int, detail: String) async {
+        let attributes = CVBoostaActivityAttributes(activityName: "Career Streak")
+        let state = CVBoostaActivityAttributes.ContentState(
+            mode: .dailyStreak,
+            title: dayCount == 0 ? "Momentum started" : "Streak protected 🔥",
+            detail: detail,
+            progress: min(max(Double(dayCount) / 30.0, 0.08), 1),
+            etaText: dayCount == 0 ? "Day 1" : "\(dayCount) days"
+        )
+
+        do {
+            let activity = try Activity.request(attributes: attributes, content: .init(state: state, staleDate: nil))
+            await activity.end(nil, dismissalPolicy: .default)
+        } catch {
+            print("Failed to celebrate streak activity: \(error)")
+        }
+    }
+
     func fail() async {
         guard let activity = currentActivity else { return }
 

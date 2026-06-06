@@ -90,6 +90,23 @@ struct CareerMomentumWidget: Widget {
     }
 }
 
+struct StreakWidget: Widget {
+    let kind = "StreakWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CVBoostaProvider()) { entry in
+            StreakWidgetView(entry: entry)
+                .widgetURL(URL(string: "cvboosta://home"))
+                .containerBackground(for: .widget) {
+                    WidgetBackground()
+                }
+        }
+        .configurationDisplayName("Career Streak")
+        .description("Keep your daily career streak visible so momentum never disappears.")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+    }
+}
+
 private struct ATSScoreWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: CVBoostaWidgetEntry
@@ -200,12 +217,81 @@ private struct DailyFocusWidgetView: View {
             if family != .accessoryRectangular {
                 HStack(spacing: 8) {
                     WidgetPill(title: entry.snapshot.recentRole ?? "ATS", tint: .blue)
-                    WidgetPill(title: entry.snapshot.streakDays == 0 ? "Start streak" : "\(entry.snapshot.streakDays)d streak", tint: .purple)
+                    WidgetPill(title: entry.snapshot.streakDays == 0 ? "Start streak" : "\(entry.snapshot.streakDays)d streak", tint: .orange)
                 }
                 Spacer(minLength: 0)
                 Label("Open Scanner", systemImage: "arrow.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct StreakWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: CVBoostaWidgetEntry
+
+    var body: some View {
+        switch family {
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.snapshot.streakDays == 0 ? "Start streak" : "\(entry.snapshot.streakDays)d streak")
+                    .font(.headline)
+                Text(entry.snapshot.streakStatusTitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        case .systemMedium:
+            VStack(alignment: .leading, spacing: 10) {
+                widgetTitle("Career Streak", subtitle: entry.snapshot.careerLevel)
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white.opacity(0.18), lineWidth: 10)
+                        Circle()
+                            .trim(from: 0, to: min(max(Double(entry.snapshot.streakDays) / 30.0, 0.08), 1))
+                            .stroke(Color.orange, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                        VStack(spacing: 2) {
+                            Image(systemName: "flame.fill")
+                                .foregroundStyle(.orange)
+                            Text(entry.snapshot.streakDays == 0 ? "0" : "\(entry.snapshot.streakDays)")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                        }
+                    }
+                    .frame(width: 74, height: 74)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(entry.snapshot.streakStatusTitle)
+                            .font(.subheadline.weight(.semibold))
+                        Text(entry.snapshot.streakStatusDetail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                        WidgetPill(title: entry.snapshot.nextMilestoneTitle, tint: .orange)
+                    }
+                }
+            }
+        default:
+            VStack(alignment: .leading, spacing: 10) {
+                widgetTitle("Career Streak", subtitle: entry.snapshot.weeklyActiveDays == 0 ? "1 action today" : "\(entry.snapshot.weeklyActiveDays)/7 this week")
+                HStack(spacing: 12) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.snapshot.streakDays == 0 ? "Start today" : "\(entry.snapshot.streakDays) day streak")
+                            .font(.title3.bold())
+                        Text(entry.snapshot.streakStatusTitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(entry.snapshot.streakStatusDetail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
             }
         }
     }
@@ -379,6 +465,7 @@ struct CVBoostaWidgetBundle: WidgetBundle {
         CVBoostaLiveActivity()
         ATSScoreWidget()
         DailyFocusWidget()
+        StreakWidget()
         PipelineWidget()
         CareerMomentumWidget()
     }

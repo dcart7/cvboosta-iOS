@@ -213,7 +213,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     private func applicationRow(_ app: ApplicationRecord, isSelected: Bool) -> some View {
         let priority = priority(for: app)
 
-        HStack(alignment: .top, spacing: BoostaSpace.sm) {
+        return HStack(alignment: .top, spacing: BoostaSpace.sm) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.company)
                     .font(BoostaType.bodyStrong)
@@ -444,6 +444,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 selectedApplicationID = record.id
             }
             widgetSyncService.mergeLocalApplications(applications)
+            celebrateStreak(with: record.status)
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
         }
@@ -464,6 +465,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         do {
             try modelContext.save()
             widgetSyncService.mergeLocalApplications(applications)
+            celebrateStreak(with: record.status)
             editingContext = nil
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
@@ -509,6 +511,27 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             resumeUsed: app.resumeUsed,
             jobLink: app.jobLink
         )
+    }
+
+    private func celebrateStreak(with status: ApplicationStatus) {
+        guard #available(iOS 16.1, *) else { return }
+        let summary = StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: applications,
+            manuallyProtectedDayStamps: []
+        )
+        let detail: String = switch status {
+        case .saved: "Saved job. Streak protected."
+        case .applied: "Application logged. Career momentum maintained."
+        case .interview: "Interview prep counts. Streak protected."
+        case .offer: "Offer progress protected your streak."
+        case .rejected: "You kept momentum alive by tracking the result."
+        }
+        Task {
+            await LiveActivityManager.shared.celebrateDailyStreak(dayCount: summary.currentStreak, detail: detail)
+        }
     }
 }
 

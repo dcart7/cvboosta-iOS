@@ -30,6 +30,17 @@ struct PrimaryButton: View {
                         : AnyShapeStyle(BoostaColor.auroraGradient)
                     )
             )
+            .overlay(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.22), .clear],
+                            startPoint: .topLeading,
+                            endPoint: .center
+                        )
+                    )
+                    .blendMode(.screen)
+            }
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
@@ -57,6 +68,17 @@ struct SecondaryButton: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(BoostaColor.surfaceElevated)
+                .overlay(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.14), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .center
+                            )
+                        )
+                        .blendMode(.screen)
+                }
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                         .stroke(BoostaColor.glassStrongStroke, lineWidth: 1)
@@ -162,6 +184,7 @@ struct ScoreRing: View {
         .onChange(of: score) { _, _ in
             animatedProgress = progress
         }
+        .shadow(color: scoreColor.opacity(0.18), radius: 18, x: 0, y: 8)
         .accessibilityLabel("ATS score \(score) out of 100")
     }
 }

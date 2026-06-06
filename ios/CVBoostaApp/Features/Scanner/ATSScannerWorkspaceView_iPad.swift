@@ -12,6 +12,7 @@ struct ATSScannerWorkspaceView_iPad: View {
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showPaywall = false
+    @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var canAnalyze: Bool {
         !viewModel.isScanning
@@ -41,9 +42,9 @@ struct ATSScannerWorkspaceView_iPad: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         }
                         .padding(.horizontal, BoostaSpace.xl)
-                        .padding(.top, BoostaSpace.lg)
+                        .padding(.top, BoostaSpace.md)
                         .padding(.bottom, BoostaSpace.xl)
-                        .frame(maxWidth: 1500)
+                        .frame(maxWidth: 1580)
                         .frame(maxWidth: .infinity, alignment: .top)
                     } else {
                         ScrollView {
@@ -91,11 +92,24 @@ struct ATSScannerWorkspaceView_iPad: View {
                     .disabled(!canAnalyze)
                     .opacity(canAnalyze ? 1 : 0.55)
                     .hoverEffect(.lift)
+
+                    Button {
+                        viewModel.beginNewSession()
+                        LatestScanCacheStore.clear(in: modelContext)
+                    } label: {
+                        Label("New Session", systemImage: "arrow.counterclockwise")
+                    }
+                    .hoverEffect(.lift)
                 }
             }
             .onAppear {
                 viewModel.onAppear()
                 Task { await authViewModel.refreshSharedState() }
+            }
+            .onReceive(sessionTicker) { _ in
+                if viewModel.sessionExpiredAndReset() {
+                    LatestScanCacheStore.clear(in: modelContext)
+                }
             }
             .fileImporter(
                 isPresented: $viewModel.isFileImporterPresented,
@@ -171,13 +185,29 @@ struct ATSScannerWorkspaceView_iPad: View {
 
     private var workflowHeader: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("ATS Scan Workspace")
-                    .font(BoostaType.title)
-                    .foregroundStyle(BoostaColor.primaryText)
-                Text("Upload → analyze → iterate. Results stay side-by-side on iPad.")
-                    .font(BoostaType.body)
-                    .foregroundStyle(BoostaColor.secondaryText)
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("ATS Scan Workspace")
+                            .font(BoostaType.title)
+                            .foregroundStyle(BoostaColor.primaryText)
+                        Text("Upload → analyze → iterate. Results stay side-by-side on iPad.")
+                            .font(BoostaType.body)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: BoostaSpace.sm) {
+                        MetricPill(title: "Session", value: "Active", color: BoostaColor.accent)
+                        MetricPill(title: "Expires", value: viewModel.scannerSessionLabel, color: BoostaColor.warning)
+                    }
+                }
+
+                WorkspaceActionButton(title: "Start New Session", systemImage: "arrow.counterclockwise") {
+                    viewModel.beginNewSession()
+                    LatestScanCacheStore.clear(in: modelContext)
+                }
             }
         }
     }
@@ -311,10 +341,10 @@ struct ATSScannerWorkspaceView_iPad: View {
 
     private var resultsEmptyState: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(
                     title: "Results panel",
-                    subtitle: "Run an analysis to see ATS score, keyword gaps, and rewrite previews here."
+                    subtitle: "Run an analysis to fill this workspace with recruiter visibility, ATS score, keyword gaps, and rewrite previews."
                 )
 
                 HStack(spacing: BoostaSpace.sm) {
@@ -329,8 +359,38 @@ struct ATSScannerWorkspaceView_iPad: View {
                     }
                     .keyboardShortcut(.return, modifiers: .command)
                 }
+
+                HStack(spacing: BoostaSpace.sm) {
+                    ScannerPreviewCard(title: "Recruiter visibility", value: "Moderate", subtitle: "Animated after scan")
+                    ScannerPreviewCard(title: "ATS trend", value: "7d / 30d", subtitle: "Shared account history")
+                    ScannerPreviewCard(title: "Tailoring preview", value: "Before → After", subtitle: "Keyword and bullet diff")
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("What shows up here")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+
+                    ForEach([
+                        "Score ring with recruiter-ready state",
+                        "Missing keyword clusters by role",
+                        "Before/after rewrite preview",
+                        "Next-step recommendations and premium insights"
+                    ], id: \.self) { line in
+                        HStack(alignment: .top, spacing: BoostaSpace.xs) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(BoostaColor.accent)
+                                .padding(.top, 2)
+                            Text(line)
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                        }
+                    }
+                }
             }
         }
+        .frame(minHeight: 340, alignment: .top)
     }
 }
 
@@ -341,9 +401,9 @@ private struct ScannerWorkspaceLayout {
     init(width: CGFloat) {
         isWide = width >= 980
         if width >= 1200 {
-            leftColumnWidth = 460
+            leftColumnWidth = 500
         } else {
-            leftColumnWidth = 420
+            leftColumnWidth = 470
         }
     }
 }
@@ -373,6 +433,34 @@ private struct WorkspaceActionButton: View {
         .opacity(isDisabled ? 0.65 : 1)
         .hoverEffect(.lift)
         .accessibilityLabel(title)
+    }
+}
+
+private struct ScannerPreviewCard: View {
+    let title: String
+    let value: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+            Text(value)
+                .font(BoostaType.bodyStrong)
+                .foregroundStyle(BoostaColor.primaryText)
+            Text(subtitle)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.tertiaryText)
+        }
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .padding(BoostaSpace.sm)
+        .background(Color.white.opacity(0.55))
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
     }
 }
 
@@ -427,25 +515,7 @@ private struct ATSResultsPanel_iPad: View {
         didPersistLatestScan = true
 
         do {
-            let payload = LatestScanPayload(from: result)
-            let data = try JSONEncoder().encode(payload)
-
-            let descriptor = FetchDescriptor<LatestScanReport>(
-                predicate: #Predicate { $0.id == "latest" }
-            )
-            if let existing = try modelContext.fetch(descriptor).first {
-                existing.updatedAt = payload.updatedAt
-                existing.payloadJSON = data
-            } else {
-                modelContext.insert(
-                    LatestScanReport(
-                        updatedAt: payload.updatedAt,
-                        payloadJSON: data
-                    )
-                )
-            }
-
-            try modelContext.save()
+            try LatestScanCacheStore.persist(result: result, in: modelContext)
         } catch {
             // Best-effort cache for companion features; ignore persistence failures.
         }

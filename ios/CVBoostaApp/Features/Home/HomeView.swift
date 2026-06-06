@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var errorMessage: String?
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animateSparkline = false
+    @State private var showStreakCenter = false
 
     private let resumeService = ResumeService.shared
 
@@ -182,7 +183,7 @@ struct HomeView: View {
             .init(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", tint: BoostaColor.accent),
             .init(title: "Momentum", value: momentumScore == 0 ? "—" : "\(momentumScore)", tint: BoostaColor.accentSecondary),
             .init(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", tint: BoostaColor.success),
-            .init(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", tint: BoostaColor.accentSecondary)
+            .init(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", tint: BoostaColor.accentSecondary, isStreak: true)
         ]
     }
 
@@ -237,6 +238,12 @@ struct HomeView: View {
             }
             .sheet(item: $previewDocument) { document in
                 HistoryPDFPreviewSheet(document: document)
+            }
+            .sheet(isPresented: $showStreakCenter) {
+                NavigationStack {
+                    StreakCenterView()
+                        .environmentObject(authViewModel)
+                }
             }
             .task {
                 await authViewModel.refreshSharedState()
@@ -326,7 +333,16 @@ struct HomeView: View {
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
                     ForEach(quickInsights) { insight in
-                        HomeStatCard(title: insight.title, value: insight.value, color: insight.tint)
+                        if insight.isStreak {
+                            Button {
+                                showStreakCenter = true
+                            } label: {
+                                HomeStatCard(title: insight.title, value: insight.value, color: insight.tint)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            HomeStatCard(title: insight.title, value: insight.value, color: insight.tint)
+                        }
                     }
                 }
 
@@ -480,6 +496,7 @@ private struct HomeInsight: Identifiable {
     let title: String
     let value: String
     let tint: Color
+    var isStreak: Bool = false
 }
 
 private struct TodayAction: Identifiable {

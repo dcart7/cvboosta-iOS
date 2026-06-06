@@ -13,13 +13,37 @@ final class WidgetSyncService {
         let scans = snapshot.scanHistory.sorted(by: { $0.createdAt < $1.createdAt })
         let currentScore = scans.last?.matchAfter ?? scans.last?.atsScore ?? 0
         let weeklyDelta = weeklyDelta(from: scans)
-        let streak = streakDays(from: scans)
+        let accountBackedApplications = snapshot.applications.map {
+            ApplicationRecord(
+                id: $0.id,
+                company: $0.company,
+                role: $0.role,
+                status: ApplicationStatus(rawValue: $0.status.lowercased()) ?? .applied,
+                appliedAt: $0.appliedAt,
+                source: $0.source ?? "Account"
+            )
+        }
+        let streakSummary = StreakEngine.build(
+            now: .now,
+            user: snapshot.user,
+            scans: scans,
+            applications: accountBackedApplications,
+            manuallyProtectedDayStamps: []
+        )
 
         cachedSnapshot.updatedAt = .now
         cachedSnapshot.firstName = displayName(from: snapshot.user)
         cachedSnapshot.currentATSScore = currentScore
         cachedSnapshot.weeklyATSDelta = weeklyDelta
-        cachedSnapshot.streakDays = streak
+        cachedSnapshot.streakDays = streakSummary.currentStreak
+        cachedSnapshot.streakStatusTitle = streakSummary.statusTitle
+        cachedSnapshot.streakStatusDetail = streakSummary.microcopy
+        cachedSnapshot.weeklyActiveDays = streakSummary.weeklyActiveDays
+        cachedSnapshot.careerLevel = streakSummary.careerLevel
+        cachedSnapshot.nextMilestoneTitle = streakSummary.milestones.first(where: { !$0.isReached })?.title ?? "Elite"
+        cachedSnapshot.applicationsCount = snapshot.applications.count
+        cachedSnapshot.interviewsCount = snapshot.applications.filter { $0.status.lowercased() == "interview" }.count
+        cachedSnapshot.offersCount = snapshot.applications.filter { $0.status.lowercased() == "offer" }.count
         cachedSnapshot.responseRate = cachedSnapshot.applicationsCount == 0 ? 0 : Int((Double(cachedSnapshot.interviewsCount + cachedSnapshot.offersCount) / Double(cachedSnapshot.applicationsCount)) * 100)
         cachedSnapshot.recentRole = scans.last?.targetRole.nilIfEmpty
         cachedSnapshot.recentCompany = scans.last?.company?.nilIfEmpty
@@ -38,17 +62,27 @@ final class WidgetSyncService {
 
         let roleText = scans.last?.targetRole.nilIfEmpty ?? "your target roles"
         cachedSnapshot.dailyFocusTitle = "Today's Focus"
-        cachedSnapshot.dailyFocusDetail = currentScore == 0
+        cachedSnapshot.dailyFocusDetail = streakSummary.todayActions.first?.detail
+            ?? (currentScore == 0
             ? "Run your first ATS scan to unlock personalized career guidance."
-            : "Tailor for \(roleText) and improve recruiter-facing impact bullets."
+            : "Tailor for \(roleText) and improve recruiter-facing impact bullets.")
 
         cachedSnapshot.momentumTitle = "Career Momentum"
-        cachedSnapshot.momentumDetail = momentumDetail(score: currentScore, delta: weeklyDelta, streak: streak)
+        cachedSnapshot.momentumDetail = momentumDetail(score: currentScore, delta: weeklyDelta, streak: streakSummary.currentStreak)
+
+        if let nextInterview = snapshot.applications
+            .filter({ $0.status.lowercased() == "interview" })
+            .sorted(by: { $0.appliedAt < $1.appliedAt })
+            .first {
+            cachedSnapshot.nextInterviewTitle = "\(nextInterview.company) Interview"
+            cachedSnapshot.nextInterviewDate = nextInterview.appliedAt
+        }
 
         persist()
     }
 
     func mergeLatestScan(result: ResumeScanResult) {
+        let predictedStreak = streakDaysAfterToday(existing: cachedSnapshot.streakDays, recentScanDate: cachedSnapshot.recentScanDate)
         cachedSnapshot.updatedAt = .now
         cachedSnapshot.currentATSScore = result.response.matchAfter ?? result.response.atsScore
         cachedSnapshot.weeklyATSDelta = max((result.response.matchAfter ?? result.response.atsScore) - (result.response.matchBefore ?? result.response.atsScore), 0)
@@ -56,6 +90,10 @@ final class WidgetSyncService {
         cachedSnapshot.recentRole = result.targetRole
         cachedSnapshot.recentCompany = nil
         cachedSnapshot.recentScanDate = .now
+        cachedSnapshot.streakDays = predictedStreak
+        cachedSnapshot.weeklyActiveDays = max(cachedSnapshot.weeklyActiveDays, min(predictedStreak, 7))
+        cachedSnapshot.streakStatusTitle = "Streak protected 🔥"
+        cachedSnapshot.streakStatusDetail = "Small improvements. Bigger interview chances."
         cachedSnapshot.dailyFocusTitle = "Today's Focus"
         cachedSnapshot.dailyFocusDetail = result.response.missingSkills.isEmpty
             ? "Your resume is in a healthy spot. Start applying while momentum is high."
@@ -66,11 +104,24 @@ final class WidgetSyncService {
     }
 
     func mergeLocalApplications(_ applications: [ApplicationRecord]) {
+        let streakSummary = StreakEngine.build(
+            now: .now,
+            user: nil,
+            scans: [],
+            applications: applications,
+            manuallyProtectedDayStamps: []
+        )
         cachedSnapshot.updatedAt = .now
         cachedSnapshot.applicationsCount = applications.count
         cachedSnapshot.interviewsCount = applications.filter { $0.status == .interview }.count
         cachedSnapshot.offersCount = applications.filter { $0.status == .offer }.count
         cachedSnapshot.responseRate = applications.isEmpty ? 0 : Int((Double(cachedSnapshot.interviewsCount + cachedSnapshot.offersCount) / Double(applications.count)) * 100)
+        cachedSnapshot.streakDays = max(cachedSnapshot.streakDays, streakSummary.currentStreak)
+        cachedSnapshot.streakStatusTitle = streakSummary.statusTitle
+        cachedSnapshot.streakStatusDetail = streakSummary.microcopy
+        cachedSnapshot.weeklyActiveDays = max(cachedSnapshot.weeklyActiveDays, streakSummary.weeklyActiveDays)
+        cachedSnapshot.careerLevel = streakSummary.careerLevel
+        cachedSnapshot.nextMilestoneTitle = streakSummary.milestones.first(where: { !$0.isReached })?.title ?? cachedSnapshot.nextMilestoneTitle
 
         if let nextInterview = applications
             .filter({ $0.status == .interview && $0.interviewAt != nil })
@@ -105,21 +156,6 @@ final class WidgetSyncService {
         return (last.matchAfter ?? last.atsScore) - (first.matchAfter ?? first.atsScore)
     }
 
-    private func streakDays(from scans: [ScanHistorySnapshot]) -> Int {
-        let calendar = Calendar.current
-        let uniqueDays = Set(scans.map { calendar.startOfDay(for: $0.createdAt) })
-        guard !uniqueDays.isEmpty else { return 0 }
-
-        var current = calendar.startOfDay(for: Date())
-        var streak = 0
-        while uniqueDays.contains(current) {
-            streak += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: current) else { break }
-            current = previous
-        }
-        return streak
-    }
-
     private func displayName(from user: AuthUser) -> String? {
         if let displayName = user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !displayName.isEmpty {
             return displayName.split(separator: " ").first.map(String.init)
@@ -138,6 +174,13 @@ final class WidgetSyncService {
             return "Consistency is holding with a \(streak)-day streak."
         }
         return "Resume health is stable. One more optimization can move it up."
+    }
+
+    private func streakDaysAfterToday(existing: Int, recentScanDate: Date?) -> Int {
+        if let recentScanDate, Calendar.current.isDateInToday(recentScanDate) {
+            return existing
+        }
+        return max(existing, 0) + 1
     }
 }
 

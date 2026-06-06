@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Charts
 
 /// iPad-only full statistics workspace.
 /// The compact iPad home landing remains in `HomeWorkspaceView_iPad`.
@@ -20,6 +21,8 @@ struct StatisticsWorkspaceView_iPad: View {
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var historyErrorMessage: String?
     @State private var selectedSection: StatisticsWorkspaceSection = .overview
+    @State private var selectedRange: StatisticsTimeRange_iPad = .thirtyDays
+    @State private var showStreakCenter = false
 
     private let resumeService = ResumeService.shared
 
@@ -47,6 +50,14 @@ struct StatisticsWorkspaceView_iPad: View {
         historyItems.sorted(by: { $0.createdAt < $1.createdAt })
     }
 
+    private var filteredHistoryAscending: [HistoryListItem] {
+        guard let days = selectedRange.dayWindow else { return sharedHistoryAscending }
+        guard let start = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else {
+            return sharedHistoryAscending
+        }
+        return sharedHistoryAscending.filter { $0.createdAt >= start }
+    }
+
     private func normalizedATSScore(_ raw: Int) -> Int {
         if raw > 100 {
             return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
@@ -61,14 +72,24 @@ struct StatisticsWorkspaceView_iPad: View {
     }
 
     private var avgScore: Int {
-        let values = sharedHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
+        let values = filteredHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
         guard !values.isEmpty else { return 0 }
         let total = values.reduce(0, +)
         return total / values.count
     }
 
     private var atsTrendScores: [Int] {
-        sharedHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
+        filteredHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
+    }
+
+    private var trendPoints: [StatisticsChartPoint] {
+        filteredHistoryAscending.enumerated().map { index, item in
+            StatisticsChartPoint(
+                id: index,
+                date: item.createdAt,
+                score: normalizedATSScore(item.matchAfter ?? item.score)
+            )
+        }
     }
 
     private var streakDays: Int {
@@ -105,9 +126,9 @@ struct StatisticsWorkspaceView_iPad: View {
                     ScrollView {
                         content(width: proxy.size.width)
                             .padding(.horizontal, BoostaSpace.xl)
-                            .padding(.top, BoostaSpace.lg)
+                            .padding(.top, BoostaSpace.md)
                             .padding(.bottom, BoostaSpace.xl)
-                            .frame(maxWidth: 1400)
+                            .frame(maxWidth: 1560)
                             .frame(maxWidth: .infinity)
                     }
                     .scrollIndicators(.visible)
@@ -148,6 +169,12 @@ struct StatisticsWorkspaceView_iPad: View {
             .sheet(item: $previewDocument) { document in
                 HistoryPDFPreviewSheet(document: document)
             }
+            .sheet(isPresented: $showStreakCenter) {
+                NavigationStack {
+                    StreakCenterView()
+                        .environmentObject(authViewModel)
+                }
+            }
             .overlay(alignment: .top) {
                 if let historyErrorMessage {
                     ErrorBanner(message: historyErrorMessage)
@@ -179,8 +206,8 @@ struct StatisticsWorkspaceView_iPad: View {
     }
 
     private func workspaceColumnCount(for width: CGFloat) -> Int {
-        if width >= 1220 { return 3 }
-        if width >= 860 { return 2 }
+        if width >= 1320 { return 3 }
+        if width >= 980 { return 2 }
         return 1
     }
 
@@ -235,33 +262,38 @@ struct StatisticsWorkspaceView_iPad: View {
             streakCard
             weeklySummaryCard
             sharedHistoryCard
+                .gridCellColumns(columnCount)
         case .ats:
             overviewCard
                 .gridCellColumns(min(2, columnCount))
             atsTrendCard
+                .gridCellColumns(min(2, columnCount))
+            recentScanCard
             if latestPayload != nil || latestHistoryDetail != nil {
                 insightsCard
-                    .gridCellColumns(columnCount)
+                    .gridCellColumns(max(min(2, columnCount), 1))
             } else {
                 emptyStateCard
-                    .gridCellColumns(columnCount)
+                    .gridCellColumns(max(min(2, columnCount), 1))
             }
-            recentScanCard
         case .funnel:
             interviewPipelineCard
+                .gridCellColumns(min(2, columnCount))
             streakCard
             weeklySummaryCard
             sharedHistoryCard
+                .gridCellColumns(columnCount)
         case .insights:
             if latestPayload != nil || latestHistoryDetail != nil {
                 insightsCard
-                    .gridCellColumns(columnCount)
+                    .gridCellColumns(max(min(2, columnCount), 1))
             } else {
                 emptyStateCard
-                    .gridCellColumns(columnCount)
+                    .gridCellColumns(max(min(2, columnCount), 1))
             }
             recentScanCard
             sharedHistoryCard
+                .gridCellColumns(columnCount)
         }
     }
 
@@ -293,6 +325,12 @@ struct StatisticsWorkspaceView_iPad: View {
                             MetricPill(title: "Avg. ATS", value: avgScore == 0 ? "—" : "\(avgScore)", color: BoostaColor.warning)
                         }
 
+                        HStack(spacing: BoostaSpace.sm) {
+                            StatisticsMetricRing_iPad(title: "Career", value: latestScore == 0 ? "—" : "\(latestScore)", progress: Double(latestScore) / 100, tint: BoostaColor.accent)
+                            StatisticsMetricRing_iPad(title: "Interviews", value: "\(interviewsCount)", progress: min(Double(interviewsCount) / 5, 1), tint: BoostaColor.success)
+                            StatisticsMetricRing_iPad(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", progress: min(Double(streakDays) / 10, 1), tint: BoostaColor.warning)
+                        }
+
                         Divider()
                             .opacity(0.35)
 
@@ -303,6 +341,7 @@ struct StatisticsWorkspaceView_iPad: View {
                 }
             }
         }
+        .frame(minHeight: 230, alignment: .top)
     }
 
     private var atsTrendCard: some View {
@@ -313,13 +352,65 @@ struct StatisticsWorkspaceView_iPad: View {
                     subtitle: atsTrendScores.isEmpty ? "No trend yet" : "\(atsTrendScores.count) shared history items"
                 )
 
+                Picker("Trend range", selection: $selectedRange) {
+                    ForEach(StatisticsTimeRange_iPad.allCases) { range in
+                        Text(range.title).tag(range)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 if atsTrendScores.count < 2 {
                     Text("More shared history will make the full account trend clearer.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    ATSSparkline(scores: atsTrendScores)
-                        .frame(height: 78)
+                    Chart(trendPoints) { point in
+                        LineMark(x: .value("Date", point.date), y: .value("ATS", point.score))
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                            .foregroundStyle(BoostaColor.accent)
+
+                        AreaMark(x: .value("Date", point.date), y: .value("ATS", point.score))
+                            .foregroundStyle(
+                                .linearGradient(
+                                    colors: [BoostaColor.accent.opacity(0.18), BoostaColor.accent.opacity(0.02)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+
+                        PointMark(x: .value("Date", point.date), y: .value("ATS", point.score))
+                            .foregroundStyle(BoostaColor.accent)
+                            .symbolSize(point.id == trendPoints.count - 1 ? 34 : 14)
+                    }
+                    .chartYScale(domain: 0...100)
+                    .chartYAxis {
+                        AxisMarks(position: .leading, values: [0, 50, 100]) { value in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.8))
+                                .foregroundStyle(Color.white.opacity(0.08))
+                            AxisValueLabel {
+                                if let intValue = value.as(Int.self) {
+                                    Text("\(intValue)")
+                                        .font(BoostaType.caption)
+                                        .foregroundStyle(BoostaColor.secondaryText)
+                                }
+                            }
+                        }
+                    }
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: min(max(trendPoints.count, 2), 6))) { value in
+                            AxisGridLine().foregroundStyle(.clear)
+                            AxisTick().foregroundStyle(Color.white.opacity(0.16))
+                            AxisValueLabel {
+                                if let dateValue = value.as(Date.self) {
+                                    Text(dateValue.formatted(.dateTime.month(.abbreviated).day()))
+                                        .font(BoostaType.caption)
+                                        .foregroundStyle(BoostaColor.secondaryText)
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 180)
 
                     HStack {
                         Text("Avg \(avgScore == 0 ? "—" : "\(avgScore)")")
@@ -342,6 +433,7 @@ struct StatisticsWorkspaceView_iPad: View {
                 }
             }
         }
+        .frame(minHeight: 240, alignment: .top)
     }
 
     private var trendInsight: String {
@@ -522,6 +614,10 @@ struct StatisticsWorkspaceView_iPad: View {
                 Text(streakDays == 0 ? "Start your streak today." : "\(streakDays) active day\(streakDays == 1 ? "" : "s")")
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
+
+                WorkspaceActionButton(title: "Open Streak Center", systemImage: "flame.fill") {
+                    showStreakCenter = true
+                }
             }
         }
     }
@@ -556,12 +652,12 @@ struct StatisticsWorkspaceView_iPad: View {
                                 await openHistoryPDF(for: item)
                             }
                         } label: {
-                            HStack(spacing: BoostaSpace.md) {
-                                VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .center, spacing: BoostaSpace.md) {
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(item.role ?? "CV Optimization")
                                         .font(BoostaType.bodyStrong)
                                         .foregroundStyle(BoostaColor.primaryText)
-                                    Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                    Text(historySubtitle(for: item))
                                         .font(BoostaType.caption)
                                         .foregroundStyle(BoostaColor.secondaryText)
                                 }
@@ -574,7 +670,7 @@ struct StatisticsWorkspaceView_iPad: View {
                                     color: BoostaColor.accent
                                 )
                             }
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 4)
                         }
                         .buttonStyle(.plain)
                     }
@@ -629,6 +725,7 @@ struct StatisticsWorkspaceView_iPad: View {
                 }
             }
         }
+        .frame(minHeight: 148, alignment: .top)
     }
 
     private func readinessRow(_ title: String, done: Bool) -> some View {
@@ -653,6 +750,14 @@ struct StatisticsWorkspaceView_iPad: View {
             ? "ATS is up \(delta)"
             : "ATS is \(abs(delta)) below your strongest baseline"
         return "\(atsSummary), \(applicationsCount) tracked applications, \(interviewsCount) interviews in pipeline, \(keywordsImproved) keywords improved."
+    }
+
+    private func historySubtitle(for item: HistoryListItem) -> String {
+        let date = item.createdAt.formatted(date: .abbreviated, time: .shortened)
+        if let company = item.company, !company.isEmpty {
+            return "\(company) • \(date)"
+        }
+        return date
     }
 
     private func loadSharedHistory() async {
@@ -733,72 +838,81 @@ private enum StatisticsWorkspaceSection: String, CaseIterable, Identifiable {
     }
 }
 
-private struct ATSSparkline: View {
-    let scores: [Int]
-    @State private var isRevealed = false
+private enum StatisticsTimeRange_iPad: String, CaseIterable, Identifiable {
+    case sevenDays
+    case thirtyDays
+    case all
 
-    var body: some View {
-        GeometryReader { proxy in
-            let points = normalizedPoints(in: proxy.size)
+    var id: String { rawValue }
 
-            ZStack {
-                Path { path in
-                    guard points.count > 1 else { return }
-                    path.move(to: points[0])
-                    for point in points.dropFirst() {
-                        path.addLine(to: point)
-                    }
-                }
-                .trim(from: 0, to: isRevealed ? 1 : 0)
-                .stroke(BoostaColor.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                .animation(.easeOut(duration: 0.9), value: isRevealed)
-
-                Path { path in
-                    guard points.count > 1 else { return }
-                    path.move(to: CGPoint(x: points[0].x, y: proxy.size.height))
-                    path.addLine(to: points[0])
-                    for point in points.dropFirst() {
-                        path.addLine(to: point)
-                    }
-                    path.addLine(to: CGPoint(x: points.last?.x ?? 0, y: proxy.size.height))
-                    path.closeSubpath()
-                }
-                .fill(BoostaColor.accent.opacity(0.12))
-            }
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.25))
-                    .frame(height: 1)
-            }
+    var title: String {
+        switch self {
+        case .sevenDays: return "7D"
+        case .thirtyDays: return "30D"
+        case .all: return "All"
         }
-        .onAppear {
-            isRevealed = true
-        }
-        .onChange(of: scores) { _, _ in
-            isRevealed = false
-            DispatchQueue.main.async {
-                isRevealed = true
-            }
-        }
-        .accessibilityLabel("ATS score trend chart")
     }
 
-    private func normalizedPoints(in size: CGSize) -> [CGPoint] {
-        guard scores.count > 1 else { return [] }
-        let minScore = max(CGFloat(scores.min() ?? 0), 0)
-        let maxScore = max(CGFloat(scores.max() ?? 0), 1)
-        let range = max(maxScore - minScore, 1)
+    var dayWindow: Int? {
+        switch self {
+        case .sevenDays: return 7
+        case .thirtyDays: return 30
+        case .all: return nil
+        }
+    }
+}
 
-        let inset: CGFloat = 6
-        let width = max(size.width - inset * 2, 1)
-        let height = max(size.height - inset * 2, 1)
+private struct StatisticsChartPoint: Identifiable {
+    let id: Int
+    let date: Date
+    let score: Int
+}
 
-        return scores.enumerated().map { idx, raw in
-            let x = inset + (CGFloat(idx) / CGFloat(scores.count - 1)) * width
-            let clamped = min(max(CGFloat(raw), minScore), maxScore)
-            let normalized = (clamped - minScore) / range
-            let y = inset + (1 - normalized) * height
-            return CGPoint(x: x, y: y)
+private struct StatisticsMetricRing_iPad: View {
+    let title: String
+    let value: String
+    let progress: Double
+    let tint: Color
+
+    @State private var animatedProgress: Double = 0
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.16), lineWidth: 10)
+
+                Circle()
+                    .trim(from: 0, to: animatedProgress)
+                    .stroke(
+                        AngularGradient(colors: [tint.opacity(0.4), tint], center: .center),
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                Text(value)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+            }
+            .frame(width: 78, height: 78)
+
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(BoostaColor.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.86)) {
+                animatedProgress = min(max(progress, 0), 1)
+            }
+        }
+        .onChange(of: progress) { _, newValue in
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.86)) {
+                animatedProgress = min(max(newValue, 0), 1)
+            }
         }
     }
 }

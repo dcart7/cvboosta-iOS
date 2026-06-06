@@ -53,17 +53,17 @@ struct CVBoostaLiveActivity: Widget {
     private func lockScreenView(_ context: ActivityViewContext<CVBoostaActivityAttributes>) -> some View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text(context.state.title)
+                    Label(context.state.title, systemImage: context.state.mode == .dailyStreak ? "flame.fill" : "sparkles")
                         .font(.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(context.state.mode == .dailyStreak ? .orange : .white)
                     Spacer()
-                    Text(percentText(context.state.progress))
+                    Text(context.state.mode == .dailyStreak ? context.state.etaText : percentText(context.state.progress))
                         .font(.headline)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(context.state.mode == .dailyStreak ? .orange : .green)
                 }
 
                 ProgressView(value: context.state.progress)
-                    .tint(.cyan)
+                    .tint(context.state.mode == .dailyStreak ? .orange : .cyan)
 
                 HStack {
                     Text(context.state.detail)

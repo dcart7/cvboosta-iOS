@@ -6,9 +6,24 @@ struct ATSScannerView: View {
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showPaywall = false
+    @State private var currentStep: ScannerWizardStep = .upload
+    @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var canAnalyze: Bool {
         !viewModel.isScanning && viewModel.selectedFileName != nil && !viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var canContinue: Bool {
+        switch currentStep {
+        case .upload:
+            return viewModel.selectedFileName != nil
+        case .role:
+            return !viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .job:
+            return true
+        case .review:
+            return canAnalyze
+        }
     }
 
     var body: some View {
@@ -24,20 +39,11 @@ struct ATSScannerView: View {
                 ScrollView {
                     VStack(spacing: BoostaSpace.md) {
                         analysisPreviewCard
-                        resumeUploadCard
-                        targetRoleCard
-                        jobDescriptionCard
-                        filtersCard
+                        sessionCard
+                        wizardProgressCard
+                        currentStepCard
                         accessCard
-
-                        PrimaryButton(
-                            title: "Analyze Resume",
-                            isLoading: viewModel.isScanning,
-                            isDisabled: !canAnalyze
-                        ) {
-                            HapticsService.impact(.medium)
-                            viewModel.analyzeResume()
-                        }
+                        wizardFooter
                     }
                     .padding(BoostaSpace.md)
                 }
@@ -60,6 +66,9 @@ struct ATSScannerView: View {
                 Task {
                     await authViewModel.refreshSharedState()
                 }
+            }
+            .onReceive(sessionTicker) { _ in
+                _ = viewModel.sessionExpiredAndReset()
             }
             .fileImporter(
                 isPresented: $viewModel.isFileImporterPresented,
@@ -98,7 +107,7 @@ struct ATSScannerView: View {
     private var resumeUploadCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Resume upload", subtitle: "PDF only, up to 10 MB")
+                SectionHeader(title: "Step 1 • Upload CV", subtitle: "PDF only, up to 10 MB")
 
                 SecondaryButton(title: "Upload Resume PDF") {
                     viewModel.startImport()
@@ -116,7 +125,7 @@ struct ATSScannerView: View {
     private var analysisPreviewCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "What we analyze", subtitle: "Fast ATS diagnostics with action-oriented feedback")
+                SectionHeader(title: "Stay recruiter-ready", subtitle: "Quick ATS diagnostics with clearer next steps")
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
                     KeywordChip(text: "ATS Parsing", status: .present)
@@ -134,21 +143,47 @@ struct ATSScannerView: View {
         }
     }
 
+    private var sessionCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(
+                    title: "Scanner session",
+                    subtitle: "Your setup resets when the session expires."
+                )
+
+                HStack(spacing: BoostaSpace.sm) {
+                    MetricPill(title: "Status", value: "Active", color: BoostaColor.accent)
+                    MetricPill(title: "Expires", value: viewModel.scannerSessionLabel, color: BoostaColor.warning)
+                }
+
+                SecondaryButton(title: "Start New Session") {
+                    viewModel.beginNewSession()
+                }
+            }
+        }
+    }
+
     private var targetRoleCard: some View {
         GlassCard {
-            TextInputField(
-                title: "Target role",
-                placeholder: "Backend Developer",
-                text: $viewModel.targetRole,
-                textContentType: .jobTitle
-            )
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                TextInputField(
+                    title: "Step 2 • Target role",
+                    placeholder: "Backend Developer",
+                    text: $viewModel.targetRole,
+                    textContentType: .jobTitle
+                )
+
+                Text("This tells CVBoosta which hiring language and ATS signals matter most.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
         }
     }
 
     private var jobDescriptionCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Job description", subtitle: "Optional, recommended 100+ characters")
+                SectionHeader(title: "Step 3 • Job description", subtitle: "Optional, but it sharpens keyword targeting")
                 TextEditor(text: $viewModel.jobDescription)
                     .frame(minHeight: 130)
                     .padding(BoostaSpace.xs)
@@ -169,7 +204,7 @@ struct ATSScannerView: View {
     private var filtersCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Experience & market")
+                SectionHeader(title: "Step 4 • Review setup", subtitle: "Fine-tune the scan before you analyze")
 
                 Picker("Experience level", selection: $viewModel.experienceLevel) {
                     ForEach(ScannerViewModel.ExperienceLevel.allCases, id: \.self) { level in
@@ -188,13 +223,115 @@ struct ATSScannerView: View {
         }
     }
 
+    private var wizardProgressCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                HStack {
+                    Text("Scanner flow")
+                        .font(BoostaType.bodyStrong)
+                    Spacer()
+                    Text("Step \(currentStep.rawValue + 1) of \(ScannerWizardStep.allCases.count)")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                }
+
+                HStack(spacing: 8) {
+                    ForEach(ScannerWizardStep.allCases) { step in
+                        VStack(spacing: 6) {
+                            Circle()
+                                .fill(step == currentStep ? BoostaColor.accent : step.rawValue < currentStep.rawValue ? BoostaColor.success : BoostaColor.surfaceMuted)
+                                .frame(width: 28, height: 28)
+                                .overlay {
+                                    if step.rawValue < currentStep.rawValue {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    } else {
+                                        Text("\(step.rawValue + 1)")
+                                            .font(BoostaType.caption)
+                                            .foregroundStyle(step == currentStep ? .white : BoostaColor.secondaryText)
+                                    }
+                                }
+                            Text(step.shortTitle)
+                                .font(BoostaType.caption)
+                                .foregroundStyle(step == currentStep ? BoostaColor.primaryText : BoostaColor.secondaryText)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var currentStepCard: some View {
+        switch currentStep {
+        case .upload:
+            resumeUploadCard
+        case .role:
+            targetRoleCard
+        case .job:
+            jobDescriptionCard
+        case .review:
+            reviewCard
+        }
+    }
+
+    private var reviewCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "Ready to analyze", subtitle: "One last look before we score recruiter visibility")
+
+                filtersCard
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
+                    ReviewMetricCard(title: "Resume", value: viewModel.selectedFileName ?? "Missing", tint: viewModel.selectedFileName == nil ? BoostaColor.warning : BoostaColor.success)
+                    ReviewMetricCard(title: "Target role", value: viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Missing" : viewModel.targetRole, tint: viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? BoostaColor.warning : BoostaColor.accent)
+                    ReviewMetricCard(title: "Experience", value: viewModel.experienceLevel.rawValue, tint: BoostaColor.accentSecondary)
+                    ReviewMetricCard(title: "Market", value: viewModel.targetMarket.rawValue, tint: BoostaColor.warning)
+                }
+
+                Text(viewModel.jobDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? "No job description added. You can still analyze, but keyword targeting will be broader."
+                    : "Job description added — keyword targeting and recruiter visibility will be sharper.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+    }
+
+    private var wizardFooter: some View {
+        HStack(spacing: BoostaSpace.sm) {
+            if currentStep != .upload {
+                SecondaryButton(title: "Back") {
+                    currentStep = currentStep.previous
+                }
+            }
+
+            if currentStep == .review {
+                PrimaryButton(
+                    title: "Analyze Resume",
+                    isLoading: viewModel.isScanning,
+                    isDisabled: !canAnalyze
+                ) {
+                    HapticsService.impact(.medium)
+                    viewModel.analyzeResume()
+                }
+            } else {
+                PrimaryButton(title: "Continue", isDisabled: !canContinue) {
+                    currentStep = currentStep.next
+                }
+            }
+        }
+    }
+
     private var accessCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Usage")
 
                 if subscriptionService.isPremium {
-                    Text("Premium active: unlimited ATS scans")
+                    Text("Premium active: deeper ATS intelligence and unlimited scans")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.success)
                 } else {
@@ -209,7 +346,7 @@ struct ATSScannerView: View {
                         .foregroundStyle(BoostaColor.secondaryText)
 
                     HStack(spacing: BoostaSpace.sm) {
-                        PrimaryButton(title: "Upgrade") {
+                        PrimaryButton(title: "Unlock Premium") {
                             showPaywall = true
                         }
                         SecondaryButton(title: "Restore") {
@@ -232,4 +369,56 @@ struct ATSScannerView: View {
 #Preview {
     ATSScannerView()
         .environmentObject(AuthViewModel())
+}
+
+private enum ScannerWizardStep: Int, CaseIterable, Identifiable {
+    case upload
+    case role
+    case job
+    case review
+
+    var id: Int { rawValue }
+
+    var shortTitle: String {
+        switch self {
+        case .upload: return "Upload"
+        case .role: return "Role"
+        case .job: return "Job"
+        case .review: return "Review"
+        }
+    }
+
+    var next: ScannerWizardStep {
+        ScannerWizardStep(rawValue: min(rawValue + 1, ScannerWizardStep.review.rawValue)) ?? .review
+    }
+
+    var previous: ScannerWizardStep {
+        ScannerWizardStep(rawValue: max(rawValue - 1, ScannerWizardStep.upload.rawValue)) ?? .upload
+    }
+}
+
+private struct ReviewMetricCard: View {
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+            Text(value)
+                .font(BoostaType.bodyStrong)
+                .foregroundStyle(tint)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .padding(BoostaSpace.sm)
+        .background(Color.white.opacity(0.55))
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+    }
 }

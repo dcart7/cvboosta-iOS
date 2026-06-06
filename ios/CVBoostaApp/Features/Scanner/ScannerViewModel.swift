@@ -45,24 +45,31 @@ final class ScannerViewModel: ObservableObject {
     private let atsService: ATSServiceProtocol
     private let subscriptionService: SubscriptionService
     private let widgetSyncService: WidgetSyncService
+    private let sessionService: WorkspaceSessionService
     private var scanTask: Task<Void, Never>?
 
     init(
         atsService: ATSServiceProtocol? = nil,
         subscriptionService: SubscriptionService? = nil,
-        widgetSyncService: WidgetSyncService? = nil
+        widgetSyncService: WidgetSyncService? = nil,
+        sessionService: WorkspaceSessionService? = nil
     ) {
         self.atsService = atsService ?? ATSService.shared
         self.subscriptionService = subscriptionService ?? .shared
         self.widgetSyncService = widgetSyncService ?? .shared
+        self.sessionService = sessionService ?? .shared
     }
 
     func onAppear() {
         subscriptionService.refreshEntitlements()
+        if !sessionExpiredAndReset() {
+            sessionService.ensureSession(for: .scanner)
+        }
     }
 
     func startImport() {
         errorMessage = nil
+        sessionService.touch(.scanner)
         isFileImporterPresented = true
     }
 
@@ -72,6 +79,7 @@ final class ScannerViewModel: ObservableObject {
 
     func analyzeResume() {
         errorMessage = nil
+        sessionService.touch(.scanner)
 
         guard let fileURL = selectedFileURL else {
             errorMessage = "Please upload a PDF resume."
@@ -124,12 +132,32 @@ final class ScannerViewModel: ObservableObject {
                 selectedFileURL = url
                 selectedFileName = url.lastPathComponent
                 errorMessage = nil
+                sessionService.touch(.scanner)
             } catch {
                 errorMessage = "Unable to read selected PDF."
             }
         case .failure(let error):
             errorMessage = error.localizedDescription
         }
+    }
+
+    func beginNewSession() {
+        sessionService.startNewSession(for: .scanner)
+        resetSessionState()
+    }
+
+    @discardableResult
+    func sessionExpiredAndReset() -> Bool {
+        guard sessionService.resetIfExpired(.scanner) else {
+            return false
+        }
+
+        resetSessionState()
+        return true
+    }
+
+    var scannerSessionLabel: String {
+        sessionService.formattedRemainingTime(for: .scanner)
     }
 
     private func runScan(pdfURL: URL, role: String) async {
@@ -182,6 +210,8 @@ final class ScannerViewModel: ObservableObject {
     private func completeScan(with response: ResumeScanResponse, isDemo: Bool, role: String) async {
         await updateProgress(value: 1.0, step: 3, eta: "")
         HapticsService.success()
+        sessionService.touch(.scanner)
+        sessionService.touch(.tailoring)
 
         scanResult = ResumeScanResult(
             response: response,
@@ -200,6 +230,11 @@ final class ScannerViewModel: ObservableObject {
 
         if #available(iOS 16.1, *) {
             await LiveActivityManager.shared.complete(finalScore: response.atsScore)
+            let streakDayCount = CVBoostaWidgetStore.loadSnapshot().streakDays
+            await LiveActivityManager.shared.celebrateDailyStreak(
+                dayCount: streakDayCount,
+                detail: "Your future recruiter would approve."
+            )
         }
     }
 
@@ -231,5 +266,22 @@ final class ScannerViewModel: ObservableObject {
     private var normalizedJobDescription: String? {
         let value = jobDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
+    }
+
+    private func resetSessionState() {
+        targetRole = ""
+        jobDescription = ""
+        experienceLevel = .midLevel
+        targetMarket = .unitedStates
+        selectedFileName = nil
+        selectedFileURL = nil
+        scanResult = nil
+        errorMessage = nil
+        isScanning = false
+        scanProgress = 0
+        progressMessage = "Ready"
+        progressStepIndex = 0
+        scanTask?.cancel()
+        scanTask = nil
     }
 }

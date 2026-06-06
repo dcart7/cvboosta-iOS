@@ -16,6 +16,8 @@ struct StatisticsView: View {
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animatedTrendCount = 0
     @State private var selectedSection: StatisticsSection = .overview
+    @State private var selectedRange: StatisticsTimeRange = .thirtyDays
+    @State private var showStreakCenter = false
 
     private let resumeService = ResumeService.shared
 
@@ -33,6 +35,14 @@ struct StatisticsView: View {
 
     private var sharedHistoryAscending: [HistoryListItem] {
         historyItems.sorted(by: { $0.createdAt < $1.createdAt })
+    }
+
+    private var filteredHistoryAscending: [HistoryListItem] {
+        guard let days = selectedRange.dayWindow else { return sharedHistoryAscending }
+        guard let start = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else {
+            return sharedHistoryAscending
+        }
+        return sharedHistoryAscending.filter { $0.createdAt >= start }
     }
 
     private func normalizedATSScore(_ raw: Int) -> Int {
@@ -69,16 +79,16 @@ struct StatisticsView: View {
     }
 
     private var avgScore: Int {
-        let values = sharedHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
+        let values = filteredHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
         guard !values.isEmpty else { return 0 }
         let total = values.reduce(0, +)
         return total / values.count
     }
 
     private var monthlyDelta: Int {
-        guard sharedHistoryAscending.count > 1 else { return 0 }
-        return normalizedATSScore(sharedHistoryAscending.last?.matchAfter ?? sharedHistoryAscending.last?.score ?? 0)
-            - normalizedATSScore(sharedHistoryAscending.first?.matchAfter ?? sharedHistoryAscending.first?.score ?? 0)
+        guard filteredHistoryAscending.count > 1 else { return 0 }
+        return normalizedATSScore(filteredHistoryAscending.last?.matchAfter ?? filteredHistoryAscending.last?.score ?? 0)
+            - normalizedATSScore(filteredHistoryAscending.first?.matchAfter ?? filteredHistoryAscending.first?.score ?? 0)
     }
 
     private var streakDays: Int {
@@ -128,12 +138,10 @@ struct StatisticsView: View {
     }
 
     private var trendPoints: [CareerTrendPoint] {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return sharedHistoryAscending.enumerated().map { index, item in
+        return filteredHistoryAscending.enumerated().map { index, item in
             CareerTrendPoint(
                 id: index,
-                label: formatter.string(from: item.createdAt),
+                date: item.createdAt,
                 atsScore: normalizedATSScore(item.matchAfter ?? item.score)
             )
         }
@@ -274,9 +282,18 @@ struct StatisticsView: View {
             .sheet(item: $previewDocument) { document in
                 HistoryPDFPreviewSheet(document: document)
             }
+            .sheet(isPresented: $showStreakCenter) {
+                NavigationStack {
+                    StreakCenterView()
+                        .environmentObject(authViewModel)
+                }
+            }
             .task {
                 await authViewModel.refreshSharedState()
                 await loadSharedHistory()
+                animateTrend()
+            }
+            .onChange(of: selectedRange) { _, _ in
                 animateTrend()
             }
         }
@@ -345,6 +362,12 @@ struct StatisticsView: View {
                     KeywordChip(text: "Resume Strength", status: avgScore >= 75 ? .present : avgScore >= 60 ? .weak : .missing)
                 }
 
+                HStack(spacing: BoostaSpace.sm) {
+                    StatisticsMetricRing(title: "Career", value: careerScore == 0 ? "—" : "\(careerScore)", progress: Double(careerScore) / 100, tint: BoostaColor.accent)
+                    StatisticsMetricRing(title: "Response", value: responseRate == 0 ? "—" : "\(responseRate)%", progress: Double(responseRate) / 100, tint: BoostaColor.success)
+                    StatisticsMetricRing(title: "Momentum", value: streakDays == 0 ? "Start" : "\(min(streakDays * 10, 99))", progress: min(Double(streakDays) / 10, 1), tint: BoostaColor.warning)
+                }
+
                 PrimaryButton(title: "Analyze Resume") {
                     appRouter.open(.scanner)
                 }
@@ -377,18 +400,25 @@ struct StatisticsView: View {
                     }
                 }
 
+                Picker("Trend range", selection: $selectedRange) {
+                    ForEach(StatisticsTimeRange.allCases) { range in
+                        Text(range.title).tag(range)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 if trendPoints.count < 2 {
                     Text("More shared history will make this performance trend meaningful.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
                     Chart(Array(trendPoints.prefix(max(animatedTrendCount, 0)))) { point in
-                        LineMark(x: .value("Date", point.label), y: .value("ATS", point.atsScore))
+                        LineMark(x: .value("Date", point.date), y: .value("ATS", point.atsScore))
                             .interpolationMethod(.catmullRom)
                             .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                             .foregroundStyle(BoostaColor.accent)
 
-                        AreaMark(x: .value("Date", point.label), y: .value("ATS", point.atsScore))
+                        AreaMark(x: .value("Date", point.date), y: .value("ATS", point.atsScore))
                             .foregroundStyle(
                                 .linearGradient(
                                     colors: [BoostaColor.accent.opacity(0.18), BoostaColor.accent.opacity(0.02)],
@@ -397,7 +427,7 @@ struct StatisticsView: View {
                                 )
                             )
 
-                        PointMark(x: .value("Date", point.label), y: .value("ATS", point.atsScore))
+                        PointMark(x: .value("Date", point.date), y: .value("ATS", point.atsScore))
                             .foregroundStyle(BoostaColor.accent)
                             .symbolSize(point.id == trendPoints.count - 1 ? 36 : 14)
                     }
@@ -420,8 +450,8 @@ struct StatisticsView: View {
                             AxisGridLine().foregroundStyle(.clear)
                             AxisTick().foregroundStyle(Color.white.opacity(0.16))
                             AxisValueLabel {
-                                if let stringValue = value.as(String.self) {
-                                    Text(stringValue)
+                                if let dateValue = value.as(Date.self) {
+                                    Text(chartLabel(for: dateValue))
                                         .font(BoostaType.caption)
                                         .foregroundStyle(BoostaColor.secondaryText)
                                 }
@@ -552,6 +582,10 @@ struct StatisticsView: View {
                     MetricPill(title: "This week", value: "\(weeklyApplications) apps", color: BoostaColor.warning)
                     MetricPill(title: "Scans", value: "\(scansThisWeek)", color: BoostaColor.success)
                 }
+
+                SecondaryButton(title: "Open Streak Center") {
+                    showStreakCenter = true
+                }
             }
         }
     }
@@ -670,6 +704,10 @@ struct StatisticsView: View {
             }
         }
     }
+
+    private func chartLabel(for date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day())
+    }
 }
 
 private extension StatisticsView {
@@ -699,9 +737,33 @@ private enum StatisticsSection: String, CaseIterable, Identifiable {
     }
 }
 
+private enum StatisticsTimeRange: String, CaseIterable, Identifiable {
+    case sevenDays
+    case thirtyDays
+    case all
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .sevenDays: return "7D"
+        case .thirtyDays: return "30D"
+        case .all: return "All"
+        }
+    }
+
+    var dayWindow: Int? {
+        switch self {
+        case .sevenDays: return 7
+        case .thirtyDays: return 30
+        case .all: return nil
+        }
+    }
+}
+
 private struct CareerTrendPoint: Identifiable {
     let id: Int
-    let label: String
+    let date: Date
     let atsScore: Int
 }
 
@@ -717,6 +779,55 @@ private struct CareerBreakdownMetric: Identifiable {
     let title: String
     let score: Int
     let color: Color
+}
+
+private struct StatisticsMetricRing: View {
+    let title: String
+    let value: String
+    let progress: Double
+    let tint: Color
+
+    @State private var animatedProgress: Double = 0
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.16), lineWidth: 10)
+
+                Circle()
+                    .trim(from: 0, to: animatedProgress)
+                    .stroke(
+                        AngularGradient(colors: [tint.opacity(0.4), tint], center: .center),
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                Text(value)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+            }
+            .frame(width: 78, height: 78)
+
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(BoostaColor.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.86)) {
+                animatedProgress = min(max(progress, 0), 1)
+            }
+        }
+        .onChange(of: progress) { _, newValue in
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.86)) {
+                animatedProgress = min(max(newValue, 0), 1)
+            }
+        }
+    }
 }
 
 #Preview {

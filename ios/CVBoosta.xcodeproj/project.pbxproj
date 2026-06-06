@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0092628BF5F7407048583811 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD0066FA7DE85125E77CF5F /* AuthService.swift */; };
+		04BD185C0FE8E00FB80464DB /* WorkspaceSessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D635202B0B1BB875254A0C /* WorkspaceSessionService.swift */; };
 		04EBC54D7100FB2509128AC1 /* CVBoostaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AAC93232D43362218F1D58CA /* CVBoostaWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		061CF42B9A0A3E40173204F2 /* HomeWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF43F0E3501A34C986F0A26A /* HomeWorkspaceView_iPad.swift */; };
 		070B1EA94D6533906A97638F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9F8B93F8812D5DC150A93 /* SettingsView.swift */; };
@@ -83,6 +84,7 @@
 		F0B505210B255C42915E4782 /* AuthExperienceComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB0485E439E8BE8A7857AD1 /* AuthExperienceComponents.swift */; };
 		F0E065A7DB394ADE2BA765BE /* CVBoostaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC241D9E737EE88C410CEEF0 /* CVBoostaApp.swift */; };
 		F17A72E0157B1775B30B7B7B /* ApplicationRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EEF7C2CB15528A282B8E03 /* ApplicationRecord.swift */; };
+		F6D364C1EA25CF6388A7E7CB /* StreakCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66363A82A704EED4F2259A30 /* StreakCenterView.swift */; };
 		F72C26EACFDA572428720F4E /* ATSScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27F1E6788856182BDFC2EB9 /* ATSScannerView.swift */; };
 		FA64AC120EDF6D8B05F7F860 /* ResumeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC92A83BB7F7127FA9CDA40 /* ResumeService.swift */; };
 /* End PBXBuildFile section */
@@ -120,6 +122,7 @@
 
 /* Begin PBXFileReference section */
 		04F01EA905668C7DAA562A63 /* TypographyTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypographyTokens.swift; sourceTree = "<group>"; };
+		07D635202B0B1BB875254A0C /* WorkspaceSessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSessionService.swift; sourceTree = "<group>"; };
 		09D77990A523F804A6CA8E67 /* ResumeAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeAPIService.swift; sourceTree = "<group>"; };
 		0BA31832DAB32F2F0428FDA6 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		0D4BACFB7CEBCC84E10D8E01 /* GlassMaterials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassMaterials.swift; sourceTree = "<group>"; };
@@ -147,6 +150,7 @@
 		62E437F91C90E0E2D170222B /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
 		634616FF81D1E4EEAF7915B1 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		6459DB581B49D74C3B551B51 /* SharedHistoryDocumentSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedHistoryDocumentSupport.swift; sourceTree = "<group>"; };
+		66363A82A704EED4F2259A30 /* StreakCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakCenterView.swift; sourceTree = "<group>"; };
 		678708556F0848D2FE043D46 /* ResumeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeProfile.swift; sourceTree = "<group>"; };
 		67C90AC1E9BA7AAA44DA936C /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		6C38EE427CC40866369576E6 /* ScannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerViewModel.swift; sourceTree = "<group>"; };
@@ -378,6 +382,7 @@
 				7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */,
 				DEEE2C3751FEABF09BADBC00 /* UserService.swift */,
 				9992BBEA9E48B91E8D1C3434 /* WidgetSyncService.swift */,
+				07D635202B0B1BB875254A0C /* WorkspaceSessionService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -391,10 +396,19 @@
 				82A02AEE3F9CC59BB1C1BC86 /* Onboarding */,
 				5CC62BEF49E5DA161487673C /* Scanner */,
 				7D9A5E19B91F0D6B6098C02E /* Settings */,
+				A227592F2E4E5062D8B01065 /* Streak */,
 				FBE759B6FA9CA884AC6301E3 /* Tailoring */,
 				D1FA4CCEAEBD04A2DFBABE30 /* Tracker */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		A227592F2E4E5062D8B01065 /* Streak */ = {
+			isa = PBXGroup;
+			children = (
+				66363A82A704EED4F2259A30 /* StreakCenterView.swift */,
+			);
+			path = Streak;
 			sourceTree = "<group>";
 		};
 		C1CEDC913A175548313E3063 /* Architecture */ = {
@@ -659,6 +673,7 @@
 				CCB6241CFBD0F5BEB01B2AA2 /* SpotlightIndexer.swift in Sources */,
 				392677F2E714733C3696C1E6 /* StatisticsView.swift in Sources */,
 				AC6D4DA61366FDF6B5CBE99B /* StatisticsWorkspaceView_iPad.swift in Sources */,
+				F6D364C1EA25CF6388A7E7CB /* StreakCenterView.swift in Sources */,
 				69A0F095B017171229EB43CF /* StringValidation.swift in Sources */,
 				0C9D1C9F70BD8C4E5315D318 /* SubscriptionService.swift in Sources */,
 				57AB37BAB32F57C14ECA5773 /* TailoringPreviewView.swift in Sources */,
@@ -668,6 +683,7 @@
 				CFFC982EA13AC3FB9D41C88F /* UserService.swift in Sources */,
 				C8FC740FAFCBBFEEDDA0C3BC /* WelcomeView.swift in Sources */,
 				2EEF4EDF7F4B1C816A820E97 /* WidgetSyncService.swift in Sources */,
+				04BD185C0FE8E00FB80464DB /* WorkspaceSessionService.swift in Sources */,
 				62228BC180A66ED6994EA95E /* iPadWorkspaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -868,7 +884,7 @@
 		B2E650498A9CE2AE16668C33 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "CVBOOSTA IOS ICON";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = CVBoostaApp/CVBoostaApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
@@ -888,7 +904,7 @@
 		BA7578E25053F9FF83E6FDB4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "CVBOOSTA IOS ICON";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = CVBoostaApp/CVBoostaApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;

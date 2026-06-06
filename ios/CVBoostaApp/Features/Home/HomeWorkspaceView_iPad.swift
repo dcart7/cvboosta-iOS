@@ -16,6 +16,7 @@ struct HomeWorkspaceView_iPad: View {
     @State private var historyErrorMessage: String?
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animateSparkline = false
+    @State private var showStreakCenter = false
 
     private let resumeService = ResumeService.shared
 
@@ -109,6 +110,16 @@ struct HomeWorkspaceView_iPad: View {
         return Array(items.prefix(3))
     }
 
+    private var streakCount: Int {
+        StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: trackedApplications,
+            manuallyProtectedDayStamps: []
+        ).currentStreak
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -123,9 +134,9 @@ struct HomeWorkspaceView_iPad: View {
                     ScrollView {
                         content(width: proxy.size.width)
                             .padding(.horizontal, BoostaSpace.xl)
-                            .padding(.top, BoostaSpace.lg)
+                            .padding(.top, BoostaSpace.md)
                             .padding(.bottom, BoostaSpace.xl)
-                            .frame(maxWidth: 1400)
+                            .frame(maxWidth: 1560)
                             .frame(maxWidth: .infinity)
                     }
                 }
@@ -160,6 +171,12 @@ struct HomeWorkspaceView_iPad: View {
             .sheet(item: $previewDocument) { document in
                 HistoryPDFPreviewSheet(document: document)
             }
+            .sheet(isPresented: $showStreakCenter) {
+                NavigationStack {
+                    StreakCenterView()
+                        .environmentObject(authViewModel)
+                }
+            }
             .task {
                 await authViewModel.refreshSharedState()
                 await loadSharedHistory()
@@ -183,6 +200,7 @@ struct HomeWorkspaceView_iPad: View {
             quickStatsCard
             todayCard
             recentActivityCard
+                .gridCellColumns(columns.count)
 
             actionsCard
                 .gridCellColumns(columns.count)
@@ -222,10 +240,16 @@ struct HomeWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "Compact Statistics", subtitle: "A compressed read of your current momentum")
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
                     HomeStatCard(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", color: BoostaColor.accent)
                     HomeStatCard(title: "Momentum", value: momentumScore == 0 ? "—" : "\(momentumScore)", color: BoostaColor.accentSecondary)
                     HomeStatCard(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", color: BoostaColor.success)
+                    Button {
+                        showStreakCenter = true
+                    } label: {
+                        HomeStatCard(title: "Streak", value: streakCount == 0 ? "Start" : "\(streakCount)d", color: BoostaColor.success)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 CompactTrendView(scores: trendScores, isAnimated: animateSparkline)
@@ -279,6 +303,7 @@ struct HomeWorkspaceView_iPad: View {
                 }
             }
         }
+        .frame(minHeight: 224, alignment: .top)
     }
 
     private var recentActivityCard: some View {
@@ -308,23 +333,25 @@ struct HomeWorkspaceView_iPad: View {
                                 await openHistoryPDF(for: item)
                             }
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .center, spacing: BoostaSpace.md) {
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(item.role ?? "CV Optimization")
                                         .font(BoostaType.bodyStrong)
                                         .foregroundStyle(BoostaColor.primaryText)
-                                    Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                    Text(historyRowSubtitle(for: item))
                                         .font(BoostaType.caption)
                                         .foregroundStyle(BoostaColor.secondaryText)
                                 }
 
                                 Spacer()
 
-                                Text("\(item.matchAfter ?? item.score)")
-                                    .font(BoostaType.bodyStrong)
-                                    .foregroundStyle(BoostaColor.accent)
+                                MetricPill(
+                                    title: "ATS",
+                                    value: "\(item.matchAfter ?? item.score)",
+                                    color: BoostaColor.accent
+                                )
                             }
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 4)
                         }
                         .buttonStyle(.plain)
                     }
@@ -381,6 +408,14 @@ struct HomeWorkspaceView_iPad: View {
         } catch {
             historyErrorMessage = "Could not open browser-generated PDF in the app."
         }
+    }
+
+    private func historyRowSubtitle(for item: HistoryListItem) -> String {
+        let date = item.createdAt.formatted(date: .abbreviated, time: .shortened)
+        if let company = item.company, !company.isEmpty {
+            return "\(company) • \(date)"
+        }
+        return date
     }
 }
 

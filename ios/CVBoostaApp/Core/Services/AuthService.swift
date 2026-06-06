@@ -228,7 +228,7 @@ actor AuthService {
     }
 
     private func fetchCurrentSnapshot(accessToken: String) async throws -> AuthMePayload {
-        async let user: AuthUser = apiClient.getJSON(
+        async let userPayload: [String: JSONValue] = apiClient.getJSON(
             path: "/auth/me",
             headers: ["Authorization": "Bearer \(accessToken)"]
         )
@@ -245,6 +245,9 @@ actor AuthService {
 
         let subscription = Self.mapSubscription(from: billingRaw)
         let usageLimits = Self.mapUsageLimits(from: billingRaw, subscription: subscription)
+        let mePayload = try await userPayload
+        let user = try Self.mapUser(from: mePayload)
+        let applications = Self.mapApplications(from: mePayload)
 
         let historyItems = try await history
         let snapshots: [ScanHistorySnapshot] = historyItems.items.sorted(by: { $0.createdAt > $1.createdAt }).map {
@@ -261,12 +264,12 @@ actor AuthService {
         }
 
         return AuthMePayload(
-            user: try await user,
+            user: user,
             subscription: subscription,
             usageLimits: usageLimits,
             savedResumes: [],
             scanHistory: snapshots,
-            applications: []
+            applications: applications
         )
     }
 
@@ -303,6 +306,12 @@ actor AuthService {
 }
 
 private extension AuthService {
+    struct AuthPayloadParseError: LocalizedError {
+        let message: String
+
+        var errorDescription: String? { message }
+    }
+
     static let iso8601: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
@@ -343,6 +352,63 @@ private extension AuthService {
             expiresAt: expiresAt,
             source: source
         )
+    }
+
+    static func mapUser(from payload: [String: JSONValue]) throws -> AuthUser {
+        let source: [String: JSONValue]
+        if case .object(let nested)? = payload["user"] {
+            source = nested
+        } else {
+            source = payload
+        }
+
+        guard
+            let id = source.int("id"),
+            let email = source.string("email"),
+            let createdAt = parseDate(source.string("created_at"))
+        else {
+            throw APIError.decoding(AuthPayloadParseError(message: "Could not parse account payload from /auth/me."))
+        }
+
+        return AuthUser(
+            id: id,
+            email: email,
+            displayName: source.string("full_name") ?? source.string("display_name") ?? source.string("name"),
+            createdAt: createdAt
+        )
+    }
+
+    static func mapApplications(from payload: [String: JSONValue]) -> [AccountApplicationSnapshot] {
+        let keys = ["applications", "tracker", "application_history"]
+        guard let values = keys.compactMap({ payload[$0] }).first else { return [] }
+        guard case .array(let rawItems) = values else { return [] }
+
+        return rawItems.compactMap { item in
+            guard case .object(let object) = item else { return nil }
+
+            let id = object.string("id").flatMap(UUID.init(uuidString:)) ?? UUID()
+            guard
+                let company = object.string("company"),
+                let role = object.string("role") ?? object.string("job_title") ?? object.string("title"),
+                let status = object.string("status")
+            else {
+                return nil
+            }
+
+            let appliedAt =
+                parseDate(object.string("applied_at"))
+                ?? parseDate(object.string("created_at"))
+                ?? Date()
+
+            return AccountApplicationSnapshot(
+                id: id,
+                company: company,
+                role: role,
+                status: status,
+                source: object.string("source"),
+                appliedAt: appliedAt
+            )
+        }
     }
 
     static func mapUsageLimits(from payload: [String: JSONValue], subscription: AuthSubscription) -> AuthUsageLimits {

@@ -64,7 +64,16 @@ struct CVBoostaApp: App {
 
 struct AppRootView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
+
+    private var accountApplicationsSignature: String {
+        authViewModel.me?.applications
+            .sorted(by: { $0.appliedAt < $1.appliedAt })
+            .map { "\($0.id.uuidString)-\($0.status)-\($0.appliedAt.timeIntervalSince1970)" }
+            .joined(separator: "|") ?? ""
+    }
 
     var body: some View {
         Group {
@@ -83,6 +92,52 @@ struct AppRootView: View {
             }
         }
         .preferredColorScheme(AppAppearancePreference(rawValue: appearanceMode)?.colorScheme)
+        .task(id: accountApplicationsSignature) {
+            syncAccountApplications()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active, authViewModel.state == .loggedIn else { return }
+            Task {
+                await authViewModel.refreshSharedState()
+            }
+        }
+    }
+
+    private func syncAccountApplications() {
+        guard let accountApplications = authViewModel.me?.applications, !accountApplications.isEmpty else { return }
+
+        let existingRecords = (try? modelContext.fetch(FetchDescriptor<ApplicationRecord>())) ?? []
+        let existingByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.id, $0) })
+        let snapshotIDs = Set(accountApplications.map(\.id))
+
+        for snapshot in accountApplications {
+            let status = ApplicationStatus(rawValue: snapshot.status.lowercased()) ?? .applied
+
+            if let existing = existingByID[snapshot.id] {
+                existing.company = snapshot.company
+                existing.role = snapshot.role
+                existing.status = status
+                existing.appliedAt = snapshot.appliedAt
+                existing.source = snapshot.source ?? "Account"
+            } else {
+                modelContext.insert(
+                    ApplicationRecord(
+                        id: snapshot.id,
+                        company: snapshot.company,
+                        role: snapshot.role,
+                        status: status,
+                        appliedAt: snapshot.appliedAt,
+                        source: snapshot.source ?? "Account"
+                    )
+                )
+            }
+        }
+
+        for record in existingRecords where record.source == "Account" && !snapshotIDs.contains(record.id) {
+            modelContext.delete(record)
+        }
+
+        try? modelContext.save()
     }
 }
 

@@ -6,6 +6,11 @@ struct CVBoostaWidgetSnapshot: Codable, Hashable {
     var currentATSScore: Int
     var weeklyATSDelta: Int
     var streakDays: Int
+    var streakStatusTitle: String
+    var streakStatusDetail: String
+    var weeklyActiveDays: Int
+    var careerLevel: String
+    var nextMilestoneTitle: String
     var applicationsCount: Int
     var interviewsCount: Int
     var offersCount: Int
@@ -29,6 +34,11 @@ struct CVBoostaWidgetSnapshot: Codable, Hashable {
         currentATSScore: 82,
         weeklyATSDelta: 6,
         streakDays: 5,
+        streakStatusTitle: "Streak protected",
+        streakStatusDetail: "Your future recruiter would approve.",
+        weeklyActiveDays: 5,
+        careerLevel: "Recruiter-visible",
+        nextMilestoneTitle: "7 day milestone",
         applicationsCount: 24,
         interviewsCount: 3,
         offersCount: 1,
@@ -53,6 +63,11 @@ struct CVBoostaWidgetSnapshot: Codable, Hashable {
         currentATSScore: 0,
         weeklyATSDelta: 0,
         streakDays: 0,
+        streakStatusTitle: "Start your streak",
+        streakStatusDetail: "One useful career action starts momentum.",
+        weeklyActiveDays: 0,
+        careerLevel: "Starting",
+        nextMilestoneTitle: "3 day milestone",
         applicationsCount: 0,
         interviewsCount: 0,
         offersCount: 0,

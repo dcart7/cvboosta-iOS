@@ -18,6 +18,7 @@ struct TailoringPreviewView: View {
 
     @State private var toastMessage: String?
     @State private var errorMessage: String?
+    @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var latestPayload: LatestScanPayload? {
         guard let data = latestReports.first?.payloadJSON else { return nil }
@@ -37,6 +38,7 @@ struct TailoringPreviewView: View {
                 ScrollView {
                     VStack(spacing: BoostaSpace.md) {
                         headerCard
+                        sessionCard
 
                         if let payload = latestPayload {
                             matchCard(payload)
@@ -54,6 +56,14 @@ struct TailoringPreviewView: View {
                 }
             }
             .navigationTitle("Tailoring")
+            .onAppear {
+                prepareTailoringSession()
+            }
+            .onReceive(sessionTicker) { _ in
+                if WorkspaceSessionService.shared.resetIfExpired(.tailoring) {
+                    LatestScanCacheStore.clear(in: modelContext)
+                }
+            }
             .overlay(alignment: .top) {
                 if let errorMessage {
                     ErrorBanner(message: errorMessage)
@@ -108,6 +118,27 @@ struct TailoringPreviewView: View {
                             .foregroundStyle(BoostaColor.accent)
                     }
                     .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var sessionCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(
+                    title: "Tailoring session",
+                    subtitle: "When the session expires, this preview clears automatically."
+                )
+
+                HStack(spacing: BoostaSpace.sm) {
+                    MetricPill(title: "Status", value: latestPayload == nil ? "Waiting" : "Active", color: latestPayload == nil ? BoostaColor.secondaryText : BoostaColor.accent)
+                    MetricPill(title: "Expires", value: WorkspaceSessionService.shared.formattedRemainingTime(for: .tailoring), color: BoostaColor.warning)
+                }
+
+                SecondaryButton(title: "Start New Session") {
+                    WorkspaceSessionService.shared.startNewSession(for: .tailoring)
+                    LatestScanCacheStore.clear(in: modelContext)
                 }
             }
         }
@@ -202,20 +233,11 @@ struct TailoringPreviewView: View {
     private func optimizedPreviewCard(_ payload: LatestScanPayload) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Optimized resume (preview)")
+                SectionHeader(title: "Optimized resume", subtitle: "Compact preview instead of a wall of text")
 
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(previewBullets(from: payload.response.optimizedCV), id: \.self) { bullet in
-                        HStack(alignment: .top, spacing: BoostaSpace.xs) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(BoostaColor.success)
-                                .padding(.top, 2)
-                            Text(bullet)
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.secondaryText)
-                                .textSelection(.enabled)
-                        }
+                    ForEach(improvementHighlights(from: payload.response.optimizedCV), id: \.self) { bullet in
+                        CompactImprovementRow(text: bullet, tint: BoostaColor.success)
                     }
                 }
 
@@ -248,23 +270,17 @@ struct TailoringPreviewView: View {
     }
 
     private func tailoringDiffCard(_ payload: LatestScanPayload) -> some View {
-        let before = previewBullets(from: payload.response.originalCVText)
-        let after = previewBullets(from: payload.response.optimizedCV)
+        let pairs = compactChangePairs(payload: payload)
         let weakPhrases = weakPhrases(in: payload.response.originalCVText)
 
         return GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "What changed", subtitle: "See AI value before you open Studio")
 
-                ForEach(Array(zip(before.indices, before)).prefix(2), id: \.0) { pair in
-                    let index = pair.0
-                    let oldLine = pair.1
+                ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
                     VStack(alignment: .leading, spacing: 8) {
-                        TailoringDiffLine(label: "Before", text: oldLine, tint: BoostaColor.secondaryText, symbol: "minus.circle.fill")
-
-                        if after.indices.contains(index) {
-                            TailoringDiffLine(label: "After", text: after[index], tint: BoostaColor.success, symbol: "plus.circle.fill")
-                        }
+                        TailoringDiffLine(label: "Before", text: pair.before, tint: BoostaColor.secondaryText, symbol: "minus.circle.fill")
+                        TailoringDiffLine(label: "After", text: pair.after, tint: BoostaColor.success, symbol: "sparkles")
                     }
                 }
 
@@ -424,7 +440,7 @@ struct TailoringPreviewView: View {
             .filter { $0.count > 30 }
 
         if !lines.isEmpty {
-            return Array(lines.prefix(3))
+            return Array(lines.prefix(3)).map { excerpt($0, limit: 22) }
         }
 
         let sentences = text
@@ -432,7 +448,7 @@ struct TailoringPreviewView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { $0.count > 24 }
 
-        return Array(sentences.prefix(3))
+        return Array(sentences.prefix(3)).map { excerpt($0, limit: 22) }
     }
 
     private func weakPhrases(in text: String) -> [String] {
@@ -445,6 +461,37 @@ struct TailoringPreviewView: View {
             "participated in"
         ]
         return candidates.filter { lowered.contains($0) }
+    }
+
+    private func prepareTailoringSession() {
+        if WorkspaceSessionService.shared.resetIfExpired(.tailoring) {
+            LatestScanCacheStore.clear(in: modelContext)
+        } else {
+            WorkspaceSessionService.shared.ensureSession(for: .tailoring)
+        }
+    }
+
+    private func compactChangePairs(payload: LatestScanPayload) -> [(before: String, after: String)] {
+        let before = previewBullets(from: payload.response.originalCVText)
+        let after = previewBullets(from: payload.response.optimizedCV)
+        let count = min(before.count, after.count, 3)
+        guard count > 0 else { return [] }
+        return (0..<count).map { index in
+            (before[index], after[index])
+        }
+    }
+
+    private func improvementHighlights(from text: String) -> [String] {
+        previewBullets(from: text).map { excerpt($0, limit: 18) }
+    }
+
+    private func excerpt(_ text: String, limit: Int) -> String {
+        let words = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+
+        guard words.count > limit else { return text }
+        return words.prefix(limit).joined(separator: " ") + "…"
     }
 }
 
@@ -466,8 +513,9 @@ private struct TailoringDiffLine: View {
                     .foregroundStyle(tint)
                     .padding(.top, 2)
                 Text(text)
-                    .font(BoostaType.body)
+                    .font(BoostaType.caption)
                     .foregroundStyle(label == "After" ? BoostaColor.primaryText : BoostaColor.secondaryText)
+                    .lineLimit(3)
             }
             .padding(.horizontal, BoostaSpace.sm)
             .padding(.vertical, 10)
@@ -478,6 +526,29 @@ private struct TailoringDiffLine: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
+    }
+}
+
+private struct CompactImprovementRow: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: BoostaSpace.xs) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(tint)
+                .padding(.top, 2)
+            Text(text)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(3)
+                .textSelection(.enabled)
+        }
+        .padding(.horizontal, BoostaSpace.sm)
+        .padding(.vertical, 10)
+        .background(BoostaColor.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
     }
 }
 

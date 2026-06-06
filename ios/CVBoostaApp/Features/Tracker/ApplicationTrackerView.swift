@@ -153,7 +153,7 @@ struct ApplicationTrackerView: View {
     private func applicationCard(_ app: ApplicationRecord) -> some View {
         let priority = priority(for: app)
 
-        GlassCard {
+        return GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.xs) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -320,6 +320,7 @@ struct ApplicationTrackerView: View {
         do {
             try modelContext.save()
             widgetSyncService.mergeLocalApplications(applications)
+            celebrateStreak(with: record.status)
             showAddSheet = false
         } catch {
             errorMessage = "Could not save application."
@@ -342,6 +343,7 @@ struct ApplicationTrackerView: View {
         do {
             try modelContext.save()
             widgetSyncService.mergeLocalApplications(applications)
+            celebrateStreak(with: record.status)
             editingContext = nil
         } catch {
             errorMessage = "Could not update application."
@@ -386,6 +388,27 @@ struct ApplicationTrackerView: View {
             resumeUsed: app.resumeUsed,
             jobLink: app.jobLink
         )
+    }
+
+    private func celebrateStreak(with status: ApplicationStatus) {
+        guard #available(iOS 16.1, *) else { return }
+        let summary = StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: applications,
+            manuallyProtectedDayStamps: []
+        )
+        let detail: String = switch status {
+        case .saved: "Saved job. Streak protected."
+        case .applied: "Application logged. Career momentum maintained."
+        case .interview: "Interview prep counts. Streak protected."
+        case .offer: "Offer progress protected your streak."
+        case .rejected: "You kept momentum alive by tracking the result."
+        }
+        Task {
+            await LiveActivityManager.shared.celebrateDailyStreak(dayCount: summary.currentStreak, detail: detail)
+        }
     }
 }
 

@@ -31,7 +31,7 @@ struct iPadWorkspaceView: View {
         }
         .navigationTitle("CVBoosta")
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 360)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 244, max: 270)
     }
 
     @ViewBuilder

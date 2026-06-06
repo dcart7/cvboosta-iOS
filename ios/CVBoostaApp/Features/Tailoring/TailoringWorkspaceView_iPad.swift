@@ -18,6 +18,7 @@ struct TailoringWorkspaceView_iPad: View {
 
     @State private var toastMessage: String?
     @State private var errorMessage: String?
+    @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var latestPayload: LatestScanPayload? {
         guard let data = latestReports.first?.payloadJSON else { return nil }
@@ -38,6 +39,7 @@ struct TailoringWorkspaceView_iPad: View {
                     ScrollView {
                         VStack(spacing: BoostaSpace.lg) {
                             headerCard
+                            sessionCard
 
                             if let payload = latestPayload {
                                 workspaceBody(payload: payload, width: proxy.size.width)
@@ -55,6 +57,14 @@ struct TailoringWorkspaceView_iPad: View {
                 }
             }
             .navigationTitle("Tailoring")
+            .onAppear {
+                prepareTailoringSession()
+            }
+            .onReceive(sessionTicker) { _ in
+                if WorkspaceSessionService.shared.resetIfExpired(.tailoring) {
+                    LatestScanCacheStore.clear(in: modelContext)
+                }
+            }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
@@ -136,6 +146,32 @@ struct TailoringWorkspaceView_iPad: View {
         }
     }
 
+    private var sessionCard: some View {
+        GlassCard(padding: BoostaSpace.lg) {
+            HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Tailoring Session")
+                        .font(BoostaType.section)
+                        .foregroundStyle(BoostaColor.primaryText)
+                    Text("This workspace clears automatically when the session expires.")
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: BoostaSpace.sm) {
+                    MetricPill(title: "Status", value: latestPayload == nil ? "Waiting" : "Active", color: latestPayload == nil ? BoostaColor.secondaryText : BoostaColor.accent)
+                    MetricPill(title: "Expires", value: WorkspaceSessionService.shared.formattedRemainingTime(for: .tailoring), color: BoostaColor.warning)
+                    WorkspaceActionButton(title: "New Session", systemImage: "arrow.counterclockwise") {
+                        WorkspaceSessionService.shared.startNewSession(for: .tailoring)
+                        LatestScanCacheStore.clear(in: modelContext)
+                    }
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private func workspaceBody(payload: LatestScanPayload, width: CGFloat) -> some View {
         let layout = TailoringWorkspaceLayout(width: width)
@@ -167,11 +203,12 @@ struct TailoringWorkspaceView_iPad: View {
     private func originalCard(_ payload: LatestScanPayload) -> some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Original (parsed)", subtitle: "Extracted from your uploaded PDF")
-                Text(payload.response.originalCVText)
+                SectionHeader(title: "Original (parsed)", subtitle: "Compact source preview")
+                Text(compactPreviewText(payload.response.originalCVText))
                     .font(.system(size: 13, weight: .regular, design: .monospaced))
                     .foregroundStyle(BoostaColor.secondaryText)
                     .textSelection(.enabled)
+                    .lineLimit(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -180,13 +217,13 @@ struct TailoringWorkspaceView_iPad: View {
     private func optimizedCard(_ payload: LatestScanPayload) -> some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Optimized", subtitle: "ATS-friendly version from CVBoosta backend")
+                SectionHeader(title: "Optimized", subtitle: "Cleaner, role-specific rewrite preview")
 
-                Text(payload.response.optimizedCV)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(BoostaColor.primaryText)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(previewBullets(from: payload.response.optimizedCV), id: \.self) { line in
+                        TailoringWorkspaceDiffLine(title: "Improved", text: line, tint: BoostaColor.success)
+                    }
+                }
 
                 HStack(spacing: BoostaSpace.sm) {
                     WorkspaceActionButton(title: "Copy", systemImage: "doc.on.doc") {
@@ -220,6 +257,23 @@ struct TailoringWorkspaceView_iPad: View {
                 }
             }
         }
+    }
+
+    private func prepareTailoringSession() {
+        if WorkspaceSessionService.shared.resetIfExpired(.tailoring) {
+            LatestScanCacheStore.clear(in: modelContext)
+        } else {
+            WorkspaceSessionService.shared.ensureSession(for: .tailoring)
+        }
+    }
+
+    private func compactPreviewText(_ text: String) -> String {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return Array(lines.prefix(10)).joined(separator: "\n")
     }
 
     private func jobContextCard(_ payload: LatestScanPayload) -> some View {
