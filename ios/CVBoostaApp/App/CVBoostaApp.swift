@@ -67,6 +67,7 @@ struct AppRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
+    @State private var accountSyncTicker = Timer.publish(every: 180, on: .main, in: .common).autoconnect()
 
     private var accountApplicationsSignature: String {
         authViewModel.me?.applications
@@ -98,7 +99,13 @@ struct AppRootView: View {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active, authViewModel.state == .loggedIn else { return }
             Task {
-                await authViewModel.refreshSharedState()
+                await performAccountSync()
+            }
+        }
+        .onReceive(accountSyncTicker) { _ in
+            guard scenePhase == .active, authViewModel.state == .loggedIn else { return }
+            Task {
+                await performAccountSync()
             }
         }
     }
@@ -138,6 +145,11 @@ struct AppRootView: View {
         }
 
         try? modelContext.save()
+    }
+
+    private func performAccountSync() async {
+        await authViewModel.refreshSharedState()
+        syncAccountApplications()
     }
 }
 

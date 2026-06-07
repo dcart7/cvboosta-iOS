@@ -247,7 +247,7 @@ struct HomeWorkspaceView_iPad: View {
                     Button {
                         showStreakCenter = true
                     } label: {
-                        HomeStatCard(title: "Streak", value: streakCount == 0 ? "Start" : "\(streakCount)d", color: BoostaColor.success)
+                        HomeStatCard(title: "Streak", value: streakCount == 0 ? "Start" : "\(streakCount)d", color: BoostaColor.success, icon: "flame.fill")
                     }
                     .buttonStyle(.plain)
                 }

@@ -11,6 +11,7 @@ struct StreakCenterView: View {
     @AppStorage("cvboosta.streak.freeze.day") private var frozenDayStamp = ""
 
     @State private var usedRecoveryThisSession = false
+    @State private var selectedHeatmapDay: StreakHeatmapDay?
 
     private var summary: StreakSummary {
         StreakEngine.build(
@@ -52,29 +53,26 @@ struct StreakCenterView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 HStack(alignment: .center, spacing: BoostaSpace.md) {
                     ZStack {
-                        ScoreRing(score: summary.progressToNextMilestonePercent)
+                        StreakProgressRing(
+                            currentStreak: summary.currentStreak,
+                            progress: summary.progressToNextMilestone
+                        )
                             .frame(width: 118, height: 118)
-
-                        VStack(spacing: 4) {
-                            Image(systemName: "flame.fill")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundStyle(.orange)
-                            Text("\(summary.currentStreak)")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundStyle(BoostaColor.primaryText)
-                        }
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(summary.identityLine)
                             .font(BoostaType.section)
                             .foregroundStyle(BoostaColor.primaryText)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(summary.statusTitle)
                             .font(BoostaType.bodyStrong)
                             .foregroundStyle(summary.statusTint)
+                            .lineLimit(2)
                         Text(summary.microcopy)
                             .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
@@ -149,7 +147,18 @@ struct StreakCenterView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "Monthly Heatmap", subtitle: "Visible momentum beats fake motivation")
 
-                HeatmapGrid(days: summary.heatmapDays)
+                HeatmapGrid(days: summary.heatmapDays, selectedDay: $selectedHeatmapDay)
+
+                if let selectedHeatmapDay {
+                    HStack(spacing: BoostaSpace.xs) {
+                        Image(systemName: "calendar")
+                            .foregroundStyle(BoostaColor.accent)
+                        Text(selectedHeatmapDetail(for: selectedHeatmapDay))
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                    }
+                }
+
                 Text("1 useful career action protects the day. Scan, tailor, apply, prep, or improve.")
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
@@ -162,7 +171,7 @@ struct StreakCenterView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "Milestones", subtitle: "Consistency creates recruiter visibility")
 
-                ForEach(summary.milestones) { milestone in
+                ForEach(summary.visibleMilestones) { milestone in
                     HStack(spacing: BoostaSpace.sm) {
                         ZStack {
                             Circle()
@@ -184,12 +193,21 @@ struct StreakCenterView: View {
 
                         Spacer()
 
-                        if milestone.isReached {
-                            Text("Unlocked")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(milestone.tint)
-                        }
+                        Text(milestone.isReached ? "Unlocked" : "Next")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(milestone.isReached ? milestone.tint : BoostaColor.secondaryText)
                     }
+
+                    if !milestone.isReached {
+                        ProgressView(value: Double(summary.milestoneProgressCurrent), total: Double(max(summary.milestoneProgressGoal, 1)))
+                            .tint(milestone.tint)
+                    }
+                }
+
+                if let nextMilestone = summary.visibleMilestones.last(where: { !$0.isReached }) {
+                    Text("\(summary.currentStreak)/\(nextMilestone.dayCount) days toward the next unlock")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
                 }
             }
         }
@@ -276,6 +294,17 @@ struct StreakCenterView: View {
         frozenDayStamp = StreakEngine.dayStamp(for: .now)
         usedRecoveryThisSession = true
     }
+
+    private func selectedHeatmapDetail(for day: StreakHeatmapDay) -> String {
+        let dateText = day.date.formatted(date: .abbreviated, time: .omitted)
+        if day.intensity == 0 {
+            return "\(dateText) • No streak activity"
+        }
+        if day.isToday {
+            return "\(dateText) • Today is protected"
+        }
+        return "\(dateText) • Career action completed"
+    }
 }
 
 enum StreakActionKind: String, CaseIterable, Identifiable {
@@ -353,6 +382,7 @@ struct StreakSummary {
     let longestStreak: Int
     let weeklyActiveDays: Int
     let progressToNextMilestonePercent: Int
+    let progressToNextMilestone: Double
     let careerLevel: String
     let identityLine: String
     let statusTitle: String
@@ -364,6 +394,9 @@ struct StreakSummary {
     let canUseRecovery: Bool
     let heatmapDays: [StreakHeatmapDay]
     let milestones: [StreakMilestone]
+    let visibleMilestones: [StreakMilestone]
+    let milestoneProgressCurrent: Int
+    let milestoneProgressGoal: Int
     let missions: [StreakMission]
     let achievements: [StreakAchievement]
     let notificationIdeas: [String]
@@ -410,6 +443,7 @@ enum StreakEngine {
         let progressDenominator = max(nextMilestone.0 - previousMilestone, 1)
         let progressValue = min(max(currentStreak - previousMilestone, 0), progressDenominator)
         let progressPercent = Int((Double(progressValue) / Double(progressDenominator)) * 100)
+        let progressRatio = Double(progressValue) / Double(progressDenominator)
 
         let careerLevel: String = {
             switch currentStreak {
@@ -481,6 +515,9 @@ enum StreakEngine {
         let milestones = milestonesConfig.map {
             StreakMilestone(dayCount: $0.0, title: $0.1, description: $0.2, tint: $0.3, isReached: currentStreak >= $0.0)
         }
+        let lastUnlockedMilestone = milestones.last(where: { $0.isReached })
+        let nextVisibleMilestone = milestones.first(where: { !$0.isReached })
+        let visibleMilestones = [lastUnlockedMilestone, nextVisibleMilestone].compactMap { $0 }
 
         let applicationsThisWeek = applications.filter { calendar.isDate($0.appliedAt, equalTo: now, toGranularity: .weekOfYear) }.count
         let improvedScans = scans.filter { ($0.matchAfter ?? $0.atsScore) > ($0.matchBefore ?? $0.atsScore) }.count
@@ -515,6 +552,7 @@ enum StreakEngine {
             longestStreak: longestStreak,
             weeklyActiveDays: weeklyActiveDays,
             progressToNextMilestonePercent: progressPercent,
+            progressToNextMilestone: progressRatio,
             careerLevel: careerLevel,
             identityLine: identityLine,
             statusTitle: statusTitle,
@@ -526,6 +564,9 @@ enum StreakEngine {
             canUseRecovery: canUseRecovery,
             heatmapDays: heatmapDays,
             milestones: milestones,
+            visibleMilestones: visibleMilestones,
+            milestoneProgressCurrent: currentStreak,
+            milestoneProgressGoal: nextMilestone.0,
             missions: missions,
             achievements: achievements,
             notificationIdeas: [
@@ -691,23 +732,79 @@ enum StreakEngine {
     }
 }
 
+private struct StreakProgressRing: View {
+    let currentStreak: Int
+    let progress: Double
+
+    @State private var animatedProgress: Double = 0
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.18), lineWidth: 12)
+
+            Circle()
+                .trim(from: 0, to: animatedProgress)
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            (currentStreak == 0 ? BoostaColor.secondaryText : .orange).opacity(0.4),
+                            currentStreak == 0 ? BoostaColor.secondaryText : .orange
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 4) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(currentStreak == 0 ? BoostaColor.secondaryText : .orange)
+                Text("\(currentStreak)")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(BoostaColor.primaryText)
+                Text("days")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.86)) {
+                animatedProgress = min(max(progress, 0.04), 1)
+            }
+        }
+        .onChange(of: progress) { _, newValue in
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.86)) {
+                animatedProgress = min(max(newValue, 0.04), 1)
+            }
+        }
+    }
+}
+
 private struct HeatmapGrid: View {
     let days: [StreakHeatmapDay]
+    @Binding var selectedDay: StreakHeatmapDay?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 6) {
             ForEach(days) { day in
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(heatColor(for: day))
-                    .frame(height: 24)
-                    .overlay {
-                        if day.isToday {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
+                Button {
+                    selectedDay = day
+                } label: {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(heatColor(for: day))
+                        .frame(height: 24)
+                        .overlay {
+                            if day.isToday || selectedDay?.id == day.id {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(selectedDay?.id == day.id ? BoostaColor.accent : Color.white.opacity(0.8), lineWidth: 1.5)
+                            }
                         }
                     }
+                .buttonStyle(.plain)
             }
         }
     }

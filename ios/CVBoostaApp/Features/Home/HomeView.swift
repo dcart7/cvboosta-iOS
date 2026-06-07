@@ -337,7 +337,7 @@ struct HomeView: View {
                             Button {
                                 showStreakCenter = true
                             } label: {
-                                HomeStatCard(title: insight.title, value: insight.value, color: insight.tint)
+                                HomeStatCard(title: insight.title, value: insight.value, color: insight.tint, icon: "flame.fill")
                             }
                             .buttonStyle(.plain)
                         } else {
@@ -510,6 +510,7 @@ struct HomeStatCard: View {
     let title: String
     let value: String
     let color: Color
+    var icon: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: BoostaSpace.xs) {
@@ -519,10 +520,18 @@ struct HomeStatCard: View {
 
             Spacer(minLength: 0)
 
-            Text(value)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(color)
-                .minimumScaleFactor(0.8)
+            HStack(spacing: 8) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(color)
+                }
+
+                Text(value)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(color)
+                    .minimumScaleFactor(0.8)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
         .padding(BoostaSpace.sm)
