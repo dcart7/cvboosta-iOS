@@ -13,6 +13,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     @State private var selectedApplicationID: UUID?
     @State private var showAddSheet = false
     @State private var editingContext: ApplicationEditingContext?
+    @State private var interviewReflectionTarget: ApplicationRecord?
 
     private let widgetSyncService = WidgetSyncService.shared
 
@@ -39,7 +40,9 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     }
 
     private var widgetSyncSignature: [String] {
-        applications.map { "\($0.id.uuidString)-\($0.status.rawValue)-\($0.appliedAt.timeIntervalSince1970)" }
+        applications.map {
+            "\($0.id.uuidString)-\($0.status.rawValue)-\($0.appliedAt.timeIntervalSince1970)-\($0.interviewAt?.timeIntervalSince1970 ?? 0)-\($0.interviewReflectionSubmittedAt?.timeIntervalSince1970 ?? 0)"
+        }
     }
 
     var body: some View {
@@ -123,14 +126,31 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     )
                 }
             }
+            .sheet(item: $interviewReflectionTarget) { application in
+                NavigationStack {
+                    InterviewReflectionView(
+                        company: application.company,
+                        role: application.role,
+                        initialRating: application.interviewReflectionRating,
+                        initialOutcome: application.interviewReflectionOutcome,
+                        initialNotes: application.interviewReflectionNotes
+                    ) { reflection in
+                        saveInterviewReflection(for: application.id, reflection: reflection)
+                    }
+                }
+            }
             .onAppear {
                 if selectedApplicationID == nil {
                     selectedApplicationID = applications.first?.id
                 }
                 widgetSyncService.mergeLocalApplications(applications)
+                syncInterviewLiveActivity()
+                presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: widgetSyncSignature) { _, _ in
                 widgetSyncService.mergeLocalApplications(applications)
+                syncInterviewLiveActivity()
+                presentPendingInterviewReflectionIfNeeded()
             }
         }
     }
@@ -312,6 +332,15 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 if let link = app.jobLink, !link.isEmpty {
                     infoRow("Job link", value: link)
                 }
+
+                if let outcome = app.interviewReflectionOutcome {
+                    Divider()
+                        .opacity(0.35)
+                    infoRow("Interview outcome", value: outcome)
+                    if let rating = app.interviewReflectionRating {
+                        infoRow("Confidence", value: "\(rating)/5")
+                    }
+                }
             }
         }
     }
@@ -331,7 +360,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Notes")
-                Text((app.notes?.isEmpty == false) ? (app.notes ?? "") : "No notes yet.")
+                Text(displayNotes(for: app))
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
                     .textSelection(.enabled)
@@ -498,6 +527,77 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
         }
+    }
+
+    private func saveInterviewReflection(for id: UUID, reflection: InterviewReflectionDraft) {
+        guard let record = applications.first(where: { $0.id == id }) else { return }
+        record.interviewReflectionRating = reflection.rating
+        record.interviewReflectionOutcome = reflection.outcome
+        record.interviewReflectionNotes = reflection.notes
+        record.interviewReflectionSubmittedAt = .now
+
+        do {
+            try modelContext.save()
+            interviewReflectionTarget = nil
+            if #available(iOS 16.1, *) {
+                Task {
+                    await LiveActivityManager.shared.clearPostInterviewReflection()
+                }
+            }
+        } catch {
+            // Best effort local reflection.
+        }
+    }
+
+    private func presentPendingInterviewReflectionIfNeeded() {
+        guard interviewReflectionTarget == nil else { return }
+        let now = Date()
+        if let pending = applications
+            .filter({ $0.status == .interview && ($0.interviewAt ?? .distantFuture) <= now && $0.interviewReflectionSubmittedAt == nil })
+            .sorted(by: { ($0.interviewAt ?? .distantPast) > ($1.interviewAt ?? .distantPast) })
+            .first {
+            interviewReflectionTarget = pending
+            if #available(iOS 16.1, *) {
+                Task {
+                    await LiveActivityManager.shared.showPostInterviewReflection(
+                        company: pending.company,
+                        role: pending.role
+                    )
+                }
+            }
+        }
+    }
+
+    private func syncInterviewLiveActivity() {
+        guard #available(iOS 16.1, *) else { return }
+        let now = Date()
+        if let nextInterview = applications
+            .filter({ $0.status == .interview && ($0.interviewAt ?? .distantPast) > now })
+            .sorted(by: { ($0.interviewAt ?? .distantFuture) < ($1.interviewAt ?? .distantFuture) })
+            .first,
+           let interviewAt = nextInterview.interviewAt {
+            Task {
+                await LiveActivityManager.shared.showInterviewCountdown(
+                    company: nextInterview.company,
+                    role: nextInterview.role,
+                    interviewAt: interviewAt
+                )
+            }
+        } else {
+            Task {
+                await LiveActivityManager.shared.clearInterviewCountdown()
+            }
+        }
+    }
+
+    private func displayNotes(for app: ApplicationRecord) -> String {
+        if let reflection = app.interviewReflectionNotes, !reflection.isEmpty {
+            return reflection
+        }
+        if let notes = app.notes, !notes.isEmpty {
+            return notes
+        }
+        return "No notes yet."
     }
 
     private func makeDraft(from app: ApplicationRecord) -> NewApplicationDraft {

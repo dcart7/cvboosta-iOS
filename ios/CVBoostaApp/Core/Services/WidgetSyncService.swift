@@ -76,6 +76,7 @@ final class WidgetSyncService {
             .first {
             cachedSnapshot.nextInterviewTitle = "\(nextInterview.company) Interview"
             cachedSnapshot.nextInterviewDate = nextInterview.appliedAt
+            cachedSnapshot.nextInterviewCompany = nextInterview.company
         }
 
         persist()
@@ -129,9 +130,11 @@ final class WidgetSyncService {
             .first {
             cachedSnapshot.nextInterviewTitle = "\(nextInterview.company) Interview"
             cachedSnapshot.nextInterviewDate = nextInterview.interviewAt
+            cachedSnapshot.nextInterviewCompany = nextInterview.company
         } else {
             cachedSnapshot.nextInterviewTitle = nil
             cachedSnapshot.nextInterviewDate = nil
+            cachedSnapshot.nextInterviewCompany = nil
         }
 
         persist()

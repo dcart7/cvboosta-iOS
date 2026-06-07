@@ -25,6 +25,7 @@ struct CVBoostaActivityAttributes: ActivityAttributes {
         case interviewCountdown
         case applicationStatus
         case dailyStreak
+        case postInterviewReflection
     }
 
     var activityName: String

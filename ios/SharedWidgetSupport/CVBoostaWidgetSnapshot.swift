@@ -27,6 +27,7 @@ struct CVBoostaWidgetSnapshot: Codable, Hashable {
     var recentScanDate: Date?
     var nextInterviewTitle: String?
     var nextInterviewDate: Date?
+    var nextInterviewCompany: String?
 
     static let placeholder = CVBoostaWidgetSnapshot(
         updatedAt: .now,
@@ -54,7 +55,8 @@ struct CVBoostaWidgetSnapshot: Codable, Hashable {
         recentCompany: "Stripe",
         recentScanDate: .now.addingTimeInterval(-7200),
         nextInterviewTitle: "Stripe Interview",
-        nextInterviewDate: .now.addingTimeInterval(60 * 60 * 24)
+        nextInterviewDate: .now.addingTimeInterval(60 * 60 * 24),
+        nextInterviewCompany: "Stripe"
     )
 
     static let empty = CVBoostaWidgetSnapshot(
@@ -83,7 +85,8 @@ struct CVBoostaWidgetSnapshot: Codable, Hashable {
         recentCompany: nil,
         recentScanDate: nil,
         nextInterviewTitle: nil,
-        nextInterviewDate: nil
+        nextInterviewDate: nil,
+        nextInterviewCompany: nil
     )
 }
 

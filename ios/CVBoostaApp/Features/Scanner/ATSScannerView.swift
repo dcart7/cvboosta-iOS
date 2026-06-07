@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct ATSScannerView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showPaywall = false
@@ -76,6 +77,17 @@ struct ATSScannerView: View {
             }
             .onReceive(sessionTicker) { _ in
                 _ = viewModel.sessionExpiredAndReset()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .background, viewModel.isScanning else { return }
+                if #available(iOS 16.1, *) {
+                    Task {
+                        await LiveActivityManager.shared.markATSBackgrounded(
+                            progress: viewModel.scanProgress,
+                            detail: viewModel.progressMessage
+                        )
+                    }
+                }
             }
             .fileImporter(
                 isPresented: $viewModel.isFileImporterPresented,

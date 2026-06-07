@@ -8,6 +8,7 @@ import UIKit
 struct ATSScannerWorkspaceView_iPad: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
@@ -118,6 +119,17 @@ struct ATSScannerWorkspaceView_iPad: View {
             .onReceive(sessionTicker) { _ in
                 if viewModel.sessionExpiredAndReset() {
                     LatestScanCacheStore.clear(in: modelContext)
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .background, viewModel.isScanning else { return }
+                if #available(iOS 16.1, *) {
+                    Task {
+                        await LiveActivityManager.shared.markATSBackgrounded(
+                            progress: viewModel.scanProgress,
+                            detail: viewModel.progressMessage
+                        )
+                    }
                 }
             }
             .fileImporter(

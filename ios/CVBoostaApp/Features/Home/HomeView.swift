@@ -251,7 +251,40 @@ struct HomeView: View {
                 withAnimation(.easeOut(duration: 0.7)) {
                     animateSparkline = true
                 }
+                syncSupportLiveActivity()
             }
+            .onChange(of: authViewModel.me?.scanHistory.count ?? 0) { _, _ in
+                syncSupportLiveActivity()
+            }
+            .onChange(of: trackedApplications.count) { _, _ in
+                syncSupportLiveActivity()
+            }
+        }
+    }
+
+    private func syncSupportLiveActivity() {
+        guard #available(iOS 16.1, *) else { return }
+        let summary = StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: trackedApplications,
+            manuallyProtectedDayStamps: []
+        )
+        let hour = Calendar.current.component(.hour, from: .now)
+        Task {
+            guard !summary.todayActions.isEmpty,
+                  summary.currentStreak > 0,
+                  !summary.statusTitle.contains("protected"),
+                  hour >= 18 else {
+                await LiveActivityManager.shared.clearStreakProtection()
+                return
+            }
+
+            await LiveActivityManager.shared.showStreakProtection(
+                dayCount: summary.currentStreak,
+                detail: summary.todayActions.first?.detail ?? summary.todayDetail
+            )
         }
     }
 

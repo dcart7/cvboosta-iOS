@@ -17,7 +17,7 @@ struct CVBoostaProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CVBoostaWidgetEntry>) -> Void) {
         let entry = CVBoostaWidgetEntry(date: .now, snapshot: CVBoostaWidgetStore.loadSnapshot())
-        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 30, to: .now) ?? .now
+        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 5, to: .now) ?? .now
         completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
     }
 }
@@ -103,6 +103,23 @@ struct StreakWidget: Widget {
         }
         .configurationDisplayName("Career Streak")
         .description("Keep your daily career streak visible so momentum never disappears.")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+    }
+}
+
+struct InterviewCountdownWidget: Widget {
+    let kind = "InterviewCountdownWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CVBoostaProvider()) { entry in
+            InterviewCountdownWidgetView(entry: entry)
+                .widgetURL(URL(string: "cvboosta://tracker"))
+                .containerBackground(for: .widget) {
+                    WidgetBackground()
+                }
+        }
+        .configurationDisplayName("Interview Countdown")
+        .description("See the real time left until your next interview.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
     }
 }
@@ -297,6 +314,64 @@ private struct StreakWidgetView: View {
     }
 }
 
+private struct InterviewCountdownWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: CVBoostaWidgetEntry
+
+    var body: some View {
+        if let interviewDate = entry.snapshot.nextInterviewDate,
+           let title = entry.snapshot.nextInterviewTitle {
+            switch family {
+            case .accessoryRectangular:
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Interview")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(timerInterval: Date()...interviewDate, countsDown: true)
+                        .font(.headline)
+                    Text(entry.snapshot.nextInterviewCompany ?? title)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            case .systemSmall:
+                VStack(alignment: .leading, spacing: 10) {
+                    widgetTitle("Interview", subtitle: entry.snapshot.nextInterviewCompany ?? "Countdown")
+                    Spacer(minLength: 0)
+                    Text(timerInterval: Date()...interviewDate, countsDown: true)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                    Text(interviewDate.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            default:
+                VStack(alignment: .leading, spacing: 10) {
+                    widgetTitle("Interview Countdown", subtitle: title)
+                    Text(timerInterval: Date()...interviewDate, countsDown: true)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                    Text(interviewDate.formatted(date: .complete, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Label("Open Tracker", systemImage: "arrow.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                widgetTitle("Interview Countdown", subtitle: "No interview scheduled")
+                Text("Add an interview date in Tracker to see a live countdown here.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 private struct PipelineWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: CVBoostaWidgetEntry
@@ -466,6 +541,7 @@ struct CVBoostaWidgetBundle: WidgetBundle {
         ATSScoreWidget()
         DailyFocusWidget()
         StreakWidget()
+        InterviewCountdownWidget()
         PipelineWidget()
         CareerMomentumWidget()
     }

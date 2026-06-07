@@ -22,6 +22,10 @@ final class ApplicationRecord {
     var resumeUsed: String?
     var jobLink: String?
     var atsScore: Int?
+    var interviewReflectionRating: Int?
+    var interviewReflectionOutcome: String?
+    var interviewReflectionNotes: String?
+    var interviewReflectionSubmittedAt: Date?
 
     init(
         id: UUID = UUID(),
@@ -34,7 +38,11 @@ final class ApplicationRecord {
         notes: String? = nil,
         resumeUsed: String? = nil,
         jobLink: String? = nil,
-        atsScore: Int? = nil
+        atsScore: Int? = nil,
+        interviewReflectionRating: Int? = nil,
+        interviewReflectionOutcome: String? = nil,
+        interviewReflectionNotes: String? = nil,
+        interviewReflectionSubmittedAt: Date? = nil
     ) {
         self.id = id
         self.company = company
@@ -47,5 +55,9 @@ final class ApplicationRecord {
         self.resumeUsed = resumeUsed
         self.jobLink = jobLink
         self.atsScore = atsScore
+        self.interviewReflectionRating = interviewReflectionRating
+        self.interviewReflectionOutcome = interviewReflectionOutcome
+        self.interviewReflectionNotes = interviewReflectionNotes
+        self.interviewReflectionSubmittedAt = interviewReflectionSubmittedAt
     }
 }

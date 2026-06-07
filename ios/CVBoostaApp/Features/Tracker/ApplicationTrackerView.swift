@@ -11,6 +11,7 @@ struct ApplicationTrackerView: View {
     @State private var errorMessage: String?
     @State private var showAddSheet = false
     @State private var editingContext: ApplicationEditingContext?
+    @State private var interviewReflectionTarget: ApplicationRecord?
 
     private let widgetSyncService = WidgetSyncService.shared
 
@@ -41,7 +42,9 @@ struct ApplicationTrackerView: View {
     }
 
     private var widgetSyncSignature: [String] {
-        applications.map { "\($0.id.uuidString)-\($0.status.rawValue)-\($0.appliedAt.timeIntervalSince1970)" }
+        applications.map {
+            "\($0.id.uuidString)-\($0.status.rawValue)-\($0.appliedAt.timeIntervalSince1970)-\($0.interviewAt?.timeIntervalSince1970 ?? 0)-\($0.interviewReflectionSubmittedAt?.timeIntervalSince1970 ?? 0)"
+        }
     }
 
     var body: some View {
@@ -110,6 +113,19 @@ struct ApplicationTrackerView: View {
                     )
                 }
             }
+            .sheet(item: $interviewReflectionTarget) { application in
+                NavigationStack {
+                    InterviewReflectionView(
+                        company: application.company,
+                        role: application.role,
+                        initialRating: application.interviewReflectionRating,
+                        initialOutcome: application.interviewReflectionOutcome,
+                        initialNotes: application.interviewReflectionNotes
+                    ) { reflection in
+                        saveInterviewReflection(for: application.id, reflection: reflection)
+                    }
+                }
+            }
             .overlay(alignment: .top) {
                 if let errorMessage {
                     ErrorBanner(message: errorMessage)
@@ -119,9 +135,13 @@ struct ApplicationTrackerView: View {
             }
             .onAppear {
                 widgetSyncService.mergeLocalApplications(applications)
+                syncInterviewLiveActivity()
+                presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: widgetSyncSignature) { _, _ in
                 widgetSyncService.mergeLocalApplications(applications)
+                syncInterviewLiveActivity()
+                presentPendingInterviewReflectionIfNeeded()
             }
         }
     }
@@ -377,6 +397,68 @@ struct ApplicationTrackerView: View {
         }
     }
 
+    private func saveInterviewReflection(for id: UUID, reflection: InterviewReflectionDraft) {
+        guard let record = applications.first(where: { $0.id == id }) else { return }
+        errorMessage = nil
+        record.interviewReflectionRating = reflection.rating
+        record.interviewReflectionOutcome = reflection.outcome
+        record.interviewReflectionNotes = reflection.notes
+        record.interviewReflectionSubmittedAt = .now
+
+        do {
+            try modelContext.save()
+            interviewReflectionTarget = nil
+            if #available(iOS 16.1, *) {
+                Task {
+                    await LiveActivityManager.shared.clearPostInterviewReflection()
+                }
+            }
+        } catch {
+            errorMessage = "Could not save interview reflection."
+        }
+    }
+
+    private func presentPendingInterviewReflectionIfNeeded() {
+        guard interviewReflectionTarget == nil else { return }
+        let now = Date()
+        if let pending = applications
+            .filter({ $0.status == .interview && ($0.interviewAt ?? .distantFuture) <= now && $0.interviewReflectionSubmittedAt == nil })
+            .sorted(by: { ($0.interviewAt ?? .distantPast) > ($1.interviewAt ?? .distantPast) })
+            .first {
+            interviewReflectionTarget = pending
+            if #available(iOS 16.1, *) {
+                Task {
+                    await LiveActivityManager.shared.showPostInterviewReflection(
+                        company: pending.company,
+                        role: pending.role
+                    )
+                }
+            }
+        }
+    }
+
+    private func syncInterviewLiveActivity() {
+        guard #available(iOS 16.1, *) else { return }
+        let now = Date()
+        if let nextInterview = applications
+            .filter({ $0.status == .interview && ($0.interviewAt ?? .distantPast) > now })
+            .sorted(by: { ($0.interviewAt ?? .distantFuture) < ($1.interviewAt ?? .distantFuture) })
+            .first,
+           let interviewAt = nextInterview.interviewAt {
+            Task {
+                await LiveActivityManager.shared.showInterviewCountdown(
+                    company: nextInterview.company,
+                    role: nextInterview.role,
+                    interviewAt: interviewAt
+                )
+            }
+        } else {
+            Task {
+                await LiveActivityManager.shared.clearInterviewCountdown()
+            }
+        }
+    }
+
     private func makeDraft(from app: ApplicationRecord) -> NewApplicationDraft {
         NewApplicationDraft(
             company: app.company,
@@ -606,5 +688,124 @@ private struct ApplicationBadge: View {
             .padding(.vertical, BoostaSpace.xxs)
             .background(tint.opacity(0.12))
             .clipShape(Capsule())
+    }
+}
+
+struct InterviewReflectionDraft {
+    let rating: Int
+    let outcome: String
+    let notes: String?
+}
+
+private struct InterviewReflectionView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let company: String
+    let role: String
+    let initialRating: Int?
+    let initialOutcome: String?
+    let initialNotes: String?
+    let onSave: (InterviewReflectionDraft) -> Void
+
+    @State private var rating: Int
+    @State private var outcome: String
+    @State private var notes: String
+
+    init(
+        company: String,
+        role: String,
+        initialRating: Int?,
+        initialOutcome: String?,
+        initialNotes: String?,
+        onSave: @escaping (InterviewReflectionDraft) -> Void
+    ) {
+        self.company = company
+        self.role = role
+        self.initialRating = initialRating
+        self.initialOutcome = initialOutcome
+        self.initialNotes = initialNotes
+        self.onSave = onSave
+        _rating = State(initialValue: initialRating ?? 3)
+        _outcome = State(initialValue: initialOutcome ?? "Went well")
+        _notes = State(initialValue: initialNotes ?? "")
+    }
+
+    private let outcomes = ["Went well", "Mixed", "Needs improvement", "Waiting for feedback"]
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [BoostaColor.pageTop, BoostaColor.pageBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                        SectionHeader(
+                            title: "How did the interview go?",
+                            subtitle: "\(company) • \(role)"
+                        )
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Confidence")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+
+                            HStack(spacing: 10) {
+                                ForEach(1...5, id: \.self) { value in
+                                    Button {
+                                        rating = value
+                                    } label: {
+                                        Image(systemName: value <= rating ? "star.fill" : "star")
+                                            .font(.system(size: 22, weight: .semibold))
+                                            .foregroundStyle(value <= rating ? BoostaColor.warning : BoostaColor.secondaryText)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+
+                        Picker("Outcome", selection: $outcome) {
+                            ForEach(outcomes, id: \.self) { item in
+                                Text(item).tag(item)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                            Text("Notes")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                            TextEditor(text: $notes)
+                                .frame(minHeight: 140)
+                                .padding(BoostaSpace.xs)
+                                .background(Color.white.opacity(0.65))
+                                .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+                        }
+
+                        PrimaryButton(title: "Save Reflection") {
+                            onSave(
+                                InterviewReflectionDraft(
+                                    rating: rating,
+                                    outcome: outcome,
+                                    notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes
+                                )
+                            )
+                            dismiss()
+                        }
+                    }
+                }
+                .padding(BoostaSpace.md)
+            }
+        }
+        .navigationTitle("Interview Reflection")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close") { dismiss() }
+            }
+        }
     }
 }
