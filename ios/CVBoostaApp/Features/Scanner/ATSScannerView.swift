@@ -9,8 +9,15 @@ struct ATSScannerView: View {
     @State private var currentStep: ScannerWizardStep = .upload
     @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
+    private var optimizationStatus: ScanLimitStatus {
+        viewModel.optimizationLimitStatus(backendRemaining: authViewModel.me?.usageLimits.scansRemainingToday)
+    }
+
     private var canAnalyze: Bool {
-        !viewModel.isScanning && viewModel.selectedFileName != nil && !viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !viewModel.isScanning
+            && viewModel.selectedFileName != nil
+            && !viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && optimizationStatus.canScan
     }
 
     private var canContinue: Bool {
@@ -314,6 +321,10 @@ struct ATSScannerView: View {
                     isLoading: viewModel.isScanning,
                     isDisabled: !canAnalyze
                 ) {
+                    guard optimizationStatus.canScan else {
+                        showPaywall = true
+                        return
+                    }
                     HapticsService.impact(.medium)
                     viewModel.analyzeResume()
                 }
@@ -331,19 +342,25 @@ struct ATSScannerView: View {
                 SectionHeader(title: "Usage")
 
                 if subscriptionService.isPremium {
-                    Text("Premium active: deeper ATS intelligence and unlimited scans")
+                    Text("Premium active: unlimited optimizations and deeper ATS intelligence")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.success)
                 } else {
                     let usageText = if let remaining = authViewModel.me?.usageLimits.scansRemainingToday {
-                        "Free plan remaining today: \(remaining)"
+                        "Free plan optimizations remaining today: \(remaining)/1"
                     } else {
-                        "Free plan remaining today: —"
+                        "Free plan includes 1 optimization per day"
                     }
 
                     Text(usageText)
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
+
+                    if !optimizationStatus.canScan {
+                        Text("Your free optimization is used up for today. Upgrade to keep optimizing now.")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.warning)
+                    }
 
                     HStack(spacing: BoostaSpace.sm) {
                         PrimaryButton(title: "Unlock Premium") {

@@ -70,6 +70,16 @@ final class SubscriptionService: ObservableObject {
         }
     }
 
+    func consumeFreeOptimizationIfNeeded() {
+        guard !isPremium else { return }
+
+        if let scansRemainingToday {
+            self.scansRemainingToday = max(scansRemainingToday - 1, 0)
+        } else {
+            self.scansRemainingToday = 0
+        }
+    }
+
     func reset() {
         if Thread.isMainThread {
             isPremium = false

@@ -46,18 +46,21 @@ final class ScannerViewModel: ObservableObject {
     private let subscriptionService: SubscriptionService
     private let widgetSyncService: WidgetSyncService
     private let sessionService: WorkspaceSessionService
+    private let scanLimitService: ScanLimitService
     private var scanTask: Task<Void, Never>?
 
     init(
         atsService: ATSServiceProtocol? = nil,
         subscriptionService: SubscriptionService? = nil,
         widgetSyncService: WidgetSyncService? = nil,
-        sessionService: WorkspaceSessionService? = nil
+        sessionService: WorkspaceSessionService? = nil,
+        scanLimitService: ScanLimitService = .shared
     ) {
         self.atsService = atsService ?? ATSService.shared
         self.subscriptionService = subscriptionService ?? .shared
         self.widgetSyncService = widgetSyncService ?? .shared
         self.sessionService = sessionService ?? .shared
+        self.scanLimitService = scanLimitService
     }
 
     func onAppear() {
@@ -160,6 +163,22 @@ final class ScannerViewModel: ObservableObject {
         sessionService.formattedRemainingTime(for: .scanner)
     }
 
+    func optimizationLimitStatus(backendRemaining: Int?) -> ScanLimitStatus {
+        if subscriptionService.isPremium {
+            return scanLimitService.status(isPremium: true)
+        }
+
+        if let backendRemaining {
+            return ScanLimitStatus(
+                canScan: backendRemaining > 0,
+                scansRemaining: max(backendRemaining, 0),
+                resetDate: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: .now)) ?? .now
+            )
+        }
+
+        return scanLimitService.status(isPremium: false)
+    }
+
     private func runScan(pdfURL: URL, role: String) async {
         isScanning = true
         scanProgress = 0.08
@@ -224,6 +243,8 @@ final class ScannerViewModel: ObservableObject {
         if let scanResult {
             widgetSyncService.mergeLatestScan(result: scanResult)
         }
+        scanLimitService.recordScan(isPremium: subscriptionService.isPremium)
+        subscriptionService.consumeFreeOptimizationIfNeeded()
 
         isScanning = false
         progressMessage = "Ready"

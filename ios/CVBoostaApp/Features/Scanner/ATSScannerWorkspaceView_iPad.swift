@@ -14,10 +14,15 @@ struct ATSScannerWorkspaceView_iPad: View {
     @State private var showPaywall = false
     @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
+    private var optimizationStatus: ScanLimitStatus {
+        viewModel.optimizationLimitStatus(backendRemaining: authViewModel.me?.usageLimits.scansRemainingToday)
+    }
+
     private var canAnalyze: Bool {
         !viewModel.isScanning
             && viewModel.selectedFileName != nil
             && !viewModel.targetRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && optimizationStatus.canScan
     }
 
     var body: some View {
@@ -83,6 +88,10 @@ struct ATSScannerWorkspaceView_iPad: View {
                     .hoverEffect(.lift)
 
                     Button {
+                        guard optimizationStatus.canScan else {
+                            showPaywall = true
+                            return
+                        }
                         HapticsService.impact(.medium)
                         viewModel.analyzeResume()
                     } label: {
@@ -294,19 +303,25 @@ struct ATSScannerWorkspaceView_iPad: View {
                 SectionHeader(title: "Usage")
 
                 if subscriptionService.isPremium {
-                    Text("Premium active: unlimited ATS scans")
+                    Text("Premium active: unlimited optimizations")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.success)
                 } else {
                     let usageText = if let remaining = authViewModel.me?.usageLimits.scansRemainingToday {
-                        "Free plan remaining today: \(remaining)"
+                        "Free plan optimizations remaining today: \(remaining)/1"
                     } else {
-                        "Free plan remaining today: —"
+                        "Free plan includes 1 optimization per day"
                     }
 
                     Text(usageText)
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
+
+                    if !optimizationStatus.canScan {
+                        Text("Your free optimization is already used for today. Upgrade to continue.")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.warning)
+                    }
 
                     HStack(spacing: BoostaSpace.sm) {
                         WorkspaceActionButton(title: "Upgrade", systemImage: "crown") {
@@ -331,6 +346,10 @@ struct ATSScannerWorkspaceView_iPad: View {
                 isLoading: viewModel.isScanning,
                 isDisabled: !canAnalyze
             ) {
+                guard optimizationStatus.canScan else {
+                    showPaywall = true
+                    return
+                }
                 HapticsService.impact(.medium)
                 viewModel.analyzeResume()
             }
@@ -354,6 +373,10 @@ struct ATSScannerWorkspaceView_iPad: View {
                     .keyboardShortcut("o", modifiers: .command)
 
                     WorkspaceActionButton(title: "Analyze", systemImage: "sparkles", isDisabled: !canAnalyze) {
+                        guard optimizationStatus.canScan else {
+                            showPaywall = true
+                            return
+                        }
                         HapticsService.impact(.medium)
                         viewModel.analyzeResume()
                     }
