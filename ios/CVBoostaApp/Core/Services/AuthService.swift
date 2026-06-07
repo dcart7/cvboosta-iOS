@@ -325,18 +325,15 @@ private extension AuthService {
     }()
 
     static func mapSubscription(from payload: [String: JSONValue]) -> AuthSubscription {
-        let isActive: Bool
-        if let direct = payload.bool("is_active") ?? payload.bool("active") {
-            isActive = direct
-        } else {
-            isActive = payload.string("status")?.lowercased() == "active"
-        }
-
         let entitlement =
             payload.string("entitlement")
             ?? payload.string("plan")
             ?? payload.string("tier")
-            ?? (isActive ? "premium" : "free")
+            ?? payload.string("plan_name")
+            ?? payload.string("subscription_tier")
+            ?? payload.string("subscription_plan")
+
+        let isActive = inferredSubscriptionActive(from: payload, entitlement: entitlement)
 
         let expiresAt = parseDate(
             payload.string("expires_at")
@@ -347,7 +344,7 @@ private extension AuthService {
         let source = payload.string("source") ?? "stripe"
 
         return AuthSubscription(
-            entitlement: entitlement,
+            entitlement: entitlement ?? (isActive ? "premium" : "free"),
             isActive: isActive,
             expiresAt: expiresAt,
             source: source
@@ -412,7 +409,13 @@ private extension AuthService {
     }
 
     static func mapUsageLimits(from payload: [String: JSONValue], subscription: AuthSubscription) -> AuthUsageLimits {
-        let plan = payload.string("plan") ?? payload.string("tier") ?? (subscription.isActive ? "premium" : "free")
+        let plan =
+            payload.string("plan")
+            ?? payload.string("tier")
+            ?? payload.string("plan_name")
+            ?? payload.string("subscription_tier")
+            ?? payload.string("subscription_plan")
+            ?? (subscription.isActive ? "premium" : "free")
         let limit = payload.int("scans_daily_limit") ?? payload.int("daily_limit")
         let used = payload.int("scans_used_today") ?? payload.int("used_today") ?? 0
         let remaining = payload.int("scans_remaining_today") ?? payload.int("remaining_today")
@@ -431,5 +434,44 @@ private extension AuthService {
             return date
         }
         return nil
+    }
+
+    static func inferredSubscriptionActive(from payload: [String: JSONValue], entitlement: String?) -> Bool {
+        if let direct = payload.bool("is_active")
+            ?? payload.bool("active")
+            ?? payload.bool("is_premium")
+            ?? payload.bool("premium")
+            ?? payload.bool("subscribed")
+            ?? payload.bool("has_subscription")
+        {
+            return direct
+        }
+
+        let status =
+            payload.string("status")
+            ?? payload.string("subscription_status")
+            ?? payload.string("billing_status")
+
+        if let status {
+            switch status.lowercased() {
+            case "active", "paid", "premium", "pro", "trialing", "trial", "grace_period":
+                return true
+            case "free", "inactive", "canceled", "cancelled", "expired":
+                return false
+            default:
+                break
+            }
+        }
+
+        if let entitlement {
+            switch entitlement.lowercased() {
+            case "free", "basic", "none":
+                return false
+            default:
+                return true
+            }
+        }
+
+        return false
     }
 }

@@ -68,6 +68,7 @@ struct AppRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
     @State private var accountSyncTicker = Timer.publish(every: 180, on: .main, in: .common).autoconnect()
+    @StateObject private var subscriptionService = SubscriptionService.shared
 
     private var accountApplicationsSignature: String {
         authViewModel.me?.applications
@@ -149,6 +150,7 @@ struct AppRootView: View {
 
     private func performAccountSync() async {
         await authViewModel.refreshSharedState()
+        _ = await subscriptionService.syncFromBackend()
         syncAccountApplications()
     }
 }

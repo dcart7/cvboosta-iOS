@@ -80,6 +80,9 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Subscription")
                 row("Current plan", value: planTitle)
+                if let lastSyncedAt = subscriptionService.lastSyncedAt {
+                    row("Last synced", value: lastSyncedAt.formatted(date: .omitted, time: .shortened))
+                }
 
                 Text("Unlock unlimited scans, deeper ATS intelligence, AI rewrite power, interview prediction signals, and stronger recruiter visibility.")
                     .font(BoostaType.caption)

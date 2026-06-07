@@ -167,6 +167,9 @@ struct SettingsWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Subscription")
                 infoRow("Current plan", value: planTitle)
+                if let lastSyncedAt = subscriptionService.lastSyncedAt {
+                    infoRow("Last synced", value: lastSyncedAt.formatted(date: .omitted, time: .shortened))
+                }
 
                 PrimaryButton(title: subscriptionService.isPremium ? "Premium Active" : "Upgrade to Premium", isDisabled: subscriptionService.isPremium) {
                     showPaywall = true
