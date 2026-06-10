@@ -25,7 +25,10 @@ targets:
         WEB_BASE_URL: https://cvboosta.com
         APP_ENV: production
         APP_BUNDLE_ID_PLACEHOLDER: com.cvboosta.app
+        APNS_REGISTER_PATH: /devices/apns
         NSFaceIDUsageDescription: Face ID protects sensitive career data and exported documents.
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
@@ -52,6 +55,11 @@ targets:
         DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CVBoostaApp/CVBoostaApp.entitlements
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
     dependencies:
       - target: CVBoostaWidgetExtension
 

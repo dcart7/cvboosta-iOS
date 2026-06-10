@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(\.openURL) private var openURL
@@ -10,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKeys.notificationsEnabled) private var notificationsEnabled = true
     @AppStorage(AppPreferenceKeys.hapticsEnabled) private var hapticsEnabled = true
     @AppStorage(AppPreferenceKeys.biometricsEnabled) private var biometricsEnabled = true
+    @State private var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
 
     private var userName: String {
         authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
@@ -53,6 +55,13 @@ struct SettingsView: View {
             .onAppear {
                 Task {
                     await authViewModel.refreshSharedState()
+                    await refreshNotificationAuthorizationStatus()
+                }
+            }
+            .onChange(of: notificationsEnabled) { _, isEnabled in
+                Task {
+                    await PushNotificationService.shared.applyUserPreference(isEnabled: isEnabled)
+                    await refreshNotificationAuthorizationStatus()
                 }
             }
         }
@@ -150,6 +159,9 @@ struct SettingsView: View {
                 }
 
                 ToggleRow(title: "Notifications", subtitle: "Career reminders and follow-up nudges", isOn: $notificationsEnabled)
+                if notificationsEnabled {
+                    notificationStatusView
+                }
                 ToggleRow(title: "Haptics", subtitle: "Keep subtle feedback during scans and actions", isOn: $hapticsEnabled)
                 ToggleRow(title: "Biometric Lock", subtitle: "Protect sensitive resume and account data", isOn: $biometricsEnabled)
             }
@@ -189,6 +201,44 @@ struct SettingsView: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .multilineTextAlignment(.trailing)
         }
+    }
+
+    @ViewBuilder
+    private var notificationStatusView: some View {
+        switch notificationAuthorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            Text("Push access is enabled on this device.")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        case .denied:
+            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                Text("iPhone Settings still block notifications for CVBoosta.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.warning)
+
+                SecondaryButton(title: "Open Notification Settings") {
+                    openSystemNotificationSettings()
+                }
+            }
+        case .notDetermined:
+            Text("Turn this on to allow reminders, push updates, and message delivery prompts.")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        @unknown default:
+            EmptyView()
+        }
+    }
+
+    @MainActor
+    private func refreshNotificationAuthorizationStatus() async {
+        notificationAuthorizationStatus = await PushNotificationService.shared.authorizationStatus()
+    }
+
+    private func openSystemNotificationSettings() {
+        let rawValue = UIApplication.openNotificationSettingsURLString
+        let fallback = UIApplication.openSettingsURLString
+        guard let url = URL(string: rawValue.isEmpty ? fallback : rawValue) else { return }
+        openURL(url)
     }
 }
 

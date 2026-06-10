@@ -8,6 +8,8 @@
 	<string>production</string>
 	<key>APP_BUNDLE_ID_PLACEHOLDER</key>
 	<string>com.cvboosta.app</string>
+	<key>APNS_REGISTER_PATH</key>
+	<string>/devices/apns</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -48,6 +50,10 @@
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Face ID protects sensitive career data and exported documents.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

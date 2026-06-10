@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 /// iPad-only Settings workspace.
 /// The iPhone Settings experience remains in `SettingsView` untouched.
@@ -14,6 +15,7 @@ struct SettingsWorkspaceView_iPad: View {
     @AppStorage(AppPreferenceKeys.biometricsEnabled) private var biometricsEnabled = true
 
     @State private var showPaywall = false
+    @State private var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
 
     private var userName: String {
         authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
@@ -75,7 +77,16 @@ struct SettingsWorkspaceView_iPad: View {
                 }
             }
             .onAppear {
-                Task { await authViewModel.refreshSharedState() }
+                Task {
+                    await authViewModel.refreshSharedState()
+                    await refreshNotificationAuthorizationStatus()
+                }
+            }
+            .onChange(of: notificationsEnabled) { _, isEnabled in
+                Task {
+                    await PushNotificationService.shared.applyUserPreference(isEnabled: isEnabled)
+                    await refreshNotificationAuthorizationStatus()
+                }
             }
             .sheet(isPresented: $showPaywall) {
                 NavigationStack { PaywallView() }
@@ -225,6 +236,9 @@ struct SettingsWorkspaceView_iPad: View {
                 .pickerStyle(.segmented)
 
                 settingsToggle("Notifications", subtitle: "Career reminders and follow-up nudges", isOn: $notificationsEnabled)
+                if notificationsEnabled {
+                    notificationStatusView
+                }
                 settingsToggle("Haptics", subtitle: "Subtle feedback during scans and actions", isOn: $hapticsEnabled)
                 settingsToggle("Biometric Lock", subtitle: "Protect account and resume data", isOn: $biometricsEnabled)
             }
@@ -267,6 +281,45 @@ struct SettingsWorkspaceView_iPad: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .multilineTextAlignment(.trailing)
         }
+    }
+
+    @ViewBuilder
+    private var notificationStatusView: some View {
+        switch notificationAuthorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            Text("Push access is enabled on this device.")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        case .denied:
+            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                Text("iPad Settings still block notifications for CVBoosta.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.warning)
+
+                SecondaryButton(title: "Open Notification Settings") {
+                    openSystemNotificationSettings()
+                }
+                .hoverEffect(.highlight)
+            }
+        case .notDetermined:
+            Text("Turn this on to allow reminders, push updates, and message delivery prompts.")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        @unknown default:
+            EmptyView()
+        }
+    }
+
+    @MainActor
+    private func refreshNotificationAuthorizationStatus() async {
+        notificationAuthorizationStatus = await PushNotificationService.shared.authorizationStatus()
+    }
+
+    private func openSystemNotificationSettings() {
+        let rawValue = UIApplication.openNotificationSettingsURLString
+        let fallback = UIApplication.openSettingsURLString
+        guard let url = URL(string: rawValue.isEmpty ? fallback : rawValue) else { return }
+        openURL(url)
     }
 }
 
