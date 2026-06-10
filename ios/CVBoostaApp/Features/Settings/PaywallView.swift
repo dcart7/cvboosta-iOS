@@ -1,5 +1,25 @@
 import SwiftUI
 
+enum PaywallPresentationContext: Identifiable, Equatable {
+    case standard
+    case postLogin
+    case postRegister
+    case optimizationLimit(resetDate: Date?)
+
+    var id: String {
+        switch self {
+        case .standard:
+            return "standard"
+        case .postLogin:
+            return "postLogin"
+        case .postRegister:
+            return "postRegister"
+        case .optimizationLimit(let resetDate):
+            return "optimizationLimit-\(resetDate?.timeIntervalSince1970 ?? 0)"
+        }
+    }
+}
+
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -7,12 +27,18 @@ struct PaywallView: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var restoreMessage: String?
 
+    let context: PaywallPresentationContext
+
     private let plans: [WebsitePlan] = [
         .init(title: "Single Scan", badge: "Pay as you go", price: 1.15, cadence: "one-time", features: ["1 ATS scan", "Quick recruiter visibility check"], accent: BoostaColor.warning),
         .init(title: "Go", badge: "Most flexible", price: 9.20, cadence: "/ month", features: ["Unlimited ATS scans", "ATS score + keyword gaps", "Resume optimization preview"], accent: BoostaColor.accent),
         .init(title: "Pro", badge: "Best value", price: 23.00, cadence: "/ month", features: ["Everything in Go", "Tailoring workspace", "Deeper analytics + AI insights", "Priority web studio access"], accent: BoostaColor.success),
         .init(title: "Lifetime", badge: "One payment", price: 137.99, cadence: "once", features: ["Permanent CVBoosta access", "All premium ATS + tailoring tools", "No renewals"], accent: BoostaColor.accentSecondary)
     ]
+
+    init(context: PaywallPresentationContext = .standard) {
+        self.context = context
+    }
 
     var body: some View {
         ZStack {
@@ -25,15 +51,12 @@ struct PaywallView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                    SectionHeader(
-                        title: "Same plans as CVBoosta web, adapted for iOS.",
-                        subtitle: "App pricing is set 15% above the website while account access, ATS logic, and subscription status stay shared."
-                    )
+                    heroCard
 
                     benefitsCard
                     plansCard
 
-                    PrimaryButton(title: "Continue") {
+                    PrimaryButton(title: primaryCTA) {
                         // Payments and plan management live on the website.
                         openURL(AppEnvironment.webBaseURL)
                     }
@@ -46,7 +69,7 @@ struct PaywallView: View {
                         }
                     }
 
-                    SecondaryButton(title: "Maybe Later") {
+                    SecondaryButton(title: secondaryCTA) {
                         dismiss()
                     }
 
@@ -69,15 +92,48 @@ struct PaywallView: View {
         }
     }
 
+    private var heroCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                    Image(systemName: heroIcon)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(heroTint)
+                        .frame(width: 42, height: 42)
+                        .background(heroTint.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(heroTitle)
+                            .font(BoostaType.section)
+                            .foregroundStyle(BoostaColor.primaryText)
+                        Text(heroSubtitle)
+                            .font(BoostaType.body)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                    }
+                }
+
+                if let supportText {
+                    Text(supportText)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                }
+
+                HStack(spacing: BoostaSpace.sm) {
+                    MetricPill(title: "Free", value: "1/day", color: BoostaColor.warning)
+                    MetricPill(title: "Premium", value: "Unlimited", color: BoostaColor.success)
+                    MetricPill(title: "Sync", value: "Shared account", color: BoostaColor.accent)
+                }
+            }
+        }
+    }
+
     private var benefitsCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                benefit("Shared CVBoosta account across web, iPhone, and iPad")
-                benefit("Unlimited ATS scans on paid plans")
-                benefit("AI rewrite engine + role-specific tailoring")
-                benefit("Recruiter visibility prediction")
-                benefit("Advanced keyword targeting + analytics")
-                benefit("Priority access to CVBoosta Studio on web")
+                ForEach(benefitItems, id: \.self) { item in
+                    benefit(item)
+                }
             }
         }
     }
@@ -133,6 +189,120 @@ struct PaywallView: View {
                 }
             }
             .padding(.vertical, 6)
+        }
+    }
+
+    private var heroTitle: String {
+        switch context {
+        case .standard:
+            return "Same plans as CVBoosta web, adapted for iOS."
+        case .postLogin:
+            return "You’re in — unlock the full workflow when you need it."
+        case .postRegister:
+            return "Strong start. Keep free for now or unlock more depth."
+        case .optimizationLimit:
+            return "Today’s free optimization is used."
+        }
+    }
+
+    private var heroSubtitle: String {
+        switch context {
+        case .standard:
+            return "App pricing is set 15% above the website while account access, ATS logic, and subscription status stay shared."
+        case .postLogin:
+            return "Free already works well. Premium simply removes the daily cap and opens deeper ATS and tailoring output."
+        case .postRegister:
+            return "You can explore CVBoosta on free, then upgrade only when you want unlimited scanning and deeper insights."
+        case .optimizationLimit(let resetDate):
+            if let resetDate {
+                return "You can wait until \(resetDate.formatted(date: .omitted, time: .shortened)) or keep optimizing now with Premium."
+            }
+            return "You can come back tomorrow for another free run, or unlock unlimited optimizations now."
+        }
+    }
+
+    private var supportText: String? {
+        switch context {
+        case .standard:
+            return nil
+        case .postLogin:
+            return "This is just a soft prompt — you can dismiss it and keep using the app on free."
+        case .postRegister:
+            return "No pressure: the free plan stays active immediately."
+        case .optimizationLimit:
+            return "Your account, history, and results stay the same either way."
+        }
+    }
+
+    private var heroIcon: String {
+        switch context {
+        case .standard:
+            return "crown"
+        case .postLogin, .postRegister:
+            return "sparkles"
+        case .optimizationLimit:
+            return "timer"
+        }
+    }
+
+    private var heroTint: Color {
+        switch context {
+        case .standard:
+            return BoostaColor.accent
+        case .postLogin, .postRegister:
+            return BoostaColor.success
+        case .optimizationLimit:
+            return BoostaColor.warning
+        }
+    }
+
+    private var primaryCTA: String {
+        switch context {
+        case .optimizationLimit:
+            return "Keep optimizing today"
+        case .postLogin, .postRegister:
+            return "See Premium plans"
+        case .standard:
+            return "Continue"
+        }
+    }
+
+    private var secondaryCTA: String {
+        switch context {
+        case .postLogin, .postRegister:
+            return "Stay on Free"
+        case .optimizationLimit:
+            return "Maybe Later"
+        case .standard:
+            return "Maybe Later"
+        }
+    }
+
+    private var benefitItems: [String] {
+        switch context {
+        case .standard:
+            return [
+                "Shared CVBoosta account across web, iPhone, and iPad",
+                "Unlimited ATS scans on paid plans",
+                "AI rewrite engine + role-specific tailoring",
+                "Recruiter visibility prediction",
+                "Advanced keyword targeting + analytics",
+                "Priority access to CVBoosta Studio on web"
+            ]
+        case .postLogin, .postRegister:
+            return [
+                "Keep the same shared account across web, iPhone, and iPad",
+                "Unlock unlimited ATS scans when free feels too tight",
+                "See more keyword gaps, recommendations, and rewrite depth",
+                "Open richer tailoring and analytics output"
+            ]
+        case .optimizationLimit:
+            return [
+                "Unlimited ATS scans and optimizations today",
+                "More keyword gaps and deeper AI recommendations",
+                "Full tailoring depth without waiting for tomorrow",
+                "Shared subscription status across web, iPhone, and iPad"
+            ]
         }
     }
 }

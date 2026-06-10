@@ -12,7 +12,7 @@ struct ATSScannerWorkspaceView_iPad: View {
 
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
-    @State private var showPaywall = false
+    @State private var paywallContext: PaywallPresentationContext?
     @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var optimizationStatus: ScanLimitStatus {
@@ -90,7 +90,7 @@ struct ATSScannerWorkspaceView_iPad: View {
 
                     Button {
                         guard optimizationStatus.canScan else {
-                            showPaywall = true
+                            paywallContext = .optimizationLimit(resetDate: optimizationStatus.resetDate)
                             return
                         }
                         HapticsService.impact(.medium)
@@ -146,10 +146,12 @@ struct ATSScannerWorkspaceView_iPad: View {
                     viewModel.handlePickerResult(.failure(error))
                 }
             }
-            .sheet(isPresented: $showPaywall) {
+            .sheet(item: $paywallContext) { context in
                 NavigationStack {
-                    PaywallView()
+                    PaywallView(context: context)
                 }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
         }
     }
@@ -330,14 +332,12 @@ struct ATSScannerWorkspaceView_iPad: View {
                         .foregroundStyle(BoostaColor.secondaryText)
 
                     if !optimizationStatus.canScan {
-                        Text("Your free optimization is already used for today. Upgrade to continue.")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.warning)
+                        limitReachedCard
                     }
 
                     HStack(spacing: BoostaSpace.sm) {
                         WorkspaceActionButton(title: "Upgrade", systemImage: "crown") {
-                            showPaywall = true
+                            paywallContext = .optimizationLimit(resetDate: optimizationStatus.resetDate)
                         }
                         WorkspaceActionButton(title: "Restore", systemImage: "arrow.clockwise") {
                             Task {
@@ -359,7 +359,7 @@ struct ATSScannerWorkspaceView_iPad: View {
                 isDisabled: !canAnalyze
             ) {
                 guard optimizationStatus.canScan else {
-                    showPaywall = true
+                    paywallContext = .optimizationLimit(resetDate: optimizationStatus.resetDate)
                     return
                 }
                 HapticsService.impact(.medium)
@@ -386,7 +386,7 @@ struct ATSScannerWorkspaceView_iPad: View {
 
                     WorkspaceActionButton(title: "Analyze", systemImage: "sparkles", isDisabled: !canAnalyze) {
                         guard optimizationStatus.canScan else {
-                            showPaywall = true
+                            paywallContext = .optimizationLimit(resetDate: optimizationStatus.resetDate)
                             return
                         }
                         HapticsService.impact(.medium)
@@ -426,6 +426,19 @@ struct ATSScannerWorkspaceView_iPad: View {
             }
         }
         .frame(minHeight: 340, alignment: .top)
+    }
+
+    private var limitReachedCard: some View {
+        GlassCard(padding: BoostaSpace.sm) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Free limit reached for today", systemImage: "timer")
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.warning)
+                Text("Your next free optimization unlocks at \(optimizationStatus.resetDate.formatted(date: .omitted, time: .shortened)). Premium keeps this workspace unlimited.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
     }
 }
 

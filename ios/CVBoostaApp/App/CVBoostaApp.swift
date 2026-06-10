@@ -69,6 +69,7 @@ struct AppRootView: View {
     @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
     @State private var accountSyncTicker = Timer.publish(every: 180, on: .main, in: .common).autoconnect()
     @StateObject private var subscriptionService = SubscriptionService.shared
+    @State private var authPaywallContext: PaywallPresentationContext?
 
     private var accountApplicationsSignature: String {
         authViewModel.me?.applications
@@ -103,11 +104,29 @@ struct AppRootView: View {
                 await performAccountSync()
             }
         }
+        .onChange(of: authViewModel.pendingFreshAuthEvent) { _, event in
+            guard let event, authViewModel.state == .loggedIn, !subscriptionService.isPremium else { return }
+            switch event {
+            case .login:
+                authPaywallContext = .postLogin
+            case .register:
+                authPaywallContext = .postRegister
+            }
+            authViewModel.consumePendingFreshAuthEvent()
+        }
         .onReceive(accountSyncTicker) { _ in
             guard scenePhase == .active, authViewModel.state == .loggedIn else { return }
             Task {
                 await performAccountSync()
             }
+        }
+        .sheet(item: $authPaywallContext) { context in
+            NavigationStack {
+                PaywallView(context: context)
+                    .environmentObject(authViewModel)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 

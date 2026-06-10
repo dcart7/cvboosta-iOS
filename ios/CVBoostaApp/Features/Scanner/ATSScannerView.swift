@@ -6,7 +6,7 @@ struct ATSScannerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
-    @State private var showPaywall = false
+    @State private var paywallContext: PaywallPresentationContext?
     @State private var currentStep: ScannerWizardStep = .upload
     @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -115,10 +115,12 @@ struct ATSScannerView: View {
                     ATSResultsView(result: result)
                 }
             }
-            .sheet(isPresented: $showPaywall) {
+            .sheet(item: $paywallContext) { context in
                 NavigationStack {
-                    PaywallView()
+                    PaywallView(context: context)
                 }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
         }
     }
@@ -334,7 +336,7 @@ struct ATSScannerView: View {
                     isDisabled: !canAnalyze
                 ) {
                     guard optimizationStatus.canScan else {
-                        showPaywall = true
+                        paywallContext = .optimizationLimit(resetDate: optimizationStatus.resetDate)
                         return
                     }
                     HapticsService.impact(.medium)
@@ -369,14 +371,12 @@ struct ATSScannerView: View {
                         .foregroundStyle(BoostaColor.secondaryText)
 
                     if !optimizationStatus.canScan {
-                        Text("Your free optimization is used up for today. Upgrade to keep optimizing now.")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.warning)
+                        limitReachedCard
                     }
 
                     HStack(spacing: BoostaSpace.sm) {
                         PrimaryButton(title: "Unlock Premium") {
-                            showPaywall = true
+                            paywallContext = .optimizationLimit(resetDate: optimizationStatus.resetDate)
                         }
                         SecondaryButton(title: "Restore") {
                             Task {
@@ -390,6 +390,19 @@ struct ATSScannerView: View {
                 if let error = viewModel.errorMessage {
                     ErrorBanner(message: error)
                 }
+            }
+        }
+    }
+
+    private var limitReachedCard: some View {
+        GlassCard(padding: BoostaSpace.sm) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Free limit reached for today", systemImage: "timer")
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.warning)
+                Text("You can wait until \(optimizationStatus.resetDate.formatted(date: .omitted, time: .shortened)) for the next free run, or unlock unlimited optimizations now.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
             }
         }
     }

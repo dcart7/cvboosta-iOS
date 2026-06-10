@@ -2,6 +2,13 @@ import Foundation
 
 @MainActor
 final class AuthViewModel: ObservableObject {
+    enum FreshAuthEvent: String, Identifiable {
+        case login
+        case register
+
+        var id: String { rawValue }
+    }
+
     enum State: Equatable {
         case loading
         case loggedOut
@@ -13,6 +20,7 @@ final class AuthViewModel: ObservableObject {
     @Published var isSubmitting: Bool = false
     @Published var errorMessage: String?
     @Published var infoMessage: String?
+    @Published private(set) var pendingFreshAuthEvent: FreshAuthEvent?
 
     private let authService: AuthService
     private let subscriptionService: SubscriptionService
@@ -52,7 +60,7 @@ final class AuthViewModel: ObservableObject {
         }
         await submit { [self] in
             let snapshot = try await self.authService.login(email: email, password: password)
-            self.applyAuthenticatedState(snapshot)
+            self.applyAuthenticatedState(snapshot, freshAuthEvent: .login)
         }
     }
 
@@ -71,7 +79,7 @@ final class AuthViewModel: ObservableObject {
                 password: password,
                 displayName: displayName.isEmpty ? nil : displayName
             )
-            self.applyAuthenticatedState(snapshot)
+            self.applyAuthenticatedState(snapshot, freshAuthEvent: .register)
         }
     }
 
@@ -100,6 +108,10 @@ final class AuthViewModel: ObservableObject {
         applyLoggedOutState()
     }
 
+    func consumePendingFreshAuthEvent() {
+        pendingFreshAuthEvent = nil
+    }
+
     private func submit(_ work: @escaping @MainActor () async throws -> Void) async {
         isSubmitting = true
         defer { isSubmitting = false }
@@ -112,7 +124,7 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    private func applyAuthenticatedState(_ snapshot: AuthMePayload) {
+    private func applyAuthenticatedState(_ snapshot: AuthMePayload, freshAuthEvent: FreshAuthEvent? = nil) {
         me = snapshot
         subscriptionService.applyBackendSubscription(snapshot.subscription)
         subscriptionService.applyBackendUsageLimits(snapshot.usageLimits)
@@ -120,6 +132,7 @@ final class AuthViewModel: ObservableObject {
         errorMessage = nil
         infoMessage = nil
         state = .loggedIn
+        pendingFreshAuthEvent = freshAuthEvent
 
         Task {
             await pushNotificationService.requestAuthorizationIfNeeded()
@@ -133,6 +146,7 @@ final class AuthViewModel: ObservableObject {
         widgetSyncService.clear()
         errorMessage = nil
         infoMessage = nil
+        pendingFreshAuthEvent = nil
         state = .loggedOut
     }
 }
