@@ -633,7 +633,7 @@ struct AddApplicationView: View {
                             TextEditor(text: $notes)
                                 .frame(minHeight: 110)
                                 .padding(BoostaSpace.xs)
-                                .background(Color.white.opacity(0.65))
+                                .background(BoostaColor.surfaceInteractiveStrong)
                                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                         }
 
@@ -697,7 +697,7 @@ struct InterviewReflectionDraft {
     let notes: String?
 }
 
-private struct InterviewReflectionView: View {
+struct InterviewReflectionView: View {
     @Environment(\.dismiss) private var dismiss
 
     let company: String
@@ -782,7 +782,7 @@ private struct InterviewReflectionView: View {
                             TextEditor(text: $notes)
                                 .frame(minHeight: 140)
                                 .padding(BoostaSpace.xs)
-                                .background(Color.white.opacity(0.65))
+                                .background(BoostaColor.surfaceInteractiveStrong)
                                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                         }
 

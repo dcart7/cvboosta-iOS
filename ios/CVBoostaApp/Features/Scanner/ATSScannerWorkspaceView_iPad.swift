@@ -275,7 +275,7 @@ struct ATSScannerWorkspaceView_iPad: View {
                 TextEditor(text: $viewModel.jobDescription)
                     .frame(minHeight: 150)
                     .padding(BoostaSpace.xs)
-                    .background(Color.white.opacity(0.65))
+                    .background(BoostaColor.surfaceInteractiveStrong)
                     .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
@@ -469,7 +469,7 @@ private struct WorkspaceActionButton: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
-                .background(isDisabled ? Color.white.opacity(0.35) : Color.white.opacity(0.55))
+                .background(isDisabled ? BoostaColor.surfaceDisabled : BoostaColor.surfaceInteractive)
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                         .stroke(BoostaColor.glassStroke, lineWidth: 1)
@@ -503,7 +503,7 @@ private struct ScannerPreviewCard: View {
         }
         .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
         .padding(BoostaSpace.sm)
-        .background(Color.white.opacity(0.55))
+        .background(BoostaColor.surfaceInteractive)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                 .stroke(BoostaColor.glassStroke, lineWidth: 1)

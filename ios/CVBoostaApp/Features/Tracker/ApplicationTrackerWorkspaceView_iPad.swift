@@ -297,7 +297,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                             .font(BoostaType.caption)
                             .padding(.horizontal, BoostaSpace.xs)
                             .padding(.vertical, BoostaSpace.xxs)
-                            .background(Color.white.opacity(0.65))
+                            .background(BoostaColor.surfaceInteractiveStrong)
                             .clipShape(Capsule())
                     }
                 }
@@ -690,7 +690,7 @@ private struct WorkspaceActionButton: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
-                .background(isDisabled ? Color.white.opacity(0.35) : Color.white.opacity(0.55))
+                .background(isDisabled ? BoostaColor.surfaceDisabled : BoostaColor.surfaceInteractive)
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                         .stroke(BoostaColor.glassStroke, lineWidth: 1)

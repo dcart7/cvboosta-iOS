@@ -305,7 +305,7 @@ private struct ResultInsightCard: View {
         }
         .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
         .padding(BoostaSpace.sm)
-        .background(Color.white.opacity(0.55))
+        .background(BoostaColor.surfaceInteractive)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                 .stroke(BoostaColor.glassStroke, lineWidth: 1)

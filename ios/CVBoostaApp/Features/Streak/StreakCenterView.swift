@@ -118,7 +118,7 @@ struct StreakCenterView: View {
                             Spacer()
                         }
                         .padding(BoostaSpace.sm)
-                        .background(Color.white.opacity(0.55))
+                        .background(BoostaColor.surfaceInteractive)
                         .overlay(
                             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                                 .stroke(BoostaColor.glassStroke, lineWidth: 1)
@@ -175,7 +175,7 @@ struct StreakCenterView: View {
                     HStack(spacing: BoostaSpace.sm) {
                         ZStack {
                             Circle()
-                                .fill(milestone.isReached ? milestone.tint.opacity(0.22) : Color.white.opacity(0.35))
+                                .fill(milestone.isReached ? milestone.tint.opacity(0.22) : BoostaColor.surfaceMuted)
                                 .frame(width: 38, height: 38)
                             Image(systemName: milestone.isReached ? "flame.fill" : "circle")
                                 .foregroundStyle(milestone.isReached ? milestone.tint : BoostaColor.secondaryText)
@@ -259,7 +259,7 @@ struct StreakCenterView: View {
                         }
                         .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
                         .padding(BoostaSpace.sm)
-                        .background(Color.white.opacity(0.55))
+                        .background(BoostaColor.surfaceInteractive)
                         .overlay(
                             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                                 .stroke(achievement.tint.opacity(0.35), lineWidth: 1)
@@ -379,6 +379,7 @@ struct StreakTodayAction: Identifiable {
 
 struct StreakSummary {
     let currentStreak: Int
+    let pendingStreak: Int
     let longestStreak: Int
     let weeklyActiveDays: Int
     let progressToNextMilestonePercent: Int
@@ -425,9 +426,13 @@ enum StreakEngine {
         let weeklyActiveDays = activeDays(inLast: 7, actionsByDay: actionsByDay, now: now, calendar: calendar)
         let monthlyActiveDays = activeDays(inLast: 30, actionsByDay: actionsByDay, now: now, calendar: calendar)
         let todayStamp = dayStamp(for: now)
-        let yesterdayStamp = dayStamp(for: calendar.date(byAdding: .day, value: -1, to: now) ?? now)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now) ?? now
+        let yesterdayStamp = dayStamp(for: yesterday)
         let todayProtected = actionsByDay[todayStamp] != nil
         let yesterdayProtected = actionsByDay[yesterdayStamp] != nil
+        let pendingStreak = !todayProtected && yesterdayProtected
+            ? streakLength(endingAt: yesterday, using: actionsByDay, calendar: calendar)
+            : 0
 
         let milestonesConfig: [(Int, String, String, Color)] = [
             (3, "Consistency Started", "You’ve begun the habit loop.", .orange),
@@ -549,6 +554,7 @@ enum StreakEngine {
 
         return StreakSummary(
             currentStreak: currentStreak,
+            pendingStreak: pendingStreak,
             longestStreak: longestStreak,
             weeklyActiveDays: weeklyActiveDays,
             progressToNextMilestonePercent: progressPercent,
@@ -741,7 +747,7 @@ private struct StreakProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.18), lineWidth: 12)
+                .stroke(BoostaColor.ringTrack, lineWidth: 12)
 
             Circle()
                 .trim(from: 0, to: animatedProgress)
@@ -800,7 +806,7 @@ private struct HeatmapGrid: View {
                         .overlay {
                             if day.isToday || selectedDay?.id == day.id {
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .stroke(selectedDay?.id == day.id ? BoostaColor.accent : Color.white.opacity(0.8), lineWidth: 1.5)
+                                    .stroke(selectedDay?.id == day.id ? BoostaColor.accent : BoostaColor.outlineStrong, lineWidth: 1.5)
                             }
                         }
                     }
@@ -810,7 +816,7 @@ private struct HeatmapGrid: View {
     }
 
     private func heatColor(for day: StreakHeatmapDay) -> Color {
-        if day.intensity == 0 { return Color.white.opacity(0.18) }
+        if day.intensity == 0 { return BoostaColor.heatmapEmpty }
         if day.intensity < 0.35 { return Color.orange.opacity(0.38) }
         if day.intensity < 0.7 { return Color.orange.opacity(0.6) }
         return Color.orange.opacity(0.9)

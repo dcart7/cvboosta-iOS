@@ -34,6 +34,16 @@ struct HomeView: View {
         authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
+    private var streakSummary: StreakSummary {
+        StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: trackedApplications,
+            manuallyProtectedDayStamps: []
+        )
+    }
+
     private func normalizedATSScore(_ raw: Int) -> Int {
         if raw > 100 {
             return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
@@ -64,18 +74,7 @@ struct HomeView: View {
     }
 
     private var streakDays: Int {
-        let calendar = Calendar.current
-        let uniqueDays = Set(scans.map { calendar.startOfDay(for: $0.createdAt) })
-        guard !uniqueDays.isEmpty else { return 0 }
-
-        var current = calendar.startOfDay(for: Date())
-        var streak = 0
-        while uniqueDays.contains(current) {
-            streak += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: current) else { break }
-            current = previous
-        }
-        return streak
+        streakSummary.currentStreak
     }
 
     private var trendScores: [Int] {
@@ -183,8 +182,21 @@ struct HomeView: View {
             .init(title: "Career Score", value: careerScore == 0 ? "—" : "\(careerScore)", tint: BoostaColor.accent),
             .init(title: "Momentum", value: momentumScore == 0 ? "—" : "\(momentumScore)", tint: BoostaColor.accentSecondary),
             .init(title: "Response Rate", value: responseRate == 0 ? "—" : "\(responseRate)%", tint: BoostaColor.success),
-            .init(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", tint: BoostaColor.accentSecondary, isStreak: true)
+            streakInsight
         ]
+    }
+
+    private var streakInsight: HomeInsight {
+        if streakSummary.currentStreak > 0 {
+            return .init(title: "Streak", value: "\(streakSummary.currentStreak)d", tint: BoostaColor.success, isStreak: true)
+        }
+        if streakSummary.pendingStreak > 0 {
+            return .init(title: "Protect Streak", value: "\(streakSummary.pendingStreak)d", tint: BoostaColor.warning, isStreak: true)
+        }
+        if streakSummary.canUseRecovery {
+            return .init(title: "Recover Streak", value: "Restore", tint: BoostaColor.warning, isStreak: true)
+        }
+        return .init(title: "Streak", value: "Start", tint: BoostaColor.accentSecondary, isStreak: true)
     }
 
     var body: some View {
@@ -326,7 +338,7 @@ struct HomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                            .stroke(BoostaColor.outlineSoft, lineWidth: 1)
                     )
                     .shadow(color: BoostaColor.accent.opacity(0.18), radius: 18, x: 0, y: 12)
                 }
@@ -550,6 +562,7 @@ struct HomeStatCard: View {
             Text(title)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(2)
 
             Spacer(minLength: 0)
 
@@ -568,7 +581,7 @@ struct HomeStatCard: View {
         }
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
         .padding(BoostaSpace.sm)
-        .background(Color.white.opacity(0.55))
+        .background(BoostaColor.surfaceInteractive)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                 .stroke(BoostaColor.glassStroke, lineWidth: 1)
@@ -603,7 +616,7 @@ private struct TodayActionRow: View {
             Spacer(minLength: 0)
         }
         .padding(BoostaSpace.sm)
-        .background(Color.white.opacity(0.55))
+        .background(BoostaColor.surfaceInteractive)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                 .stroke(BoostaColor.glassStroke, lineWidth: 1)

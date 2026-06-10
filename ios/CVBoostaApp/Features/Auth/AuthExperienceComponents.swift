@@ -259,7 +259,7 @@ struct AuthPrimaryNavigationButton<Destination: View>: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    .stroke(BoostaColor.outlineSoft, lineWidth: 1)
             )
             .shadow(color: BoostaColor.accent.opacity(0.24), radius: 18, x: 0, y: 12)
         }

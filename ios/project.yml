@@ -10,7 +10,9 @@ targets:
     type: application
     platform: iOS
     sources:
-      - CVBoostaApp
+      - path: CVBoostaApp
+        excludes:
+          - CVBOOSTA IOS ICON.icon
       - SharedWidgetSupport
     info:
       path: CVBoostaApp/Info.plist

@@ -208,7 +208,7 @@ struct ATSScannerView: View {
                 TextEditor(text: $viewModel.jobDescription)
                     .frame(minHeight: 130)
                     .padding(BoostaSpace.xs)
-                    .background(Color.white.opacity(0.65))
+                    .background(BoostaColor.surfaceInteractiveStrong)
                     .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
@@ -456,7 +456,7 @@ private struct ReviewMetricCard: View {
         }
         .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
         .padding(BoostaSpace.sm)
-        .background(Color.white.opacity(0.55))
+        .background(BoostaColor.surfaceInteractive)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                 .stroke(BoostaColor.glassStroke, lineWidth: 1)

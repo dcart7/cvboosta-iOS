@@ -16,8 +16,8 @@ struct GlassCard<Content: View>: View {
             .background(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.16),
-                        Color.white.opacity(0.04)
+                        BoostaColor.glassHighlightStrong,
+                        BoostaColor.glassHighlight
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing

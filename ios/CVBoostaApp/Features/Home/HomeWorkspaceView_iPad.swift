@@ -36,6 +36,16 @@ struct HomeWorkspaceView_iPad: View {
         authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
+    private var streakSummary: StreakSummary {
+        StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: trackedApplications,
+            manuallyProtectedDayStamps: []
+        )
+    }
+
     private func normalizedATSScore(_ raw: Int) -> Int {
         if raw > 100 {
             return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
@@ -110,14 +120,17 @@ struct HomeWorkspaceView_iPad: View {
         return Array(items.prefix(3))
     }
 
-    private var streakCount: Int {
-        StreakEngine.build(
-            now: .now,
-            user: authViewModel.me?.user,
-            scans: authViewModel.me?.scanHistory ?? [],
-            applications: trackedApplications,
-            manuallyProtectedDayStamps: []
-        ).currentStreak
+    private var streakInsight: (title: String, value: String, tint: Color) {
+        if streakSummary.currentStreak > 0 {
+            return ("Streak", "\(streakSummary.currentStreak)d", BoostaColor.success)
+        }
+        if streakSummary.pendingStreak > 0 {
+            return ("Protect Streak", "\(streakSummary.pendingStreak)d", BoostaColor.warning)
+        }
+        if streakSummary.canUseRecovery {
+            return ("Recover Streak", "Restore", BoostaColor.warning)
+        }
+        return ("Streak", "Start", BoostaColor.accentSecondary)
     }
 
     var body: some View {
@@ -280,7 +293,7 @@ struct HomeWorkspaceView_iPad: View {
                     Button {
                         showStreakCenter = true
                     } label: {
-                        HomeStatCard(title: "Streak", value: streakCount == 0 ? "Start" : "\(streakCount)d", color: BoostaColor.success, icon: "flame.fill")
+                        HomeStatCard(title: streakInsight.title, value: streakInsight.value, color: streakInsight.tint, icon: "flame.fill")
                     }
                     .buttonStyle(.plain)
                 }
@@ -327,7 +340,7 @@ struct HomeWorkspaceView_iPad: View {
                         Spacer(minLength: 0)
                     }
                     .padding(BoostaSpace.sm)
-                    .background(Color.white.opacity(0.55))
+                    .background(BoostaColor.surfaceInteractive)
                     .overlay(
                         RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                             .stroke(BoostaColor.glassStroke, lineWidth: 1)
@@ -472,7 +485,7 @@ private struct WorkspaceCTAButton: View {
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity)
-                .background(Color.white.opacity(0.55))
+                .background(BoostaColor.surfaceInteractive)
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                         .stroke(BoostaColor.glassStroke, lineWidth: 1)

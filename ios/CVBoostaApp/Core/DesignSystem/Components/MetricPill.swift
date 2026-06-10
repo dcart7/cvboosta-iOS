@@ -17,7 +17,7 @@ struct MetricPill: View {
         }
         .padding(.horizontal, BoostaSpace.sm)
         .padding(.vertical, BoostaSpace.xs)
-        .background(Color.white.opacity(0.55))
+        .background(BoostaColor.surfaceInteractive)
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.sm, style: .continuous))
     }
 }

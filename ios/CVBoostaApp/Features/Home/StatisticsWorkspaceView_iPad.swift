@@ -807,7 +807,7 @@ private struct WorkspaceActionButton: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
-                .background(Color.white.opacity(0.55))
+                .background(BoostaColor.surfaceInteractive)
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                         .stroke(BoostaColor.glassStroke, lineWidth: 1)
@@ -880,7 +880,7 @@ private struct StatisticsMetricRing_iPad: View {
         VStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.16), lineWidth: 10)
+                    .stroke(BoostaColor.ringTrack, lineWidth: 10)
 
                 Circle()
                     .trim(from: 0, to: animatedProgress)

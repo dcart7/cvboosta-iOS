@@ -34,7 +34,7 @@ struct PrimaryButton: View {
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.22), .clear],
+                            colors: [BoostaColor.glassHighlightStrong, .clear],
                             startPoint: .topLeading,
                             endPoint: .center
                         )
@@ -46,7 +46,7 @@ struct PrimaryButton: View {
         .foregroundStyle(.white)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                .stroke(Color.white.opacity(isDisabled ? 0.08 : 0.18), lineWidth: 1)
+                .stroke(isDisabled ? BoostaColor.glassHighlight : BoostaColor.outlineSoft, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         .shadow(color: BoostaColor.accent.opacity(isDisabled ? 0 : 0.22), radius: 18, x: 0, y: 12)
@@ -72,7 +72,7 @@ struct SecondaryButton: View {
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.14), .clear],
+                                colors: [BoostaColor.glassHighlight, .clear],
                                 startPoint: .topLeading,
                                 endPoint: .center
                             )
@@ -162,7 +162,7 @@ struct ScoreRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.35), lineWidth: lineWidth)
+                .stroke(BoostaColor.ringTrack, lineWidth: lineWidth)
 
             Circle()
                 .trim(from: 0, to: animatedProgress)

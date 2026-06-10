@@ -793,7 +793,7 @@ private struct StatisticsMetricRing: View {
         VStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.16), lineWidth: 10)
+                    .stroke(BoostaColor.ringTrack, lineWidth: 10)
 
                 Circle()
                     .trim(from: 0, to: animatedProgress)

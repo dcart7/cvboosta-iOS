@@ -67,7 +67,7 @@ struct iPadWorkspaceView: View {
         .hoverEffect(.highlight)
         .listRowBackground(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                .fill(appRouter.selectedTab == tab ? Color.white.opacity(0.72) : Color.clear)
+                .fill(appRouter.selectedTab == tab ? BoostaColor.surfaceInteractiveStrong : Color.clear)
         )
         .accessibilityLabel(title)
     }
