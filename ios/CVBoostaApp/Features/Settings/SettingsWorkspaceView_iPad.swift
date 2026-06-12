@@ -249,16 +249,16 @@ struct SettingsWorkspaceView_iPad: View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "App")
-                infoRow("Support", value: "support@cvboosta.com")
+                infoRow("Support", value: AppEnvironment.supportEmail)
                 infoRow("Version", value: "1.0")
 
                 SecondaryButton(title: "Open Privacy Policy") {
-                    openURL(AppEnvironment.webBaseURL.appending(path: "privacy-policy"))
+                    openURL(AppEnvironment.privacyPolicyURL)
                 }
                 .hoverEffect(.highlight)
 
                 SecondaryButton(title: "Open Terms of Service") {
-                    openURL(AppEnvironment.webBaseURL.appending(path: "terms-of-service"))
+                    openURL(AppEnvironment.termsOfServiceURL)
                 }
                 .hoverEffect(.highlight)
 

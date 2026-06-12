@@ -360,10 +360,15 @@ struct ATSScannerView: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.success)
                 } else {
+                    let purchasedCredits = subscriptionService.scanCreditBalance
                     let usageText = if let remaining = authViewModel.me?.usageLimits.scansRemainingToday {
-                        "Free plan optimizations remaining today: \(remaining)/1"
+                        purchasedCredits > 0
+                            ? "Optimizations available now: \(remaining + purchasedCredits) (\(remaining) free, \(purchasedCredits) purchased)"
+                            : "Free plan optimizations remaining today: \(remaining)/1"
                     } else {
-                        "Free plan includes 1 optimization per day"
+                        purchasedCredits > 0
+                            ? "Free plan includes 1 optimization per day + \(purchasedCredits) purchased scan credit(s)"
+                            : "Free plan includes 1 optimization per day"
                     }
 
                     Text(usageText)

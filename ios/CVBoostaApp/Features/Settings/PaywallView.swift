@@ -25,15 +25,14 @@ struct PaywallView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
-    @State private var restoreMessage: String?
 
     let context: PaywallPresentationContext
 
-    private let plans: [WebsitePlan] = [
-        .init(title: "Single Scan", badge: "Pay as you go", price: 1.15, cadence: "one-time", features: ["1 ATS scan", "Quick recruiter visibility check"], accent: BoostaColor.warning),
-        .init(title: "Go", badge: "Most flexible", price: 9.20, cadence: "/ month", features: ["Unlimited ATS scans", "ATS score + keyword gaps", "Resume optimization preview"], accent: BoostaColor.accent),
-        .init(title: "Pro", badge: "Best value", price: 23.00, cadence: "/ month", features: ["Everything in Go", "Tailoring workspace", "Deeper analytics + AI insights", "Priority web studio access"], accent: BoostaColor.success),
-        .init(title: "Lifetime", badge: "One payment", price: 137.99, cadence: "once", features: ["Permanent CVBoosta access", "All premium ATS + tailoring tools", "No renewals"], accent: BoostaColor.accentSecondary)
+    private let plans: [AppStorePlan] = [
+        .init(title: "Single Scan", badge: "Pay as you go", productID: AppEnvironment.appStoreSingleScanProductID, fallbackPrice: 1.00, cadence: "one-time", ctaTitle: "Buy", features: ["1 ATS scan", "Quick recruiter visibility check"], accent: BoostaColor.warning),
+        .init(title: "Go", badge: "Most flexible", productID: AppEnvironment.appStoreGoMonthlyProductID, fallbackPrice: 10.00, cadence: "/ month", ctaTitle: "Subscribe", features: ["Unlimited ATS scans", "ATS score + keyword gaps", "Resume optimization preview"], accent: BoostaColor.accent),
+        .init(title: "Pro", badge: "Best value", productID: AppEnvironment.appStoreProMonthlyProductID, fallbackPrice: 25.00, cadence: "/ month", ctaTitle: "Subscribe", features: ["Everything in Go", "Tailoring workspace", "Deeper analytics + AI insights", "Priority web studio access"], accent: BoostaColor.success),
+        .init(title: "Lifetime", badge: "One payment", productID: AppEnvironment.appStoreLifetimeProductID, fallbackPrice: 150.00, cadence: "once", ctaTitle: "Unlock", features: ["Permanent CVBoosta access", "All premium ATS + tailoring tools", "No renewals"], accent: BoostaColor.accentSecondary)
     ]
 
     init(context: PaywallPresentationContext = .standard) {
@@ -57,15 +56,15 @@ struct PaywallView: View {
                     plansCard
 
                     PrimaryButton(title: primaryCTA) {
-                        // Payments and plan management live on the website.
-                        openURL(AppEnvironment.webBaseURL)
+                        Task {
+                            await handlePrimaryCTA()
+                        }
                     }
 
-                    SecondaryButton(title: "Restore Purchases") {
+                    SecondaryButton(title: subscriptionService.isRestoringStorePurchases ? "Restoring..." : "Restore Purchases", isDisabled: subscriptionService.isRestoringStorePurchases || subscriptionService.isLoadingStoreProducts) {
                         Task {
                             await subscriptionService.restorePurchases()
                             await authViewModel.refreshSharedState()
-                            restoreMessage = subscriptionService.isPremium ? "Purchases restored." : "No purchases found."
                         }
                     }
 
@@ -73,16 +72,25 @@ struct PaywallView: View {
                         dismiss()
                     }
 
-                    if let restoreMessage {
-                        Text(restoreMessage)
+                    if let storeStatusMessage = subscriptionService.storeStatusMessage {
+                        Text(storeStatusMessage)
                             .font(BoostaType.caption)
                             .foregroundStyle(BoostaColor.secondaryText)
+                    }
+
+                    if let storeErrorMessage = subscriptionService.storeErrorMessage {
+                        Text(storeErrorMessage)
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.warning)
                     }
                 }
                 .padding(BoostaSpace.md)
             }
         }
         .navigationTitle("Premium")
+        .task {
+            await subscriptionService.prepareStore()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Close") {
@@ -148,9 +156,15 @@ struct PaywallView: View {
                     planRow(plan)
                 }
 
-                Text("Website reference: Single Scan $1, Go $8/mo, Pro $20/mo, Lifetime $119.99. iOS prices shown here are +15%.")
+                Text("App Store pricing: Single Scan $1, Go $10/mo, Pro $25/mo, Lifetime $150.")
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
+
+                if subscriptionService.isLoadingStoreProducts {
+                    Text("Loading App Store products…")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                }
             }
         }
     }
@@ -161,7 +175,7 @@ struct PaywallView: View {
             .foregroundStyle(BoostaColor.primaryText)
     }
 
-    private func planRow(_ plan: WebsitePlan) -> some View {
+    private func planRow(_ plan: AppStorePlan) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: BoostaSpace.sm) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -181,7 +195,7 @@ struct PaywallView: View {
                 Spacer()
 
                 HStack(spacing: 2) {
-                    Text(plan.price, format: .currency(code: "USD"))
+                    Text(subscriptionService.displayPrice(for: plan.productID, fallback: plan.fallbackPrice))
                         .font(BoostaType.bodyStrong)
                     Text(plan.cadence)
                         .font(BoostaType.caption)
@@ -189,7 +203,33 @@ struct PaywallView: View {
                 }
             }
             .padding(.vertical, 6)
+
+            Button {
+                Task {
+                    await subscriptionService.purchase(productID: plan.productID)
+                    await authViewModel.refreshSharedState()
+                }
+            } label: {
+                Text(subscriptionService.isProductAvailable(plan.productID) ? subscriptionService.purchaseButtonTitle(for: plan.productID) : "Unavailable")
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(subscriptionService.isProductAvailable(plan.productID) ? plan.accent : BoostaColor.surfaceDisabled)
+                    .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(!subscriptionService.isProductAvailable(plan.productID) || subscriptionService.purchaseInFlightProductID != nil || subscriptionService.isRestoringStorePurchases)
         }
+    }
+
+    private func handlePrimaryCTA() async {
+        if subscriptionService.isPremium {
+            await subscriptionService.openManageSubscriptions()
+            return
+        }
+
+        openURL(AppEnvironment.webBaseURL)
     }
 
     private var heroTitle: String {
@@ -208,7 +248,7 @@ struct PaywallView: View {
     private var heroSubtitle: String {
         switch context {
         case .standard:
-            return "App pricing is set 15% above the website while account access, ATS logic, and subscription status stay shared."
+            return "Choose the App Store plan that fits you best while keeping the same CVBoosta account, ATS logic, and synced history."
         case .postLogin:
             return "Free already works well. Premium simply removes the daily cap and opens deeper ATS and tailoring output."
         case .postRegister:
@@ -259,11 +299,11 @@ struct PaywallView: View {
     private var primaryCTA: String {
         switch context {
         case .optimizationLimit:
-            return "Keep optimizing today"
+            return subscriptionService.isPremium ? "Manage App Store Plan" : "Open Website Dashboard"
         case .postLogin, .postRegister:
-            return "See Premium plans"
+            return subscriptionService.isPremium ? "Manage App Store Plan" : "Open Website Dashboard"
         case .standard:
-            return "Continue"
+            return subscriptionService.isPremium ? "Manage App Store Plan" : "Open Website Dashboard"
         }
     }
 
@@ -307,12 +347,14 @@ struct PaywallView: View {
     }
 }
 
-private struct WebsitePlan: Identifiable {
+private struct AppStorePlan: Identifiable {
     let id = UUID()
     let title: String
     let badge: String
-    let price: Double
+    let productID: String
+    let fallbackPrice: Double
     let cadence: String
+    let ctaTitle: String
     let features: [String]
     let accent: Color
 }

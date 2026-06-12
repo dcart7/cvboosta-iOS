@@ -173,14 +173,14 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "App")
                 row("Version", value: "1.0")
-                row("Contact Support", value: "support@cvboosta.com")
+                row("Contact Support", value: AppEnvironment.supportEmail)
 
                 SecondaryButton(title: "Open Privacy Policy") {
-                    openURL(AppEnvironment.webBaseURL.appending(path: "privacy-policy"))
+                    openURL(AppEnvironment.privacyPolicyURL)
                 }
 
                 SecondaryButton(title: "Open Terms of Service") {
-                    openURL(AppEnvironment.webBaseURL.appending(path: "terms-of-service"))
+                    openURL(AppEnvironment.termsOfServiceURL)
                 }
 
                 SecondaryButton(title: "Open Website Dashboard") {

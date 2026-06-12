@@ -125,14 +125,14 @@ final class ResumeAPIService: ResumeAPIServiceProtocol {
 
         async let cvAnalysis: AnalyzeCvResponse = apiClient.postJSON(
             path: "/analyze/cv",
-            body: AnalyzeCvRequest(cvText: cvText)
+           body: AnalyzeCvRequest(cvText: cvText)
         )
 
         async let jobAnalysis: AnalyzeJobResponse = apiClient.postJSON(
             path: "/analyze/job",
             body: AnalyzeJobRequest(jobText: jobText)
         )
-
+    
         let optimize = OptimizeRequest(
             cvText: cvText,
             jobText: jobText,

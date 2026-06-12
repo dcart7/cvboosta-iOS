@@ -63,6 +63,42 @@ enum AppEnvironment {
         return URL(string: "https://cvboosta.com")!
     }
 
+    static var privacyPolicyURL: URL {
+        URL(string: "https://cvboosta.com/privacy")!
+    }
+
+    static var termsOfServiceURL: URL {
+        URL(string: "https://cvboosta.com/terms")!
+    }
+
+    static var supportEmail: String {
+        "support@virelsolutions.com"
+    }
+
+    static var appStoreSubscriptionGroupName: String {
+        "CVBoosta Premium"
+    }
+
+    static var appStoreGoMonthlyProductID: String {
+        "com.cvboosta.app.go.monthly"
+    }
+
+    static var appStoreProMonthlyProductID: String {
+        "com.cvboosta.app.pro.monthly"
+    }
+
+    static var appStoreLifetimeProductID: String {
+        "com.cvboosta.app.lifetime"
+    }
+
+    static var appStoreSingleScanProductID: String {
+        "com.cvboosta.app.single_scan"
+    }
+
+    static var appStoreTransactionSyncPath: String {
+        "/billing/app-store/sync"
+    }
+
     static var appBundleIdentifierPlaceholder: String {
         (Bundle.main.object(forInfoDictionaryKey: "APP_BUNDLE_ID_PLACEHOLDER") as? String) ?? "com.cvboosta.app"
     }

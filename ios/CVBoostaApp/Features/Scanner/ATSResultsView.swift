@@ -20,7 +20,6 @@ struct ATSResultsView: View {
                 recommendationsCard
                 missingSkillsCard
                 optimizedCVCard
-                feedbackCard
                 actionsCard
             }
             .padding(BoostaSpace.md)
@@ -177,18 +176,6 @@ struct ATSResultsView: View {
                         appRouter.open(.tailoring)
                     }
                 }
-            }
-        }
-    }
-
-    private var feedbackCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Feedback")
-                Text(result.response.feedback)
-                    .font(BoostaType.body)
-                    .foregroundStyle(BoostaColor.secondaryText)
-                    .textSelection(.enabled)
             }
         }
     }

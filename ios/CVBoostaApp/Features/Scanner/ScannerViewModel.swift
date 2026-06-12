@@ -168,15 +168,25 @@ final class ScannerViewModel: ObservableObject {
             return scanLimitService.status(isPremium: true)
         }
 
+        let purchasedCredits = subscriptionService.scanCreditBalance
+
         if let backendRemaining {
+            let totalRemaining = max(backendRemaining, 0) + purchasedCredits
             return ScanLimitStatus(
-                canScan: backendRemaining > 0,
-                scansRemaining: max(backendRemaining, 0),
+                canScan: totalRemaining > 0,
+                scansRemaining: totalRemaining,
                 resetDate: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: .now)) ?? .now
             )
         }
 
-        return scanLimitService.status(isPremium: false)
+        let freeStatus = scanLimitService.status(isPremium: false)
+        let totalRemaining = freeStatus.scansRemaining + purchasedCredits
+
+        return ScanLimitStatus(
+            canScan: totalRemaining > 0,
+            scansRemaining: totalRemaining,
+            resetDate: freeStatus.resetDate
+        )
     }
 
     private func runScan(pdfURL: URL, role: String) async {
@@ -243,8 +253,14 @@ final class ScannerViewModel: ObservableObject {
         if let scanResult {
             widgetSyncService.mergeLatestScan(result: scanResult)
         }
-        scanLimitService.recordScan(isPremium: subscriptionService.isPremium)
-        subscriptionService.consumeFreeOptimizationIfNeeded()
+
+        let fallbackFreeRemaining = scanLimitService.status(isPremium: false).scansRemaining
+        if subscriptionService.shouldUseConsumableScanCredit(fallbackFreeRemaining: fallbackFreeRemaining) {
+            subscriptionService.consumeConsumableScanCredit()
+        } else {
+            scanLimitService.recordScan(isPremium: subscriptionService.isPremium)
+            subscriptionService.consumeFreeOptimizationIfNeeded()
+        }
 
         isScanning = false
         progressMessage = "Ready"

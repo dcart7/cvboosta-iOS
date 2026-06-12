@@ -321,10 +321,15 @@ struct ATSScannerWorkspaceView_iPad: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.success)
                 } else {
+                    let purchasedCredits = subscriptionService.scanCreditBalance
                     let usageText = if let remaining = authViewModel.me?.usageLimits.scansRemainingToday {
-                        "Free plan optimizations remaining today: \(remaining)/1"
+                        purchasedCredits > 0
+                            ? "Optimizations available now: \(remaining + purchasedCredits) (\(remaining) free, \(purchasedCredits) purchased)"
+                            : "Free plan optimizations remaining today: \(remaining)/1"
                     } else {
-                        "Free plan includes 1 optimization per day"
+                        purchasedCredits > 0
+                            ? "Free plan includes 1 optimization per day + \(purchasedCredits) purchased scan credit(s)"
+                            : "Free plan includes 1 optimization per day"
                     }
 
                     Text(usageText)
@@ -541,9 +546,6 @@ private struct ATSResultsPanel_iPad: View {
 
                 optimizedCVCard
                     .gridCellColumns(columnCount)
-
-                feedbackCard
-                    .gridCellColumns(columnCount)
             }
             .onAppear {
                 persistLatestScanIfNeeded()
@@ -682,18 +684,6 @@ private struct ATSResultsPanel_iPad: View {
                     }
                     .hoverEffect(.highlight)
                 }
-            }
-        }
-    }
-
-    private var feedbackCard: some View {
-        GlassCard(padding: BoostaSpace.lg) {
-            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Feedback")
-                Text(result.response.feedback)
-                    .font(BoostaType.body)
-                    .foregroundStyle(BoostaColor.secondaryText)
-                    .textSelection(.enabled)
             }
         }
     }
