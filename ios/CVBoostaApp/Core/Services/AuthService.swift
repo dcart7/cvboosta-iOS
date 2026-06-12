@@ -105,6 +105,20 @@ private struct ForgotPasswordPayload: Encodable {
     let email: String
 }
 
+private struct OAuthLoginRequestPayload: Encodable {
+    let idToken: String?
+    let accessToken: String?
+    let fullName: String?
+    let email: String?
+
+    enum CodingKeys: String, CodingKey {
+        case idToken = "id_token"
+        case accessToken = "access_token"
+        case fullName = "full_name"
+        case email
+    }
+}
+
 private struct HistoryResponse: Decodable {
     let items: [HistoryItem]
 }
@@ -183,6 +197,18 @@ actor AuthService {
         )
         _ = try await apiClient.postJSON(path: "/auth/forgot-password", body: payload) as [String: JSONValue]
         return "If the email exists, password reset instructions were sent."
+    }
+
+    func signInWithApple(idToken: String, displayName: String?, email: String?) async throws -> AuthMePayload {
+        let payload = OAuthLoginRequestPayload(
+            idToken: idToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            accessToken: nil,
+            fullName: displayName?.trimmingCharacters(in: .whitespacesAndNewlines),
+            email: email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        )
+        let response: AuthResponse = try await apiClient.postJSON(path: "/auth/oauth/apple", body: payload)
+        try saveSession(from: response)
+        return try await fetchCurrentUserState()
     }
 
     func fetchCurrentUserState() async throws -> AuthMePayload {

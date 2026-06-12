@@ -2,13 +2,15 @@ import Foundation
 import UIKit
 import UserNotifications
 
-private struct APNSRegisterRequest: Encodable {
+private struct APNSDeviceTokenRequest: Encodable {
     let token: String
     let bundleId: String
+    let apnsEnvironment: String
 
     enum CodingKeys: String, CodingKey {
         case token
         case bundleId = "bundle_id"
+        case apnsEnvironment = "apns_environment"
     }
 }
 
@@ -73,6 +75,7 @@ final class PushNotificationService: NSObject {
         defaults.set(isEnabled, forKey: AppPreferenceKeys.notificationsEnabled)
 
         guard isEnabled else {
+            await deactivateCurrentTokenIfPossible()
             UIApplication.shared.unregisterForRemoteNotifications()
             return
         }
@@ -113,6 +116,21 @@ final class PushNotificationService: NSObject {
         _ = error
     }
 
+    func deactivateCurrentTokenIfPossible() async {
+        guard let path = apnsDeactivatePath else { return }
+        guard let requestBody = currentRequestBody() else { return }
+
+        do {
+            let _: APNSRegisterResponse = try await client.postJSON(
+                path: path,
+                body: requestBody
+            )
+            defaults.removeObject(forKey: lastSentTokenKey)
+        } catch {
+            // Best effort. We retry the normal registration flow on the next login/enable.
+        }
+    }
+
     func syncIfPossible() async {
         guard notificationsEnabled else { return }
 
@@ -136,10 +154,13 @@ final class PushNotificationService: NSObject {
         guard lastSent != token else { return }
 
         do {
-            let bundleId = Bundle.main.bundleIdentifier ?? AppEnvironment.appBundleIdentifierPlaceholder
             let _: APNSRegisterResponse = try await client.postJSON(
                 path: path,
-                body: APNSRegisterRequest(token: token, bundleId: bundleId)
+                body: APNSDeviceTokenRequest(
+                    token: token,
+                    bundleId: Bundle.main.bundleIdentifier ?? AppEnvironment.appBundleIdentifierPlaceholder,
+                    apnsEnvironment: AppEnvironment.apnsEnvironment.rawValue
+                )
             )
             defaults.set(token, forKey: lastSentTokenKey)
         } catch {
@@ -172,5 +193,27 @@ private extension PushNotificationService {
         }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    var apnsDeactivatePath: String? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "APNS_DEACTIVATE_PATH") as? String else {
+            return nil
+        }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func currentRequestBody() -> APNSDeviceTokenRequest? {
+        guard let token = defaults.string(forKey: tokenStorageKey),
+              !token.isEmpty
+        else {
+            return nil
+        }
+
+        return APNSDeviceTokenRequest(
+            token: token,
+            bundleId: Bundle.main.bundleIdentifier ?? AppEnvironment.appBundleIdentifierPlaceholder,
+            apnsEnvironment: AppEnvironment.apnsEnvironment.rawValue
+        )
     }
 }

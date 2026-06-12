@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct AuthBackgroundView: View {
@@ -300,5 +301,83 @@ struct AuthSecondaryNavigationButton<Destination: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct AuthSectionDivider: View {
+    let title: String
+
+    var body: some View {
+        HStack(spacing: BoostaSpace.sm) {
+            Rectangle()
+                .fill(BoostaColor.outlineSoft)
+                .frame(height: 1)
+
+            Text(title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.tertiaryText)
+
+            Rectangle()
+                .fill(BoostaColor.outlineSoft)
+                .frame(height: 1)
+        }
+    }
+}
+
+struct AppleSignInActionButton: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
+    let label: SignInWithAppleButton.Label
+
+    var body: some View {
+        SignInWithAppleButton(label, onRequest: configure, onCompletion: handleCompletion)
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 52)
+            .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+            .opacity(authViewModel.isSubmitting ? 0.72 : 1)
+            .disabled(authViewModel.isSubmitting)
+    }
+
+    private func configure(_ request: ASAuthorizationAppleIDRequest) {
+        request.requestedScopes = [.fullName, .email]
+    }
+
+    private func handleCompletion(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                authViewModel.errorMessage = "Apple sign-in returned an unsupported credential."
+                return
+            }
+
+            guard let tokenData = credential.identityToken,
+                  let idToken = String(data: tokenData, encoding: .utf8),
+                  !idToken.isEmpty
+            else {
+                authViewModel.errorMessage = "Apple sign-in did not return a valid identity token."
+                return
+            }
+
+            Task {
+                await authViewModel.signInWithApple(
+                    idToken: idToken,
+                    displayName: formattedDisplayName(from: credential.fullName),
+                    email: credential.email
+                )
+            }
+        case .failure(let error):
+            if let authorizationError = error as? ASAuthorizationError,
+               authorizationError.code == .canceled {
+                return
+            }
+            authViewModel.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func formattedDisplayName(from components: PersonNameComponents?) -> String? {
+        guard let components else { return nil }
+        let formatter = PersonNameComponentsFormatter()
+        let value = formatter.string(from: components).trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 }

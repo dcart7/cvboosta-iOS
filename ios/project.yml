@@ -25,6 +25,8 @@ targets:
         WEB_BASE_URL: https://cvboosta.com
         APP_ENV: production
         APP_BUNDLE_ID_PLACEHOLDER: com.cvboosta.app
+        APNS_DEACTIVATE_PATH: /devices/apns/deactivate
+        APNS_ENVIRONMENT: $(APS_ENVIRONMENT)
         APNS_REGISTER_PATH: /devices/apns
         NSFaceIDUsageDescription: Face ID protects sensitive career data and exported documents.
         NSSupportsLiveActivities: true

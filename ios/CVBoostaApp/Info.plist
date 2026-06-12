@@ -8,6 +8,10 @@
 	<string>production</string>
 	<key>APP_BUNDLE_ID_PLACEHOLDER</key>
 	<string>com.cvboosta.app</string>
+	<key>APNS_DEACTIVATE_PATH</key>
+	<string>/devices/apns/deactivate</string>
+	<key>APNS_ENVIRONMENT</key>
+	<string>$(APS_ENVIRONMENT)</string>
 	<key>APNS_REGISTER_PATH</key>
 	<string>/devices/apns</string>
 	<key>CFBundleDevelopmentRegion</key>

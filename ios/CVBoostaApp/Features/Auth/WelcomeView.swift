@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct WelcomeView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -63,6 +65,8 @@ struct WelcomeView: View {
 
     private var actionSection: some View {
         VStack(spacing: BoostaSpace.sm) {
+            AppleSignInActionButton(label: .continue)
+
             AuthPrimaryNavigationButton(title: "Check ATS Score") {
                 RegisterView()
             }
@@ -72,6 +76,10 @@ struct WelcomeView: View {
                 systemImage: "person.crop.circle.badge.checkmark"
             ) {
                 LoginView()
+            }
+
+            if let errorMessage = authViewModel.errorMessage {
+                ErrorBanner(message: errorMessage)
             }
         }
     }

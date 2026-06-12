@@ -211,6 +211,10 @@ struct RegisterView: View {
                     }
                 }
 
+                AuthSectionDivider(title: "or")
+
+                AppleSignInActionButton(label: .signUp)
+
                 if let errorMessage = authViewModel.errorMessage {
                     ErrorBanner(message: errorMessage)
                 }

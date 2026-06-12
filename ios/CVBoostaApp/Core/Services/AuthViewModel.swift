@@ -95,6 +95,17 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    func signInWithApple(idToken: String, displayName: String?, email: String?) async {
+        await submit { [self] in
+            let snapshot = try await self.authService.signInWithApple(
+                idToken: idToken,
+                displayName: displayName,
+                email: email
+            )
+            self.applyAuthenticatedState(snapshot, freshAuthEvent: .login)
+        }
+    }
+
     func refreshSharedState() async {
         guard state == .loggedIn else { return }
         await submit { [self] in
@@ -104,6 +115,7 @@ final class AuthViewModel: ObservableObject {
     }
 
     func logout() async {
+        await pushNotificationService.deactivateCurrentTokenIfPossible()
         await authService.logout()
         applyLoggedOutState()
     }

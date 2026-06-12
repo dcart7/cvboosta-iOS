@@ -9,6 +9,11 @@ enum AppEnvironment {
         case production
     }
 
+    enum APNSEnvironment: String {
+        case sandbox
+        case production
+    }
+
     static var mode: Mode {
         if let env = ProcessInfo.processInfo.environment["CVBOOSTA_ENV"],
            let value = Mode(rawValue: env.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) {
@@ -62,6 +67,24 @@ enum AppEnvironment {
         (Bundle.main.object(forInfoDictionaryKey: "APP_BUNDLE_ID_PLACEHOLDER") as? String) ?? "com.cvboosta.app"
     }
 
+    static var apnsEnvironment: APNSEnvironment {
+        if let value = ProcessInfo.processInfo.environment["APNS_ENVIRONMENT"],
+           let environment = resolvedAPNSEnvironment(from: value) {
+            return environment
+        }
+
+        if let value = Bundle.main.object(forInfoDictionaryKey: "APNS_ENVIRONMENT") as? String,
+           let environment = resolvedAPNSEnvironment(from: value) {
+            return environment
+        }
+
+        #if DEBUG
+        return .sandbox
+        #else
+        return .production
+        #endif
+    }
+
     private static func resolvedAPIOverride() -> URL? {
         if let env = ProcessInfo.processInfo.environment["API_BASE_URL"]?.trimmingCharacters(in: .whitespacesAndNewlines),
            let url = URL(string: env),
@@ -92,6 +115,17 @@ enum AppEnvironment {
                 return productionAPIURL
             }
             return candidate
+        }
+    }
+
+    private static func resolvedAPNSEnvironment(from rawValue: String) -> APNSEnvironment? {
+        switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "development", "sandbox":
+            return .sandbox
+        case "production":
+            return .production
+        default:
+            return nil
         }
     }
 }

@@ -86,6 +86,10 @@ struct LoginView: View {
                                 }
                             }
 
+                            AuthSectionDivider(title: "or")
+
+                            AppleSignInActionButton(label: .signIn)
+
                             if let errorMessage = authViewModel.errorMessage {
                                 ErrorBanner(message: errorMessage)
                             }
