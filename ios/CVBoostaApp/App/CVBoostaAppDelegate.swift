@@ -8,6 +8,9 @@ final class CVBoostaAppDelegate: NSObject, UIApplicationDelegate {
         configureTabBarAppearance()
         Task { @MainActor in
             PushNotificationService.shared.configure()
+            if #available(iOS 16.1, *) {
+                LiveActivityManager.shared.configure()
+            }
         }
         return true
     }

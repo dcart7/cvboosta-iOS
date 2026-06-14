@@ -13,6 +13,7 @@ targets:
       - path: CVBoostaApp
         excludes:
           - CVBOOSTA IOS ICON.icon
+          - CVBOOSTA IOS ICON 2.icon
       - SharedWidgetSupport
     info:
       path: CVBoostaApp/Info.plist
@@ -28,6 +29,10 @@ targets:
         APNS_DEACTIVATE_PATH: /devices/apns/deactivate
         APNS_ENVIRONMENT: $(APS_ENVIRONMENT)
         APNS_REGISTER_PATH: /devices/apns
+        LIVE_ACTIVITY_DEACTIVATE_PATH: /live-activities/apns/deactivate
+        LIVE_ACTIVITY_PUSH_TO_START_DEACTIVATE_PATH: /live-activities/apns/push-to-start/deactivate
+        LIVE_ACTIVITY_PUSH_TO_START_REGISTER_PATH: /live-activities/apns/push-to-start
+        LIVE_ACTIVITY_REGISTER_PATH: /live-activities/apns
         NSFaceIDUsageDescription: Face ID protects sensitive career data and exported documents.
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true

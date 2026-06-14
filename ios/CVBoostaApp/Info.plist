@@ -14,6 +14,14 @@
 	<string>$(APS_ENVIRONMENT)</string>
 	<key>APNS_REGISTER_PATH</key>
 	<string>/devices/apns</string>
+	<key>LIVE_ACTIVITY_DEACTIVATE_PATH</key>
+	<string>/live-activities/apns/deactivate</string>
+	<key>LIVE_ACTIVITY_PUSH_TO_START_DEACTIVATE_PATH</key>
+	<string>/live-activities/apns/push-to-start/deactivate</string>
+	<key>LIVE_ACTIVITY_PUSH_TO_START_REGISTER_PATH</key>
+	<string>/live-activities/apns/push-to-start</string>
+	<key>LIVE_ACTIVITY_REGISTER_PATH</key>
+	<string>/live-activities/apns</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

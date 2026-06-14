@@ -116,6 +116,9 @@ final class AuthViewModel: ObservableObject {
 
     func logout() async {
         await pushNotificationService.deactivateCurrentTokenIfPossible()
+        if #available(iOS 16.1, *) {
+            await LiveActivityManager.shared.deactivateRemoteStateIfPossible()
+        }
         await authService.logout()
         applyLoggedOutState()
     }
@@ -149,6 +152,9 @@ final class AuthViewModel: ObservableObject {
         Task {
             await pushNotificationService.requestAuthorizationIfNeeded()
             await pushNotificationService.syncIfPossible()
+            if #available(iOS 16.1, *) {
+                await LiveActivityManager.shared.syncRemoteStateIfPossible()
+            }
         }
     }
 
