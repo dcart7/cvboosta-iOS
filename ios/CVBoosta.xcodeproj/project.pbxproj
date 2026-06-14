@@ -49,6 +49,7 @@
 		94BEA9C9FC785E7D4512064B /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 634616FF81D1E4EEAF7915B1 /* PaywallView.swift */; };
 		9540FA4583EDA360686541E1 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14738B86F46E79C7FA758A2C /* AppRouter.swift */; };
 		95C4DDF13DD080E97D91F1B2 /* ShareService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12360C6B9C4C8ACCA46372B1 /* ShareService.swift */; };
+		9A6C9A6F2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON 3.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON 3.icon */; };
 		9BB7DBFC762E3F2A1E51A2B2 /* UIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4B305144B079B4D9636A0A /* UIComponents.swift */; };
 		9E642E1C589A2FBCA2E9DA2C /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83162248824F6AA07FC508C4 /* KeychainService.swift */; };
 		A152D8430B091E3C91537CE2 /* ColorTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BBD2033B98C9305C023DCCD /* ColorTokens.swift */; };
@@ -168,6 +169,7 @@
 		8DC92A83BB7F7127FA9CDA40 /* ResumeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeService.swift; sourceTree = "<group>"; };
 		953953FABDC008F39700FB1C /* CloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncService.swift; sourceTree = "<group>"; };
 		9992BBEA9E48B91E8D1C3434 /* WidgetSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSyncService.swift; sourceTree = "<group>"; };
+		9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON 3.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "CVBOOSTA IOS ICON 3.icon"; sourceTree = "<group>"; };
 		9B4B305144B079B4D9636A0A /* UIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIComponents.swift; sourceTree = "<group>"; };
 		9BB3081B65BD244BECD75FA9 /* TailoringWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailoringWorkspaceView_iPad.swift; sourceTree = "<group>"; };
 		9E4B2E4DC9389C29E5CCC947 /* CVBoostaWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaWidgets.swift; sourceTree = "<group>"; };
@@ -469,6 +471,7 @@
 			isa = PBXGroup;
 			children = (
 				54BC9517B088B54807EB0DB3 /* Assets.xcassets */,
+				9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON 3.icon */,
 				1542EAD33DCB06451ED938F1 /* CVBoostaApp.entitlements */,
 				E3F7E812A5E5E62EF7F0A245 /* Info.plist */,
 				555594A2C03812078F74A947 /* App */,
@@ -600,6 +603,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D2290B91ACA3450054A644A7 /* Assets.xcassets in Resources */,
+				9A6C9A6F2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON 3.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -880,7 +884,6 @@
 		B2E650498A9CE2AE16668C33 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				APS_ENVIRONMENT = production;
 				CODE_SIGN_ENTITLEMENTS = CVBoostaApp/CVBoostaApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -902,7 +905,6 @@
 		BA7578E25053F9FF83E6FDB4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				APS_ENVIRONMENT = development;
 				CODE_SIGN_ENTITLEMENTS = CVBoostaApp/CVBoostaApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
