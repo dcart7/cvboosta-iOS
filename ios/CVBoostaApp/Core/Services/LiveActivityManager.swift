@@ -70,9 +70,13 @@ final class LiveActivityManager {
     private var atsPushToStartTokenTask: Task<Void, Never>?
     private var atsActivityUpdatesTask: Task<Void, Never>?
     private var atsActivityStateTask: Task<Void, Never>?
+    private var supportActivityStateTask: Task<Void, Never>?
 
     private let atsRegistrationStorageKey = "cvboosta.live_activity.ats.registration"
     private let atsPushToStartRegistrationStorageKey = "cvboosta.live_activity.ats.push_to_start.registration"
+    private let streakCelebrationStorageKey = "cvboosta.live_activity.streak.last_seen"
+    private let pipelineFingerprintStorageKey = "cvboosta.live_activity.pipeline.last_fingerprint"
+    private let pipelinePresentedAtStorageKey = "cvboosta.live_activity.pipeline.last_presented_at"
     private let attributesTypeName = "CVBoostaActivityAttributes"
 
     private init(
@@ -90,6 +94,7 @@ final class LiveActivityManager {
                 observePushToStartTokenUpdates()
             }
             await restoreATSActivityIfPossible()
+            await restoreSupportActivityIfPossible()
             await syncRemoteStateIfPossible()
         }
     }
@@ -102,6 +107,7 @@ final class LiveActivityManager {
         }
 
         await restoreATSActivityIfPossible()
+        await restoreSupportActivityIfPossible()
         guard let activity = currentATSActivity else { return }
         observePushTokenUpdates(for: activity)
         await syncRemoteRegistrationIfPossible(for: activity)
@@ -125,8 +131,10 @@ final class LiveActivityManager {
             mode: .atsOptimization,
             title: title,
             detail: detail,
-            progress: 0.05,
-            etaText: "Preparing"
+            progress: 0.25,
+            etaText: "Live progress",
+            badgeText: "25%",
+            compactTrailingText: "25%"
         )
 
         do {
@@ -150,13 +158,16 @@ final class LiveActivityManager {
 
     func update(progress: Double, detail: String, etaText: String) async {
         guard let activity = currentATSActivity else { return }
+        let badge = percentBadge(for: progress)
 
         let newState = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
-            title: "ATS Analysis",
+            title: "ATS Analysis running",
             detail: detail,
             progress: progress,
-            etaText: etaText
+            etaText: etaText,
+            badgeText: badge,
+            compactTrailingText: badge
         )
 
         await activity.update(.init(state: newState, staleDate: nil))
@@ -164,13 +175,16 @@ final class LiveActivityManager {
 
     func markATSBackgrounded(progress: Double, detail: String) async {
         guard let activity = currentATSActivity else { return }
+        let badge = percentBadge(for: progress)
 
         let newState = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
             title: "ATS Analysis running",
             detail: detail,
             progress: progress,
-            etaText: "Continuing in background"
+            etaText: "Continuing in background",
+            badgeText: badge,
+            compactTrailingText: badge
         )
 
         await activity.update(.init(state: newState, staleDate: Date().addingTimeInterval(60 * 15)))
@@ -183,15 +197,24 @@ final class LiveActivityManager {
         releaseATSActivity(ifMatching: activity.id)
     }
 
-    func complete(finalScore: Int) async {
+    func complete(result: ResumeScanResponse) async {
         guard let activity = currentATSActivity else { return }
+        let beforeScore = result.matchBefore ?? result.atsScore
+        let afterScore = result.matchAfter ?? result.atsScore
+        let addedKeywordCount = result.addedKeywords.count
+        let detail = addedKeywordCount > 0
+            ? "+\(addedKeywordCount) keyword\(addedKeywordCount == 1 ? "" : "s") added"
+            : "ATS score refined to \(afterScore)"
+        let compactTrailingText = beforeScore == afterScore ? "\(afterScore)" : "\(beforeScore)->\(afterScore)"
 
         let completed = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
-            title: "ATS Analysis complete",
-            detail: "Final score: \(finalScore)",
+            title: "Resume optimized successfully",
+            detail: detail,
             progress: 1.0,
-            etaText: ""
+            etaText: "Ready to export",
+            badgeText: "\(afterScore)",
+            compactTrailingText: compactTrailingText
         )
 
         await activity.update(.init(state: completed, staleDate: nil))
@@ -201,47 +224,102 @@ final class LiveActivityManager {
     }
 
     func celebrateDailyStreak(dayCount: Int, detail: String) async {
-        let attributes = CVBoostaActivityAttributes(activityName: "Career Streak")
+        let effectiveDayCount = max(dayCount, 1)
+        guard shouldPresentStreakActivity(dayCount: effectiveDayCount) else { return }
+
         let state = CVBoostaActivityAttributes.ContentState(
             mode: .dailyStreak,
-            title: dayCount == 0 ? "Momentum started" : "Career streak active",
+            title: "Momentum alive",
             detail: detail,
-            progress: min(max(Double(dayCount) / 30.0, 0.08), 1),
-            etaText: dayCount == 0 ? "Day 1" : "\(dayCount) days"
-        )
-
-        do {
-            let activity = try Activity.request(
-                attributes: attributes,
-                content: .init(state: state, staleDate: Date().addingTimeInterval(60 * 5))
-            )
-            await activity.end(nil, dismissalPolicy: .default)
-        } catch {
-            print("Failed to celebrate streak activity: \(error)")
-        }
-    }
-
-    func showStreakProtection(dayCount: Int, detail: String) async {
-        let progress = min(max(Double(dayCount) / 30.0, 0.08), 1)
-        let state = CVBoostaActivityAttributes.ContentState(
-            mode: .dailyStreak,
-            title: "Weekly consistency goal",
-            detail: detail,
-            progress: progress,
-            etaText: dayCount == 0 ? "1 / 1 day" : "\(min(dayCount, 5)) / 5 days"
+            progress: min(max(Double(effectiveDayCount) / 21.0, 0.12), 1),
+            etaText: "Small wins compound",
+            badgeText: "🔥 \(effectiveDayCount)d",
+            compactTrailingText: "\(effectiveDayCount)d"
         )
 
         await upsertSupportActivity(
-            attributesName: "Streak Protection",
+            attributesName: "Momentum Streak",
+            state: state,
+            staleDate: Date().addingTimeInterval(60 * 45),
+            priority: .dailyStreak
+        )
+    }
+
+    func showStreakProtection(dayCount: Int, detail: String) async {
+        let effectiveDayCount = max(dayCount, 1)
+        let progress = min(max(Double(effectiveDayCount) / 21.0, 0.12), 1)
+        let state = CVBoostaActivityAttributes.ContentState(
+            mode: .dailyStreak,
+            title: "Momentum alive",
+            detail: detail,
+            progress: progress,
+            etaText: "Applications tracked today",
+            badgeText: "🔥 \(effectiveDayCount)d",
+            compactTrailingText: "\(effectiveDayCount)d"
+        )
+
+        await upsertSupportActivity(
+            attributesName: "Momentum Streak",
             state: state,
             staleDate: Date().addingTimeInterval(60 * 90),
             priority: .dailyStreak
         )
     }
 
+    func showApplicationStatusUpdate(
+        company: String,
+        role: String,
+        status: ApplicationStatus,
+        fingerprint: String
+    ) async {
+        guard status == .interview || status == .offer else { return }
+        guard shouldPresentPipelineUpdate(fingerprint: fingerprint) else { return }
+
+        let title: String
+        let badge: String
+        let detail = "\(company) • \(role)"
+        let footer: String
+        let progress: Double
+
+        switch status {
+        case .interview:
+            title = "Interview pipeline updated"
+            badge = "Fresh"
+            footer = "Ready for prep"
+            progress = 0.74
+        case .offer:
+            title = "Offer pipeline updated"
+            badge = "Offer"
+            footer = "High-signal moment"
+            progress = 1.0
+        default:
+            return
+        }
+
+        let state = CVBoostaActivityAttributes.ContentState(
+            mode: .applicationStatus,
+            title: title,
+            detail: detail,
+            progress: progress,
+            etaText: footer,
+            badgeText: badge,
+            compactTrailingText: badge
+        )
+
+        await upsertSupportActivity(
+            attributesName: "Pipeline Update",
+            state: state,
+            staleDate: Date().addingTimeInterval(status == .offer ? 60 * 90 : 60 * 45),
+            priority: .applicationStatus
+        )
+    }
+
     func showInterviewCountdown(company: String, role: String, interviewAt: Date) async {
         let remaining = interviewAt.timeIntervalSinceNow
         guard remaining > 0, remaining <= 60 * 60 * 3 else {
+            if currentSupportActivity == nil {
+                await restoreSupportActivityIfPossible()
+            }
             if currentSupportMode == .interviewCountdown {
                 await clearSupportActivity()
             }
@@ -249,12 +327,15 @@ final class LiveActivityManager {
         }
 
         let progress = max(0, min(1, 1 - (remaining / (60 * 60 * 3))))
+        let countdownText = relativeCountdownText(until: interviewAt)
         let state = CVBoostaActivityAttributes.ContentState(
             mode: .interviewCountdown,
-            title: company,
-            detail: role,
+            title: "Interview starts soon",
+            detail: "\(company) • \(role)",
             progress: progress,
-            etaText: interviewAt.formatted(date: .omitted, time: .shortened)
+            etaText: "Stay ready with sharp examples",
+            badgeText: countdownText,
+            compactTrailingText: countdownText
         )
 
         await upsertSupportActivity(
@@ -268,10 +349,12 @@ final class LiveActivityManager {
     func showPostInterviewReflection(company: String, role: String) async {
         let state = CVBoostaActivityAttributes.ContentState(
             mode: .postInterviewReflection,
-            title: "Log how it went",
+            title: "Capture the debrief",
             detail: "\(company) • \(role)",
             progress: 1,
-            etaText: "While it’s fresh"
+            etaText: "While it’s fresh",
+            badgeText: "Reflect",
+            compactTrailingText: "Note"
         )
 
         await upsertSupportActivity(
@@ -283,16 +366,25 @@ final class LiveActivityManager {
     }
 
     func clearPostInterviewReflection() async {
+        if currentSupportActivity == nil {
+            await restoreSupportActivityIfPossible()
+        }
         guard currentSupportMode == .postInterviewReflection else { return }
         await clearSupportActivity()
     }
 
     func clearInterviewCountdown() async {
+        if currentSupportActivity == nil {
+            await restoreSupportActivityIfPossible()
+        }
         guard currentSupportMode == .interviewCountdown else { return }
         await clearSupportActivity()
     }
 
     func clearStreakProtection() async {
+        if currentSupportActivity == nil {
+            await restoreSupportActivityIfPossible()
+        }
         guard currentSupportMode == .dailyStreak else { return }
         await clearSupportActivity()
     }
@@ -302,10 +394,12 @@ final class LiveActivityManager {
 
         let failed = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
-            title: "ATS Analysis failed",
+            title: "ATS analysis paused",
             detail: "Please try again",
             progress: 0.0,
-            etaText: ""
+            etaText: "Resume scan interrupted",
+            badgeText: "Retry",
+            compactTrailingText: "Retry"
         )
 
         await activity.update(.init(state: failed, staleDate: nil))
@@ -322,6 +416,29 @@ final class LiveActivityManager {
         guard currentATSActivity == nil else { return }
         if let activity = Activity<CVBoostaActivityAttributes>.activities.first(where: { $0.content.state.mode == .atsOptimization }) {
             bindATSActivity(activity)
+        }
+    }
+
+    private func restoreSupportActivityIfPossible() async {
+        let supportActivities = Activity<CVBoostaActivityAttributes>.activities.filter {
+            $0.content.state.mode != .atsOptimization
+        }
+        guard !supportActivities.isEmpty else {
+            currentSupportActivity = nil
+            supportActivityStateTask?.cancel()
+            supportActivityStateTask = nil
+            return
+        }
+
+        let preferred = supportActivities.max {
+            SupportPriority(mode: $0.content.state.mode).rawValue < SupportPriority(mode: $1.content.state.mode).rawValue
+        }
+
+        guard let preferred else { return }
+        bindSupportActivity(preferred)
+
+        for activity in supportActivities where activity.id != preferred.id {
+            await activity.end(nil, dismissalPolicy: .immediate)
         }
     }
 
@@ -345,7 +462,7 @@ final class LiveActivityManager {
 
     private func handleObservedATSActivity(_ activity: Activity<CVBoostaActivityAttributes>) async {
         if currentATSActivity?.id == activity.id {
-            observeActivityLifecycle(for: activity)
+            observeATSLifecycle(for: activity)
             observePushTokenUpdates(for: activity)
             await syncRemoteRegistrationIfPossible(for: activity)
             return
@@ -357,11 +474,16 @@ final class LiveActivityManager {
 
     private func bindATSActivity(_ activity: Activity<CVBoostaActivityAttributes>) {
         currentATSActivity = activity
-        observeActivityLifecycle(for: activity)
+        observeATSLifecycle(for: activity)
         observePushTokenUpdates(for: activity)
     }
 
-    private func observeActivityLifecycle(for activity: Activity<CVBoostaActivityAttributes>) {
+    private func bindSupportActivity(_ activity: Activity<CVBoostaActivityAttributes>) {
+        currentSupportActivity = activity
+        observeSupportLifecycle(for: activity)
+    }
+
+    private func observeATSLifecycle(for activity: Activity<CVBoostaActivityAttributes>) {
         atsActivityStateTask?.cancel()
         atsActivityStateTask = Task { [weak self] in
             guard let self else { return }
@@ -373,7 +495,28 @@ final class LiveActivityManager {
 
                 switch state {
                 case .dismissed, .ended:
-                    await self.handleEndedATSActivity(activityID: activity.id)
+                    self.handleEndedATSActivity(activityID: activity.id)
+                    return
+                default:
+                    continue
+                }
+            }
+        }
+    }
+
+    private func observeSupportLifecycle(for activity: Activity<CVBoostaActivityAttributes>) {
+        supportActivityStateTask?.cancel()
+        supportActivityStateTask = Task { [weak self] in
+            guard let self else { return }
+
+            for await state in activity.activityStateUpdates {
+                if Task.isCancelled {
+                    return
+                }
+
+                switch state {
+                case .dismissed, .ended:
+                    self.handleEndedSupportActivity(activityID: activity.id)
                     return
                 default:
                     continue
@@ -386,6 +529,10 @@ final class LiveActivityManager {
         releaseATSActivity(ifMatching: activityID)
     }
 
+    private func handleEndedSupportActivity(activityID: String) {
+        releaseSupportActivity(ifMatching: activityID)
+    }
+
     private func releaseATSActivity(ifMatching activityID: String) {
         guard currentATSActivity?.id == activityID else { return }
         currentATSActivity = nil
@@ -394,6 +541,13 @@ final class LiveActivityManager {
         atsActivityStateTask?.cancel()
         atsActivityStateTask = nil
         clearStoredATSRegistration()
+    }
+
+    private func releaseSupportActivity(ifMatching activityID: String) {
+        guard currentSupportActivity?.id == activityID else { return }
+        currentSupportActivity = nil
+        supportActivityStateTask?.cancel()
+        supportActivityStateTask = nil
     }
 
     private func observePushTokenUpdates(for activity: Activity<CVBoostaActivityAttributes>) {
@@ -692,6 +846,58 @@ final class LiveActivityManager {
         defaults.removeObject(forKey: atsPushToStartRegistrationStorageKey)
     }
 
+    private func shouldPresentStreakActivity(dayCount: Int) -> Bool {
+        let today = Calendar.current.startOfDay(for: .now)
+        if let snapshot = defaults.dictionary(forKey: streakCelebrationStorageKey),
+           let timestamp = snapshot["date"] as? TimeInterval,
+           let storedDayCount = snapshot["dayCount"] as? Int {
+            let storedDate = Date(timeIntervalSince1970: timestamp)
+            if Calendar.current.isDate(storedDate, inSameDayAs: today), storedDayCount >= dayCount {
+                return false
+            }
+        }
+
+        defaults.set(
+            [
+                "date": today.timeIntervalSince1970,
+                "dayCount": dayCount
+            ],
+            forKey: streakCelebrationStorageKey
+        )
+        return true
+    }
+
+    private func shouldPresentPipelineUpdate(fingerprint: String) -> Bool {
+        let lastFingerprint = defaults.string(forKey: pipelineFingerprintStorageKey)
+        let lastPresentedAt = defaults.object(forKey: pipelinePresentedAtStorageKey) as? Date
+
+        if lastFingerprint == fingerprint,
+           let lastPresentedAt,
+           Date().timeIntervalSince(lastPresentedAt) < 60 * 60 * 4 {
+            return false
+        }
+
+        defaults.set(fingerprint, forKey: pipelineFingerprintStorageKey)
+        defaults.set(Date(), forKey: pipelinePresentedAtStorageKey)
+        return true
+    }
+
+    private func percentBadge(for progress: Double) -> String {
+        "\(Int(min(max(progress, 0), 1) * 100))%"
+    }
+
+    private func relativeCountdownText(until date: Date) -> String {
+        let totalMinutes = max(Int(date.timeIntervalSinceNow / 60), 0)
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        if hours <= 0 {
+            return "In \(minutes)m"
+        }
+
+        return String(format: "In %dh %02dm", hours, minutes)
+    }
+
     private func hexString(from data: Data) -> String {
         data.map { String(format: "%02x", $0) }.joined()
     }
@@ -734,6 +940,10 @@ final class LiveActivityManager {
         staleDate: Date?,
         priority: SupportPriority
     ) async {
+        if currentSupportActivity == nil {
+            await restoreSupportActivityIfPossible()
+        }
+
         if let currentSupportMode {
             let currentPriority = SupportPriority(mode: currentSupportMode)
             guard priority.rawValue >= currentPriority.rawValue || currentSupportMode == state.mode else {
@@ -748,37 +958,44 @@ final class LiveActivityManager {
 
         if let activity = currentSupportActivity {
             await activity.end(nil, dismissalPolicy: .default)
-            currentSupportActivity = nil
+            releaseSupportActivity(ifMatching: activity.id)
         }
 
         do {
             let attributes = CVBoostaActivityAttributes(activityName: attributesName)
-            currentSupportActivity = try Activity.request(
+            let activity = try Activity.request(
                 attributes: attributes,
                 content: .init(state: state, staleDate: staleDate)
             )
+            bindSupportActivity(activity)
         } catch {
             print("Failed to start support live activity: \(error)")
         }
     }
 
     private func clearSupportActivity() async {
+        if currentSupportActivity == nil {
+            await restoreSupportActivityIfPossible()
+        }
         guard let activity = currentSupportActivity else { return }
         await activity.end(nil, dismissalPolicy: .default)
-        currentSupportActivity = nil
+        releaseSupportActivity(ifMatching: activity.id)
     }
 }
 
 @available(iOS 16.1, *)
 private enum SupportPriority: Int {
     case dailyStreak = 0
-    case interviewCountdown = 1
-    case postInterviewReflection = 2
+    case applicationStatus = 1
+    case interviewCountdown = 2
+    case postInterviewReflection = 3
 
     init(mode: CVBoostaActivityAttributes.ActivityMode) {
         switch mode {
         case .dailyStreak:
             self = .dailyStreak
+        case .applicationStatus:
+            self = .applicationStatus
         case .interviewCountdown:
             self = .interviewCountdown
         case .postInterviewReflection:

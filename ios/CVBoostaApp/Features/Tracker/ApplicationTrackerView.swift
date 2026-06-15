@@ -341,6 +341,7 @@ struct ApplicationTrackerView: View {
             try modelContext.save()
             widgetSyncService.mergeLocalApplications(applications)
             celebrateStreak(with: record.status)
+            presentPipelineLiveActivityIfNeeded(for: record)
             showAddSheet = false
         } catch {
             errorMessage = "Could not save application."
@@ -364,6 +365,7 @@ struct ApplicationTrackerView: View {
             try modelContext.save()
             widgetSyncService.mergeLocalApplications(applications)
             celebrateStreak(with: record.status)
+            presentPipelineLiveActivityIfNeeded(for: record)
             editingContext = nil
         } catch {
             errorMessage = "Could not update application."
@@ -378,6 +380,7 @@ struct ApplicationTrackerView: View {
         do {
             try modelContext.save()
             widgetSyncService.mergeLocalApplications(applications)
+            presentPipelineLiveActivityIfNeeded(for: record)
         } catch {
             errorMessage = "Could not update application status."
         }
@@ -479,7 +482,7 @@ struct ApplicationTrackerView: View {
             user: authViewModel.me?.user,
             scans: authViewModel.me?.scanHistory ?? [],
             applications: applications,
-            manuallyProtectedDayStamps: []
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
         )
         let detail: String = switch status {
         case .saved: "Saved job. Streak protected."
@@ -490,6 +493,25 @@ struct ApplicationTrackerView: View {
         }
         Task {
             await LiveActivityManager.shared.celebrateDailyStreak(dayCount: summary.currentStreak, detail: detail)
+        }
+    }
+
+    private func presentPipelineLiveActivityIfNeeded(for record: ApplicationRecord) {
+        guard #available(iOS 16.1, *) else { return }
+
+        let fingerprint = [
+            record.id.uuidString,
+            record.status.rawValue,
+            String(record.interviewAt?.timeIntervalSince1970 ?? 0)
+        ].joined(separator: "|")
+
+        Task {
+            await LiveActivityManager.shared.showApplicationStatusUpdate(
+                company: record.company,
+                role: record.role,
+                status: record.status,
+                fingerprint: fingerprint
+            )
         }
     }
 }

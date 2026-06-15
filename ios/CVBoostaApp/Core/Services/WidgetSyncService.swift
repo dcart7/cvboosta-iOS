@@ -20,7 +20,8 @@ final class WidgetSyncService {
                 role: $0.role,
                 status: ApplicationStatus(rawValue: $0.status.lowercased()) ?? .applied,
                 appliedAt: $0.appliedAt,
-                source: $0.source ?? "Account"
+                source: $0.source ?? "Account",
+                interviewAt: $0.interviewAt
             )
         }
         let streakSummary = StreakEngine.build(
@@ -28,7 +29,7 @@ final class WidgetSyncService {
             user: snapshot.user,
             scans: scans,
             applications: accountBackedApplications,
-            manuallyProtectedDayStamps: []
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
         )
 
         cachedSnapshot.updatedAt = .now
@@ -71,12 +72,16 @@ final class WidgetSyncService {
         cachedSnapshot.momentumDetail = momentumDetail(score: currentScore, delta: weeklyDelta, streak: streakSummary.currentStreak)
 
         if let nextInterview = snapshot.applications
-            .filter({ $0.status.lowercased() == "interview" })
-            .sorted(by: { $0.appliedAt < $1.appliedAt })
+            .filter({ $0.status.lowercased() == "interview" && ($0.interviewAt ?? .distantPast) > .now })
+            .sorted(by: { ($0.interviewAt ?? .distantFuture) < ($1.interviewAt ?? .distantFuture) })
             .first {
             cachedSnapshot.nextInterviewTitle = "\(nextInterview.company) Interview"
-            cachedSnapshot.nextInterviewDate = nextInterview.appliedAt
+            cachedSnapshot.nextInterviewDate = nextInterview.interviewAt
             cachedSnapshot.nextInterviewCompany = nextInterview.company
+        } else {
+            cachedSnapshot.nextInterviewTitle = nil
+            cachedSnapshot.nextInterviewDate = nil
+            cachedSnapshot.nextInterviewCompany = nil
         }
 
         persist()
@@ -110,22 +115,22 @@ final class WidgetSyncService {
             user: nil,
             scans: [],
             applications: applications,
-            manuallyProtectedDayStamps: []
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
         )
         cachedSnapshot.updatedAt = .now
         cachedSnapshot.applicationsCount = applications.count
         cachedSnapshot.interviewsCount = applications.filter { $0.status == .interview }.count
         cachedSnapshot.offersCount = applications.filter { $0.status == .offer }.count
         cachedSnapshot.responseRate = applications.isEmpty ? 0 : Int((Double(cachedSnapshot.interviewsCount + cachedSnapshot.offersCount) / Double(applications.count)) * 100)
-        cachedSnapshot.streakDays = max(cachedSnapshot.streakDays, streakSummary.currentStreak)
+        cachedSnapshot.streakDays = streakSummary.currentStreak
         cachedSnapshot.streakStatusTitle = streakSummary.statusTitle
         cachedSnapshot.streakStatusDetail = streakSummary.microcopy
-        cachedSnapshot.weeklyActiveDays = max(cachedSnapshot.weeklyActiveDays, streakSummary.weeklyActiveDays)
+        cachedSnapshot.weeklyActiveDays = streakSummary.weeklyActiveDays
         cachedSnapshot.careerLevel = streakSummary.careerLevel
         cachedSnapshot.nextMilestoneTitle = streakSummary.milestones.first(where: { !$0.isReached })?.title ?? cachedSnapshot.nextMilestoneTitle
 
         if let nextInterview = applications
-            .filter({ $0.status == .interview && $0.interviewAt != nil })
+            .filter({ $0.status == .interview && ($0.interviewAt ?? .distantPast) > .now })
             .sorted(by: { ($0.interviewAt ?? .distantFuture) < ($1.interviewAt ?? .distantFuture) })
             .first {
             cachedSnapshot.nextInterviewTitle = "\(nextInterview.company) Interview"
@@ -137,6 +142,29 @@ final class WidgetSyncService {
             cachedSnapshot.nextInterviewCompany = nil
         }
 
+        persist()
+    }
+
+    func syncStreakState(
+        user: AuthUser?,
+        scans: [ScanHistorySnapshot],
+        applications: [ApplicationRecord]
+    ) {
+        let streakSummary = StreakEngine.build(
+            now: .now,
+            user: user,
+            scans: scans,
+            applications: applications,
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
+        )
+
+        cachedSnapshot.updatedAt = .now
+        cachedSnapshot.streakDays = streakSummary.currentStreak
+        cachedSnapshot.streakStatusTitle = streakSummary.statusTitle
+        cachedSnapshot.streakStatusDetail = streakSummary.microcopy
+        cachedSnapshot.weeklyActiveDays = streakSummary.weeklyActiveDays
+        cachedSnapshot.careerLevel = streakSummary.careerLevel
+        cachedSnapshot.nextMilestoneTitle = streakSummary.milestones.first(where: { !$0.isReached })?.title ?? "Elite"
         persist()
     }
 

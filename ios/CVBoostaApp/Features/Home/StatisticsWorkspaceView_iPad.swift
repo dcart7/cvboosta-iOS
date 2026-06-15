@@ -71,6 +71,16 @@ struct StatisticsWorkspaceView_iPad: View {
             ?? 0
     }
 
+    private var streakSummary: StreakSummary {
+        StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: trackedApplications,
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
+        )
+    }
+
     private var avgScore: Int {
         let values = filteredHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
         guard !values.isEmpty else { return 0 }
@@ -93,18 +103,7 @@ struct StatisticsWorkspaceView_iPad: View {
     }
 
     private var streakDays: Int {
-        let calendar = Calendar.current
-        let uniqueDays = Set(sharedHistoryAscending.map { calendar.startOfDay(for: $0.createdAt) })
-        guard !uniqueDays.isEmpty else { return 0 }
-
-        var current = calendar.startOfDay(for: Date())
-        var streak = 0
-        while uniqueDays.contains(current) {
-            streak += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: current) else { break }
-            current = previous
-        }
-        return streak
+        streakSummary.currentStreak
     }
 
     private var latestPayload: LatestScanPayload? {

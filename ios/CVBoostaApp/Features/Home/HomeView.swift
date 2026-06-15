@@ -8,6 +8,11 @@ struct HomeView: View {
     @Query(sort: \ApplicationRecord.appliedAt, order: .reverse)
     private var trackedApplications: [ApplicationRecord]
 
+    @AppStorage(SharedStreakState.restoreDayKey, store: SharedStreakState.sharedDefaults)
+    private var restoredDayStamp = ""
+    @AppStorage(SharedStreakState.freezeDayKey, store: SharedStreakState.sharedDefaults)
+    private var frozenDayStamp = ""
+
     @State private var historyItems: [HistoryListItem] = []
     @State private var latestHistoryDetail: HistoryDetailResponse?
     @State private var isLoadingHistory = false
@@ -40,7 +45,10 @@ struct HomeView: View {
             user: authViewModel.me?.user,
             scans: authViewModel.me?.scanHistory ?? [],
             applications: trackedApplications,
-            manuallyProtectedDayStamps: []
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps(
+                restoredDayStamp: restoredDayStamp,
+                frozenDayStamp: frozenDayStamp
+            )
         )
     }
 
@@ -188,7 +196,7 @@ struct HomeView: View {
 
     private var streakInsight: HomeInsight {
         if streakSummary.currentStreak > 0 {
-            return .init(title: "Streak", value: "\(streakSummary.currentStreak)d", tint: BoostaColor.success, isStreak: true)
+            return .init(title: "Streak", value: "\(streakSummary.currentStreak)d", tint: BoostaColor.warning, isStreak: true)
         }
         if streakSummary.pendingStreak > 0 {
             return .init(title: "Protect Streak", value: "\(streakSummary.pendingStreak)d", tint: BoostaColor.warning, isStreak: true)
@@ -281,14 +289,17 @@ struct HomeView: View {
             user: authViewModel.me?.user,
             scans: authViewModel.me?.scanHistory ?? [],
             applications: trackedApplications,
-            manuallyProtectedDayStamps: []
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps(
+                restoredDayStamp: restoredDayStamp,
+                frozenDayStamp: frozenDayStamp
+            )
         )
         let hour = Calendar.current.component(.hour, from: .now)
         Task {
             guard !summary.todayActions.isEmpty,
-                  summary.currentStreak > 0,
+                  summary.currentStreak >= 2,
                   !summary.statusTitle.contains("protected"),
-                  hour >= 18 else {
+                  hour >= 20 else {
                 await LiveActivityManager.shared.clearStreakProtection()
                 return
             }

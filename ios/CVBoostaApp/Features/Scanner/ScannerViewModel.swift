@@ -36,10 +36,9 @@ final class ScannerViewModel: ObservableObject {
     @Published var scanResult: ResumeScanResult?
 
     let loadingSteps: [String] = [
-        "Analyzing ATS compatibility",
-        "Optimizing keywords",
-        "Scanning formatting issues",
-        "Generating tailored resume"
+        "Matching keywords",
+        "Optimizing readability",
+        "Analyzing job requirements"
     ]
 
     private let atsService: ATSServiceProtocol
@@ -191,7 +190,7 @@ final class ScannerViewModel: ObservableObject {
 
     private func runScan(pdfURL: URL, role: String) async {
         isScanning = true
-        scanProgress = 0.08
+        scanProgress = 0.25
         progressMessage = loadingSteps[0]
         progressStepIndex = 0
 
@@ -207,7 +206,7 @@ final class ScannerViewModel: ObservableObject {
                 }
             }
 
-            await updateProgress(value: 0.25, step: 1, eta: "~8s")
+            await updateProgress(value: 0.56, step: 1, eta: "Live progress")
 
             try Task.checkCancellation()
             let response = try await atsService.scanResumePDF(
@@ -219,7 +218,7 @@ final class ScannerViewModel: ObservableObject {
             )
 
             try Task.checkCancellation()
-            await updateProgress(value: 0.8, step: 2, eta: "~4s")
+            await updateProgress(value: 0.82, step: 2, eta: "Final refinement")
             await completeScan(with: response, isDemo: false, role: role)
         } catch is CancellationError {
             isScanning = false
@@ -266,11 +265,11 @@ final class ScannerViewModel: ObservableObject {
         progressMessage = "Ready"
 
         if #available(iOS 16.1, *) {
-            await LiveActivityManager.shared.complete(finalScore: response.atsScore)
+            await LiveActivityManager.shared.complete(result: response)
             let streakDayCount = CVBoostaWidgetStore.loadSnapshot().streakDays
             await LiveActivityManager.shared.celebrateDailyStreak(
                 dayCount: streakDayCount,
-                detail: "Your future recruiter would approve."
+                detail: "Applications tracked today"
             )
         }
     }
@@ -294,7 +293,7 @@ final class ScannerViewModel: ObservableObject {
     private func startLiveActivity() async {
         if #available(iOS 16.1, *) {
             await LiveActivityManager.shared.startATSOptimization(
-                title: "ATS Analysis",
+                title: "ATS Analysis running",
                 detail: loadingSteps[0]
             )
         }

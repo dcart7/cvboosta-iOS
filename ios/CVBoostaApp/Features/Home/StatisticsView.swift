@@ -56,6 +56,16 @@ struct StatisticsView: View {
         authViewModel.me?.scanHistory.sorted(by: { $0.createdAt < $1.createdAt }) ?? []
     }
 
+    private var streakSummary: StreakSummary {
+        StreakEngine.build(
+            now: .now,
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: trackedApplications,
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
+        )
+    }
+
     private var latestScore: Int {
         sharedHistoryAscending.last.map { normalizedATSScore($0.matchAfter ?? $0.score) }
             ?? scans.last.map { normalizedATSScore($0.matchAfter ?? $0.atsScore) }
@@ -92,18 +102,7 @@ struct StatisticsView: View {
     }
 
     private var streakDays: Int {
-        let calendar = Calendar.current
-        let uniqueDays = Set(sharedHistoryAscending.map { calendar.startOfDay(for: $0.createdAt) })
-        guard !uniqueDays.isEmpty else { return 0 }
-
-        var current = calendar.startOfDay(for: Date())
-        var streak = 0
-        while uniqueDays.contains(current) {
-            streak += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: current) else { break }
-            current = previous
-        }
-        return streak
+        streakSummary.currentStreak
     }
 
     private var weeklyApplications: Int {

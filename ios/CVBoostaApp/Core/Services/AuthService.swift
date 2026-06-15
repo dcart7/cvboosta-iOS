@@ -54,6 +54,7 @@ struct AccountApplicationSnapshot: Hashable, Identifiable {
     let status: String
     let source: String?
     let appliedAt: Date
+    let interviewAt: Date?
 }
 
 struct AuthMePayload: Hashable {
@@ -422,6 +423,11 @@ private extension AuthService {
                 parseDate(object.string("applied_at"))
                 ?? parseDate(object.string("created_at"))
                 ?? Date()
+            let interviewAt =
+                parseDate(object.string("interview_at"))
+                ?? parseDate(object.string("scheduled_at"))
+                ?? parseDate(object.string("interview_date"))
+                ?? parseDate(object.string("starts_at"))
 
             return AccountApplicationSnapshot(
                 id: id,
@@ -429,7 +435,8 @@ private extension AuthService {
                 role: role,
                 status: status,
                 source: object.string("source"),
-                appliedAt: appliedAt
+                appliedAt: appliedAt,
+                interviewAt: interviewAt
             )
         }
     }

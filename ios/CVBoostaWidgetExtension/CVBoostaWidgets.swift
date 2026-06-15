@@ -319,56 +319,76 @@ private struct InterviewCountdownWidgetView: View {
     let entry: CVBoostaWidgetEntry
 
     var body: some View {
-        if let interviewDate = entry.snapshot.nextInterviewDate,
-           let title = entry.snapshot.nextInterviewTitle {
-            switch family {
-            case .accessoryRectangular:
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Interview")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(timerInterval: Date()...interviewDate, countsDown: true)
-                        .font(.headline)
-                    Text(entry.snapshot.nextInterviewCompany ?? title)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+        Group {
+            if let interviewDate = upcomingInterviewDate {
+                switch family {
+                case .accessoryRectangular:
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Interview")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(timerInterval: entry.date...interviewDate, countsDown: true)
+                            .font(.headline)
+                            .monospacedDigit()
+                        Text(interviewCompanyLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                case .systemSmall:
+                    VStack(alignment: .leading, spacing: 10) {
+                        widgetTitle("Interview", subtitle: interviewCompanyLine)
+                        Spacer(minLength: 0)
+                        Text(timerInterval: entry.date...interviewDate, countsDown: true)
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                        Text(interviewDate.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                default:
+                    VStack(alignment: .leading, spacing: 10) {
+                        widgetTitle("Interview Countdown", subtitle: interviewTitle)
+                        Text(timerInterval: entry.date...interviewDate, countsDown: true)
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                        Text(interviewDate.formatted(date: .complete, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Label("Open Tracker", systemImage: "arrow.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            case .systemSmall:
-                VStack(alignment: .leading, spacing: 10) {
-                    widgetTitle("Interview", subtitle: entry.snapshot.nextInterviewCompany ?? "Countdown")
-                    Spacer(minLength: 0)
-                    Text(timerInterval: Date()...interviewDate, countsDown: true)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                    Text(interviewDate.formatted(date: .abbreviated, time: .shortened))
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    widgetTitle("Interview Countdown", subtitle: "No interview scheduled")
+                    Text("Add an interview date in Tracker to see a live countdown here.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            default:
-                VStack(alignment: .leading, spacing: 10) {
-                    widgetTitle("Interview Countdown", subtitle: title)
-                    Text(timerInterval: Date()...interviewDate, countsDown: true)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                    Text(interviewDate.formatted(date: .complete, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Label("Open Tracker", systemImage: "arrow.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                widgetTitle("Interview Countdown", subtitle: "No interview scheduled")
-                Text("Add an interview date in Tracker to see a live countdown here.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private var upcomingInterviewDate: Date? {
+        guard let interviewDate = entry.snapshot.nextInterviewDate else { return nil }
+        return interviewDate > entry.date ? interviewDate : nil
+    }
+
+    private var interviewTitle: String {
+        entry.snapshot.nextInterviewTitle
+            ?? entry.snapshot.nextInterviewCompany.map { "\($0) Interview" }
+            ?? "Upcoming interview"
+    }
+
+    private var interviewCompanyLine: String {
+        entry.snapshot.nextInterviewCompany ?? interviewTitle
     }
 }
 
