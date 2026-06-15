@@ -36,11 +36,13 @@
 		6AC407A631AEEABC16E48A0F /* HapticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D96A48F58F41FE1D68D9D05 /* HapticsService.swift */; };
 		6B1014B586589FB77D95CC57 /* SharedHistoryDocumentSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6459DB581B49D74C3B551B51 /* SharedHistoryDocumentSupport.swift */; };
 		6BAB69BFCD9A74DDFD3E5C6B /* ATSInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD474CCF739DCCFBE6AB208 /* ATSInsight.swift */; };
+		6F155B77000D806268297F15 /* SharedStreakState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0071ECB8FC9DF9329EAF4E6 /* SharedStreakState.swift */; };
 		6FE6173FD52B58F2A4339130 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62E437F91C90E0E2D170222B /* AnalyticsView.swift */; };
 		785A1DF6C39B9A8F2064F8F1 /* MotionCurves.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30DAF36D4C63A14331D4A84A /* MotionCurves.swift */; };
 		7B6B343CDC1573D0277A6ECD /* MetricPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 856917246B5DA81EB8281D6B /* MetricPill.swift */; };
 		7FFA61A01BC4DE357D15CB4F /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D331903CBC87E0E4C13F5CB4 /* ForgotPasswordView.swift */; };
 		87B51017F8308A9C822616AF /* ScannerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C38EE427CC40866369576E6 /* ScannerViewModel.swift */; };
+		89C20659AF10BC3BA786CC6A /* SharedStreakState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0071ECB8FC9DF9329EAF4E6 /* SharedStreakState.swift */; };
 		8BD44724D7CA963528D58445 /* ATSResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4EAAE2FB86DDDF0F3433812 /* ATSResultsView.swift */; };
 		8DACDDFC65B21FC398C49932 /* CVBoostaWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF7772F015A07077DAB30DB /* CVBoostaWidgetSnapshot.swift */; };
 		90885C66013D29315F43AABB /* ApplicationTrackerWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD204FCF77D50300C7EF080 /* ApplicationTrackerWorkspaceView_iPad.swift */; };
@@ -49,7 +51,6 @@
 		94BEA9C9FC785E7D4512064B /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 634616FF81D1E4EEAF7915B1 /* PaywallView.swift */; };
 		9540FA4583EDA360686541E1 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14738B86F46E79C7FA758A2C /* AppRouter.swift */; };
 		95C4DDF13DD080E97D91F1B2 /* ShareService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12360C6B9C4C8ACCA46372B1 /* ShareService.swift */; };
-		9A6C9A6F2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon */; };
 		9BB7DBFC762E3F2A1E51A2B2 /* UIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4B305144B079B4D9636A0A /* UIComponents.swift */; };
 		9E642E1C589A2FBCA2E9DA2C /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83162248824F6AA07FC508C4 /* KeychainService.swift */; };
 		A152D8430B091E3C91537CE2 /* ColorTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BBD2033B98C9305C023DCCD /* ColorTokens.swift */; };
@@ -62,6 +63,7 @@
 		B60657164012C785BBCCA612 /* ATSResponseParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF76411B4D790EB18DB72BE /* ATSResponseParsingTests.swift */; };
 		B8081D06BF9D8CD22DF01C5E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA31832DAB32F2F0428FDA6 /* OnboardingView.swift */; };
 		B9095B6DA3D10E22D753047D /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2A9218B2C8FB4577724DE3 /* JSONValue.swift */; };
+		9A6C9A6F2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon */; };
 		C6724C80800F64DB795246DF /* TypographyTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F01EA905668C7DAA562A63 /* TypographyTokens.swift */; };
 		C8FC740FAFCBBFEEDDA0C3BC /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6FEAA043E841C4669C6C7E /* WelcomeView.swift */; };
 		C9D4D2E2018B77DE5807CCF2 /* CVBoostaLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1461E22841145EB23F015DCE /* CVBoostaLiveActivity.swift */; };
@@ -169,13 +171,14 @@
 		8DC92A83BB7F7127FA9CDA40 /* ResumeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeService.swift; sourceTree = "<group>"; };
 		953953FABDC008F39700FB1C /* CloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncService.swift; sourceTree = "<group>"; };
 		9992BBEA9E48B91E8D1C3434 /* WidgetSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSyncService.swift; sourceTree = "<group>"; };
-		9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "CVBOOSTA IOS ICON.icon"; sourceTree = "<group>"; };
 		9B4B305144B079B4D9636A0A /* UIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIComponents.swift; sourceTree = "<group>"; };
 		9BB3081B65BD244BECD75FA9 /* TailoringWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailoringWorkspaceView_iPad.swift; sourceTree = "<group>"; };
 		9E4B2E4DC9389C29E5CCC947 /* CVBoostaWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaWidgets.swift; sourceTree = "<group>"; };
 		9FF7772F015A07077DAB30DB /* CVBoostaWidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaWidgetSnapshot.swift; sourceTree = "<group>"; };
+		A0071ECB8FC9DF9329EAF4E6 /* SharedStreakState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStreakState.swift; sourceTree = "<group>"; };
 		A23540F758E3EDCD837B0B25 /* ScanLimitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanLimitService.swift; sourceTree = "<group>"; };
 		AA66DB81C49009B7D8053EF9 /* StatisticsWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsWorkspaceView_iPad.swift; sourceTree = "<group>"; };
+		9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "CVBOOSTA IOS ICON.icon"; sourceTree = "<group>"; };
 		AAC93232D43362218F1D58CA /* CVBoostaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CVBoostaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AEE5A1A839FD6DF6A38FCED8 /* HandoffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffService.swift; sourceTree = "<group>"; };
 		AF9335E5A9024CA3551C605D /* SiriSuggestionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriSuggestionService.swift; sourceTree = "<group>"; };
@@ -485,6 +488,7 @@
 			isa = PBXGroup;
 			children = (
 				9FF7772F015A07077DAB30DB /* CVBoostaWidgetSnapshot.swift */,
+				A0071ECB8FC9DF9329EAF4E6 /* SharedStreakState.swift */,
 			);
 			path = SharedWidgetSupport;
 			sourceTree = "<group>";
@@ -668,6 +672,7 @@
 				DD7638D5E516B0A68419B367 /* SettingsWorkspaceView_iPad.swift in Sources */,
 				95C4DDF13DD080E97D91F1B2 /* ShareService.swift in Sources */,
 				6B1014B586589FB77D95CC57 /* SharedHistoryDocumentSupport.swift in Sources */,
+				89C20659AF10BC3BA786CC6A /* SharedStreakState.swift in Sources */,
 				52330AB38A5D1268BB375BD0 /* SiriSuggestionService.swift in Sources */,
 				570D6D6F9D69430B0F1EB0F7 /* SpacingTokens.swift in Sources */,
 				CCB6241CFBD0F5BEB01B2AA2 /* SpotlightIndexer.swift in Sources */,
@@ -705,6 +710,7 @@
 				C9D4D2E2018B77DE5807CCF2 /* CVBoostaLiveActivity.swift in Sources */,
 				457AE59E76AFC4E925C898D9 /* CVBoostaWidgetSnapshot.swift in Sources */,
 				5B7BF584111FCB4ACAB82CB0 /* CVBoostaWidgets.swift in Sources */,
+				6F155B77000D806268297F15 /* SharedStreakState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
