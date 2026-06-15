@@ -172,7 +172,7 @@ struct SettingsView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "App")
-                row("Version", value: Bundle.main.releaseVersionString)
+                row("Version", value: appVersion)
                 row("Contact Support", value: AppEnvironment.supportEmail)
 
                 SecondaryButton(title: "Open Privacy Policy") {
@@ -188,6 +188,10 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
     }
 
     private func row(_ title: String, value: String) -> some View {

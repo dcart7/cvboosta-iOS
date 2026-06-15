@@ -294,7 +294,7 @@ struct SettingsWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "App")
                 infoRow("Support", value: AppEnvironment.supportEmail)
-                infoRow("Version", value: Bundle.main.releaseVersionString)
+                infoRow("Version", value: appVersion)
 
                 SecondaryButton(title: "Open Privacy Policy") {
                     openURL(AppEnvironment.privacyPolicyURL)
@@ -312,6 +312,10 @@ struct SettingsWorkspaceView_iPad: View {
                 .hoverEffect(.highlight)
             }
         }
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
     }
 
     private func infoRow(_ title: String, value: String) -> some View {
