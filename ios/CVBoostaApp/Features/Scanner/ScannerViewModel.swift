@@ -36,10 +36,10 @@ final class ScannerViewModel: ObservableObject {
     @Published var scanResult: ResumeScanResult?
 
     let loadingSteps: [String] = [
-        "Reading resume structure",
-        "Checking ATS compatibility",
-        "Finding missing keywords",
-        "Preparing improvement plan"
+        "Analyzing ATS compatibility",
+        "Optimizing keywords",
+        "Scanning formatting issues",
+        "Generating tailored resume"
     ]
 
     private let atsService: ATSServiceProtocol
@@ -294,8 +294,8 @@ final class ScannerViewModel: ObservableObject {
     private func startLiveActivity() async {
         if #available(iOS 16.1, *) {
             await LiveActivityManager.shared.startATSOptimization(
-                title: "ATS Scan",
-                detail: selectedFileName ?? "Resume"
+                title: "ATS Analysis",
+                detail: loadingSteps[0]
             )
         }
     }

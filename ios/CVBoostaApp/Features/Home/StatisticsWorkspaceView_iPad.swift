@@ -123,9 +123,11 @@ struct StatisticsWorkspaceView_iPad: View {
                 .ignoresSafeArea()
 
                 GeometryReader { proxy in
+                    let horizontalPadding = WorkspaceLayoutMetrics.horizontalPadding(for: proxy.size.width)
+
                     ScrollView {
-                        content(width: proxy.size.width)
-                            .padding(.horizontal, BoostaSpace.xl)
+                        content(width: proxy.size.width, horizontalPadding: horizontalPadding)
+                            .padding(.horizontal, horizontalPadding)
                             .padding(.top, BoostaSpace.md)
                             .padding(.bottom, BoostaSpace.xl)
                             .frame(maxWidth: 1560)
@@ -186,10 +188,10 @@ struct StatisticsWorkspaceView_iPad: View {
     }
 
     @ViewBuilder
-    private func content(width: CGFloat) -> some View {
-        let columnCount = workspaceColumnCount(for: width)
+    private func content(width: CGFloat, horizontalPadding: CGFloat) -> some View {
+        let columnCount = workspaceColumnCount(for: width, horizontalPadding: horizontalPadding)
         let columns = Array(
-            repeating: GridItem(.flexible(minimum: 320), spacing: BoostaSpace.lg, alignment: .top),
+            repeating: GridItem(.flexible(minimum: 300), spacing: BoostaSpace.lg, alignment: .top),
             count: columnCount
         )
 
@@ -205,41 +207,70 @@ struct StatisticsWorkspaceView_iPad: View {
         .animation(BoostaMotion.smooth, value: columnCount)
     }
 
-    private func workspaceColumnCount(for width: CGFloat) -> Int {
-        if width >= 1320 { return 3 }
-        if width >= 980 { return 2 }
-        return 1
+    private func workspaceColumnCount(for width: CGFloat, horizontalPadding: CGFloat) -> Int {
+        WorkspaceLayoutMetrics.columnCount(
+            for: width,
+            minCardWidth: 300,
+            maxColumns: 3,
+            horizontalPadding: horizontalPadding
+        )
     }
 
     private var headerCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            HStack(alignment: .top, spacing: BoostaSpace.lg) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Hi, \(firstName)")
-                        .font(BoostaType.title)
-                        .foregroundStyle(BoostaColor.primaryText)
-                    Text("Your career intelligence workspace — shared across web and iPad.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                    headerContent
+                    Spacer(minLength: 0)
+                    headerActions
                 }
 
-                Spacer()
-
-                HStack(spacing: BoostaSpace.sm) {
-                    WorkspaceActionButton(
-                        title: "Scan Resume",
-                        systemImage: "doc.text.magnifyingglass"
-                    ) {
-                        appRouter.open(.scanner)
-                    }
-
-                    WorkspaceActionButton(
-                        title: "Tailor",
-                        systemImage: "wand.and.stars"
-                    ) {
-                        appRouter.open(.tailoring)
-                    }
+                VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                    headerContent
+                    headerActions
                 }
+            }
+        }
+    }
+
+    private var headerContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Hi, \(firstName)")
+                .font(BoostaType.title)
+                .foregroundStyle(BoostaColor.primaryText)
+            Text("Your career intelligence workspace — shared across web and iPad.")
+                .font(BoostaType.body)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var headerActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: BoostaSpace.sm) {
+                headerActionButtons
+            }
+
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                headerActionButtons
+            }
+        }
+    }
+
+    private var headerActionButtons: some View {
+        Group {
+            WorkspaceActionButton(
+                title: "Scan Resume",
+                systemImage: "doc.text.magnifyingglass"
+            ) {
+                appRouter.open(.scanner)
+            }
+
+            WorkspaceActionButton(
+                title: "Tailor",
+                systemImage: "wand.and.stars"
+            ) {
+                appRouter.open(.tailoring)
             }
         }
     }
@@ -302,46 +333,72 @@ struct StatisticsWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "Today")
 
-                HStack(alignment: .top, spacing: BoostaSpace.lg) {
-                    HStack(spacing: BoostaSpace.md) {
-                        ScoreRing(score: latestScore)
-                            .frame(width: 120, height: 120)
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(latestScore == 0 ? "No scans yet" : "Latest ATS Score")
-                                .font(BoostaType.bodyStrong)
-                            Text(latestScore == 0 ? "Run one scan to get a baseline and unlock insights." : "Keep refining role keywords and measurable impact.")
-                                .font(BoostaType.body)
-                                .foregroundStyle(BoostaColor.secondaryText)
-                        }
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                        overviewLead
+                        Spacer(minLength: 0)
+                        overviewMetrics
                     }
 
-                    Spacer(minLength: 0)
-
-                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                        HStack(spacing: BoostaSpace.sm) {
-                            MetricPill(title: "Applications", value: "\(applicationsCount)", color: BoostaColor.accent)
-                            MetricPill(title: "Interviews", value: "\(interviewsCount)", color: BoostaColor.success)
-                            MetricPill(title: "Avg. ATS", value: avgScore == 0 ? "—" : "\(avgScore)", color: BoostaColor.warning)
-                        }
-
-                        HStack(spacing: BoostaSpace.sm) {
-                            StatisticsMetricRing_iPad(title: "Career", value: latestScore == 0 ? "—" : "\(latestScore)", progress: Double(latestScore) / 100, tint: BoostaColor.accent)
-                            StatisticsMetricRing_iPad(title: "Interviews", value: "\(interviewsCount)", progress: min(Double(interviewsCount) / 5, 1), tint: BoostaColor.success)
-                            StatisticsMetricRing_iPad(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", progress: min(Double(streakDays) / 10, 1), tint: BoostaColor.warning)
-                        }
-
-                        Divider()
-                            .opacity(0.35)
-
-                        Text("Focus: Tailor for one role, rescan, then apply.")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.secondaryText)
+                    VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                        overviewLead
+                        overviewMetrics
                     }
                 }
             }
         }
         .frame(minHeight: 230, alignment: .top)
+    }
+
+    private var overviewLead: some View {
+        HStack(spacing: BoostaSpace.md) {
+            ScoreRing(score: latestScore)
+                .frame(width: 120, height: 120)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(latestScore == 0 ? "No scans yet" : "Latest ATS Score")
+                    .font(BoostaType.bodyStrong)
+                Text(latestScore == 0 ? "Run one scan to get a baseline and unlock insights." : "Keep refining role keywords and measurable impact.")
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var overviewMetrics: some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BoostaSpace.sm) {
+                    overviewMetricPills
+                }
+
+                VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                    overviewMetricPills
+                }
+            }
+
+            HStack(spacing: BoostaSpace.sm) {
+                StatisticsMetricRing_iPad(title: "Career", value: latestScore == 0 ? "—" : "\(latestScore)", progress: Double(latestScore) / 100, tint: BoostaColor.accent)
+                StatisticsMetricRing_iPad(title: "Interviews", value: "\(interviewsCount)", progress: min(Double(interviewsCount) / 5, 1), tint: BoostaColor.success)
+                StatisticsMetricRing_iPad(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", progress: min(Double(streakDays) / 10, 1), tint: BoostaColor.warning)
+            }
+
+            Divider()
+                .opacity(0.35)
+
+            Text("Focus: Tailor for one role, rescan, then apply.")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        }
+    }
+
+    private var overviewMetricPills: some View {
+        Group {
+            MetricPill(title: "Applications", value: "\(applicationsCount)", color: BoostaColor.accent)
+            MetricPill(title: "Interviews", value: "\(interviewsCount)", color: BoostaColor.success)
+            MetricPill(title: "Avg. ATS", value: avgScore == 0 ? "—" : "\(avgScore)", color: BoostaColor.warning)
+        }
     }
 
     private var atsTrendCard: some View {
@@ -496,97 +553,83 @@ struct StatisticsWorkspaceView_iPad: View {
                 )
 
                 if let payload = latestPayload {
-                    HStack(alignment: .top, spacing: BoostaSpace.lg) {
-                        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                            Text("Top missing skills")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.secondaryText)
-
-                            let limit = subscriptionService.isPremium ? 12 : 6
-                            let keywords = Array(payload.response.missingSkills.prefix(limit))
-
-                            if keywords.isEmpty {
-                                Text("No major gaps detected.")
-                                    .font(BoostaType.body)
-                                    .foregroundStyle(BoostaColor.secondaryText)
-                            } else {
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], alignment: .leading, spacing: 8) {
-                                    ForEach(keywords, id: \.self) { keyword in
-                                        KeywordChip(text: keyword, status: .missing)
-                                    }
-                                }
-                            }
-                        }
-
-                        Divider()
-                            .opacity(0.35)
-
-                        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                            Text("Quick wins")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.secondaryText)
-
-                            let fixes = Array(payload.response.recommendations.prefix(4))
-                            if fixes.isEmpty {
-                                Text("No quick wins flagged yet.")
-                                    .font(BoostaType.body)
-                                    .foregroundStyle(BoostaColor.secondaryText)
-                            } else {
-                                ForEach(fixes, id: \.self) { item in
-                                    Text("• \(item)")
-                                        .font(BoostaType.body)
-                                        .foregroundStyle(BoostaColor.secondaryText)
-                                }
-                            }
-                        }
-                    }
+                    responsiveInsightsLayout(
+                        keywords: Array(payload.response.missingSkills.prefix(subscriptionService.isPremium ? 12 : 6)),
+                        recommendations: Array(payload.response.recommendations.prefix(4))
+                    )
                 } else if let detail = latestHistoryDetail {
-                    HStack(alignment: .top, spacing: BoostaSpace.lg) {
-                        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                            Text("Top missing skills")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.secondaryText)
-
-                            let keywords = Array(detail.missingSkills.prefix(subscriptionService.isPremium ? 12 : 6))
-                            if keywords.isEmpty {
-                                Text("No major gaps detected.")
-                                    .font(BoostaType.body)
-                                    .foregroundStyle(BoostaColor.secondaryText)
-                            } else {
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], alignment: .leading, spacing: 8) {
-                                    ForEach(keywords, id: \.self) { keyword in
-                                        KeywordChip(text: keyword, status: .missing)
-                                    }
-                                }
-                            }
-                        }
-
-                        Divider()
-                            .opacity(0.35)
-
-                        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                            Text("Quick wins")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.secondaryText)
-
-                            let fixes = Array(detail.recommendations.prefix(4))
-                            if fixes.isEmpty {
-                                Text("No quick wins flagged yet.")
-                                    .font(BoostaType.body)
-                                    .foregroundStyle(BoostaColor.secondaryText)
-                            } else {
-                                ForEach(fixes, id: \.self) { item in
-                                    Text("• \(item)")
-                                        .font(BoostaType.body)
-                                        .foregroundStyle(BoostaColor.secondaryText)
-                                }
-                            }
-                        }
-                    }
+                    responsiveInsightsLayout(
+                        keywords: Array(detail.missingSkills.prefix(subscriptionService.isPremium ? 12 : 6)),
+                        recommendations: Array(detail.recommendations.prefix(4))
+                    )
                 } else {
                     Text("Run a scan to unlock personalized insights.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func responsiveInsightsLayout(keywords: [String], recommendations: [String]) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                insightsKeywordsSection(keywords: keywords)
+
+                Divider()
+                    .opacity(0.35)
+
+                insightsRecommendationsSection(recommendations: recommendations)
+            }
+
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                insightsKeywordsSection(keywords: keywords)
+
+                Divider()
+                    .opacity(0.35)
+
+                insightsRecommendationsSection(recommendations: recommendations)
+            }
+        }
+    }
+
+    private func insightsKeywordsSection(keywords: [String]) -> some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+            Text("Top missing skills")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+
+            if keywords.isEmpty {
+                Text("No major gaps detected.")
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(keywords, id: \.self) { keyword in
+                        KeywordChip(text: keyword, status: .missing)
+                    }
+                }
+            }
+        }
+    }
+
+    private func insightsRecommendationsSection(recommendations: [String]) -> some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+            Text("Quick wins")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+
+            if recommendations.isEmpty {
+                Text("No quick wins flagged yet.")
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
+            } else {
+                ForEach(recommendations, id: \.self) { item in
+                    Text("• \(item)")
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

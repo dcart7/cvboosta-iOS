@@ -338,6 +338,42 @@ struct EmptyStateView: View {
     }
 }
 
+enum WorkspaceLayoutMetrics {
+    static let gridSpacing = BoostaSpace.lg
+
+    static func horizontalPadding(for width: CGFloat) -> CGFloat {
+        if width >= 1360 {
+            return BoostaSpace.xl
+        }
+        if width >= 900 {
+            return BoostaSpace.lg
+        }
+        return BoostaSpace.md
+    }
+
+    static func columnCount(
+        for width: CGFloat,
+        minCardWidth: CGFloat,
+        maxColumns: Int,
+        horizontalPadding: CGFloat? = nil,
+        spacing: CGFloat = gridSpacing
+    ) -> Int {
+        let padding = horizontalPadding ?? self.horizontalPadding(for: width)
+        let availableWidth = max(width - (padding * 2), minCardWidth)
+        var bestCount = 1
+
+        for count in 1...maxColumns {
+            let totalSpacing = CGFloat(count - 1) * spacing
+            let cardWidth = (availableWidth - totalSpacing) / CGFloat(count)
+            if cardWidth >= minCardWidth {
+                bestCount = count
+            }
+        }
+
+        return bestCount
+    }
+}
+
 #if DEBUG
 struct UIComponents_Previews: PreviewProvider {
     static var previews: some View {

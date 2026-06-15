@@ -45,9 +45,11 @@ struct SettingsWorkspaceView_iPad: View {
                 .ignoresSafeArea()
 
                 GeometryReader { proxy in
+                    let horizontalPadding = WorkspaceLayoutMetrics.horizontalPadding(for: proxy.size.width)
+
                     ScrollView {
-                        settingsGrid(width: proxy.size.width)
-                            .padding(.horizontal, BoostaSpace.xl)
+                        settingsGrid(width: proxy.size.width, horizontalPadding: horizontalPadding)
+                            .padding(.horizontal, horizontalPadding)
                             .padding(.top, BoostaSpace.lg)
                             .padding(.bottom, BoostaSpace.xxl)
                             .frame(maxWidth: 1400)
@@ -94,10 +96,10 @@ struct SettingsWorkspaceView_iPad: View {
         }
     }
 
-    private func settingsGrid(width: CGFloat) -> some View {
-        let columnCount = settingsColumnCount(for: width)
+    private func settingsGrid(width: CGFloat, horizontalPadding: CGFloat) -> some View {
+        let columnCount = settingsColumnCount(for: width, horizontalPadding: horizontalPadding)
         let columns = Array(
-            repeating: GridItem(.flexible(minimum: 320), spacing: BoostaSpace.lg, alignment: .top),
+            repeating: GridItem(.flexible(minimum: 300), spacing: BoostaSpace.lg, alignment: .top),
             count: columnCount
         )
 
@@ -116,35 +118,64 @@ struct SettingsWorkspaceView_iPad: View {
         .animation(BoostaMotion.smooth, value: columnCount)
     }
 
-    private func settingsColumnCount(for width: CGFloat) -> Int {
-        if width >= 1220 { return 3 }
-        if width >= 860 { return 2 }
-        return 1
+    private func settingsColumnCount(for width: CGFloat, horizontalPadding: CGFloat) -> Int {
+        WorkspaceLayoutMetrics.columnCount(
+            for: width,
+            minCardWidth: 300,
+            maxColumns: 3,
+            horizontalPadding: horizontalPadding
+        )
     }
 
     private var headerCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            HStack(alignment: .top, spacing: BoostaSpace.lg) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Account & App")
-                        .font(BoostaType.title)
-                        .foregroundStyle(BoostaColor.primaryText)
-                    Text("Manage your plan, privacy, appearance, and workflow preferences.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                    settingsHeaderContent
+                    Spacer(minLength: 0)
+                    settingsHeaderActions
                 }
 
-                Spacer(minLength: 0)
-
-                HStack(spacing: BoostaSpace.sm) {
-                    WorkspaceActionButton(title: "Upgrade", systemImage: "crown", isDisabled: subscriptionService.isPremium) {
-                        showPaywall = true
-                    }
-
-                    WorkspaceActionButton(title: "Log out", systemImage: "rectangle.portrait.and.arrow.right") {
-                        Task { await authViewModel.logout() }
-                    }
+                VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                    settingsHeaderContent
+                    settingsHeaderActions
                 }
+            }
+        }
+    }
+
+    private var settingsHeaderContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Account & App")
+                .font(BoostaType.title)
+                .foregroundStyle(BoostaColor.primaryText)
+            Text("Manage your plan, privacy, appearance, and workflow preferences.")
+                .font(BoostaType.body)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var settingsHeaderActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: BoostaSpace.sm) {
+                settingsHeaderButtons
+            }
+
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                settingsHeaderButtons
+            }
+        }
+    }
+
+    private var settingsHeaderButtons: some View {
+        Group {
+            WorkspaceActionButton(title: "Upgrade", systemImage: "crown", isDisabled: subscriptionService.isPremium) {
+                showPaywall = true
+            }
+
+            WorkspaceActionButton(title: "Log out", systemImage: "rectangle.portrait.and.arrow.right") {
+                Task { await authViewModel.logout() }
             }
         }
     }
@@ -154,22 +185,35 @@ struct SettingsWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "Account")
 
-                HStack(spacing: BoostaSpace.lg) {
-                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                        infoRow("Name", value: userName)
-                        infoRow("Email", value: email)
-                        infoRow("Subscription", value: planTitle)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: BoostaSpace.lg) {
+                        accountPrimaryDetails
+                        Spacer(minLength: 0)
+                        accountSecondaryDetails
                     }
 
-                    Spacer(minLength: 0)
-
-                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                        infoRow("Resume history", value: "\(authViewModel.me?.savedResumes.count ?? 0)")
-                        infoRow("Scan history", value: "\(authViewModel.me?.scanHistory.count ?? 0)")
-                        infoRow("Applications", value: "\(trackedApplications.count)")
+                    VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                        accountPrimaryDetails
+                        accountSecondaryDetails
                     }
                 }
             }
+        }
+    }
+
+    private var accountPrimaryDetails: some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+            infoRow("Name", value: userName)
+            infoRow("Email", value: email)
+            infoRow("Subscription", value: planTitle)
+        }
+    }
+
+    private var accountSecondaryDetails: some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+            infoRow("Resume history", value: "\(authViewModel.me?.savedResumes.count ?? 0)")
+            infoRow("Scan history", value: "\(authViewModel.me?.scanHistory.count ?? 0)")
+            infoRow("Applications", value: "\(trackedApplications.count)")
         }
     }
 
@@ -250,7 +294,7 @@ struct SettingsWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "App")
                 infoRow("Support", value: AppEnvironment.supportEmail)
-                infoRow("Version", value: "1.0")
+                infoRow("Version", value: Bundle.main.releaseVersionString)
 
                 SecondaryButton(title: "Open Privacy Policy") {
                     openURL(AppEnvironment.privacyPolicyURL)
@@ -271,15 +315,18 @@ struct SettingsWorkspaceView_iPad: View {
     }
 
     private func infoRow(_ title: String, value: String) -> some View {
-        HStack {
+        HStack(alignment: .top, spacing: BoostaSpace.sm) {
             Text(title)
                 .font(BoostaType.body)
                 .foregroundStyle(BoostaColor.secondaryText)
-            Spacer()
+                .lineLimit(2)
+            Spacer(minLength: 0)
             Text(value)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
                 .multilineTextAlignment(.trailing)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

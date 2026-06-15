@@ -172,7 +172,7 @@ struct SettingsView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "App")
-                row("Version", value: "1.0")
+                row("Version", value: Bundle.main.releaseVersionString)
                 row("Contact Support", value: AppEnvironment.supportEmail)
 
                 SecondaryButton(title: "Open Privacy Policy") {

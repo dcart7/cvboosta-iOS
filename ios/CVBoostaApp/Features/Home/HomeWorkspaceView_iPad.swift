@@ -144,9 +144,11 @@ struct HomeWorkspaceView_iPad: View {
                 .ignoresSafeArea()
 
                 GeometryReader { proxy in
+                    let horizontalPadding = WorkspaceLayoutMetrics.horizontalPadding(for: proxy.size.width)
+
                     ScrollView {
-                        content(width: proxy.size.width)
-                            .padding(.horizontal, BoostaSpace.xl)
+                        content(width: proxy.size.width, horizontalPadding: horizontalPadding)
+                            .padding(.horizontal, horizontalPadding)
                             .padding(.top, BoostaSpace.md)
                             .padding(.bottom, BoostaSpace.xl)
                             .frame(maxWidth: 1560)
@@ -234,49 +236,84 @@ struct HomeWorkspaceView_iPad: View {
     }
 
     @ViewBuilder
-    private func content(width: CGFloat) -> some View {
-        let columns = width >= 1180
-            ? [GridItem(.flexible()), GridItem(.flexible())]
-            : [GridItem(.flexible())]
+    private func content(width: CGFloat, horizontalPadding: CGFloat) -> some View {
+        let columnCount = WorkspaceLayoutMetrics.columnCount(
+            for: width,
+            minCardWidth: 320,
+            maxColumns: 2,
+            horizontalPadding: horizontalPadding
+        )
+        let columns = Array(
+            repeating: GridItem(.flexible(minimum: 320), spacing: BoostaSpace.lg, alignment: .top),
+            count: columnCount
+        )
 
         LazyVGrid(columns: columns, alignment: .leading, spacing: BoostaSpace.lg) {
             heroCard
-                .gridCellColumns(columns.count)
+                .gridCellColumns(columnCount)
 
             quickStatsCard
             todayCard
             recentActivityCard
-                .gridCellColumns(columns.count)
+                .gridCellColumns(columnCount)
 
             actionsCard
-                .gridCellColumns(columns.count)
+                .gridCellColumns(columnCount)
         }
+        .animation(BoostaMotion.smooth, value: columnCount)
     }
 
     private var heroCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            HStack(alignment: .center, spacing: BoostaSpace.lg) {
-                ScoreRing(score: careerScore)
-                    .frame(width: 132, height: 132)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Welcome back, \(firstName)")
-                        .font(BoostaType.title)
-                        .foregroundStyle(BoostaColor.primaryText)
-                    Text("Career momentum: \(momentumScore == 0 ? "Start your baseline" : "\(momentumScore)/100") • review today's actions, then jump into the deeper dashboard.")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
-
-                    HStack(spacing: BoostaSpace.sm) {
-                        WorkspaceCTAButton(title: "View Full Statistics", systemImage: "chart.line.uptrend.xyaxis") {
-                            appRouter.open(.statistics)
-                        }
-
-                        WorkspaceCTAButton(title: "Analyze Resume", systemImage: "doc.text.magnifyingglass") {
-                            appRouter.open(.scanner)
-                        }
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: BoostaSpace.lg) {
+                    heroRing
+                    heroContent
                 }
+
+                VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                    heroRing
+                    heroContent
+                }
+            }
+        }
+    }
+
+    private var heroRing: some View {
+        ScoreRing(score: careerScore)
+            .frame(width: 132, height: 132)
+    }
+
+    private var heroContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Welcome back, \(firstName)")
+                .font(BoostaType.title)
+                .foregroundStyle(BoostaColor.primaryText)
+            Text("Career momentum: \(momentumScore == 0 ? "Start your baseline" : "\(momentumScore)/100") • review today's actions, then jump into the deeper dashboard.")
+                .font(BoostaType.body)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BoostaSpace.sm) {
+                    heroPrimaryActions
+                }
+
+                VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                    heroPrimaryActions
+                }
+            }
+        }
+    }
+
+    private var heroPrimaryActions: some View {
+        Group {
+            WorkspaceCTAButton(title: "View Full Statistics", systemImage: "chart.line.uptrend.xyaxis") {
+                appRouter.open(.statistics)
+            }
+
+            WorkspaceCTAButton(title: "Analyze Resume", systemImage: "doc.text.magnifyingglass") {
+                appRouter.open(.scanner)
             }
         }
     }
@@ -310,6 +347,7 @@ struct HomeWorkspaceView_iPad: View {
                 }
             }
         }
+        .frame(minHeight: 316, alignment: .top)
     }
 
     private var todayCard: some View {
@@ -349,7 +387,7 @@ struct HomeWorkspaceView_iPad: View {
                 }
             }
         }
-        .frame(minHeight: 224, alignment: .top)
+        .frame(minHeight: 316, alignment: .top)
     }
 
     private var recentActivityCard: some View {
@@ -411,17 +449,29 @@ struct HomeWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Quick Actions", subtitle: "Jump back into the workflow")
 
-                HStack(spacing: BoostaSpace.sm) {
-                    WorkspaceCTAButton(title: "Tailoring", systemImage: "wand.and.stars") {
-                        appRouter.open(.tailoring)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: BoostaSpace.sm) {
+                        actionButtons
                     }
-                    WorkspaceCTAButton(title: "Tracker", systemImage: "list.bullet.clipboard") {
-                        appRouter.open(.tracker)
-                    }
-                    WorkspaceCTAButton(title: "Settings", systemImage: "gearshape") {
-                        appRouter.open(.settings)
+
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        actionButtons
                     }
                 }
+            }
+        }
+    }
+
+    private var actionButtons: some View {
+        Group {
+            WorkspaceCTAButton(title: "Tailoring", systemImage: "wand.and.stars") {
+                appRouter.open(.tailoring)
+            }
+            WorkspaceCTAButton(title: "Tracker", systemImage: "list.bullet.clipboard") {
+                appRouter.open(.tracker)
+            }
+            WorkspaceCTAButton(title: "Settings", systemImage: "gearshape") {
+                appRouter.open(.settings)
             }
         }
     }

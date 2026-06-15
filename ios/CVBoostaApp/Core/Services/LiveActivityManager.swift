@@ -120,7 +120,7 @@ final class LiveActivityManager {
     }
 
     func startATSOptimization(title: String, detail: String) async {
-        let attributes = CVBoostaActivityAttributes(activityName: "ATS Optimization")
+        let attributes = CVBoostaActivityAttributes(activityName: "ATS Analysis")
         let state = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
             title: title,
@@ -153,7 +153,7 @@ final class LiveActivityManager {
 
         let newState = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
-            title: "ATS Optimization",
+            title: "ATS Analysis",
             detail: detail,
             progress: progress,
             etaText: etaText
@@ -167,7 +167,7 @@ final class LiveActivityManager {
 
         let newState = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
-            title: "ATS Scan running",
+            title: "ATS Analysis running",
             detail: detail,
             progress: progress,
             etaText: "Continuing in background"
@@ -188,7 +188,7 @@ final class LiveActivityManager {
 
         let completed = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
-            title: "ATS Scan Complete",
+            title: "ATS Analysis complete",
             detail: "Final score: \(finalScore)",
             progress: 1.0,
             etaText: ""
@@ -204,7 +204,7 @@ final class LiveActivityManager {
         let attributes = CVBoostaActivityAttributes(activityName: "Career Streak")
         let state = CVBoostaActivityAttributes.ContentState(
             mode: .dailyStreak,
-            title: dayCount == 0 ? "Momentum started" : "Streak protected 🔥",
+            title: dayCount == 0 ? "Momentum started" : "Career streak active",
             detail: detail,
             progress: min(max(Double(dayCount) / 30.0, 0.08), 1),
             etaText: dayCount == 0 ? "Day 1" : "\(dayCount) days"
@@ -225,10 +225,10 @@ final class LiveActivityManager {
         let progress = min(max(Double(dayCount) / 30.0, 0.08), 1)
         let state = CVBoostaActivityAttributes.ContentState(
             mode: .dailyStreak,
-            title: "Protect your streak",
+            title: "Weekly consistency goal",
             detail: detail,
             progress: progress,
-            etaText: dayCount == 0 ? "One action" : "\(dayCount) days alive"
+            etaText: dayCount == 0 ? "1 / 1 day" : "\(min(dayCount, 5)) / 5 days"
         )
 
         await upsertSupportActivity(
@@ -302,7 +302,7 @@ final class LiveActivityManager {
 
         let failed = CVBoostaActivityAttributes.ContentState(
             mode: .atsOptimization,
-            title: "ATS Scan Failed",
+            title: "ATS Analysis failed",
             detail: "Please try again",
             progress: 0.0,
             etaText: ""

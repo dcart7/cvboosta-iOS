@@ -32,17 +32,45 @@ struct StreakCenterView: View {
             )
             .ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                    heroCard
-                    todayCard
-                    heatmapCard
-                    milestonesCard
-                    missionsCard
-                    achievementsCard
-                    remindersCard
+            GeometryReader { proxy in
+                let horizontalPadding = WorkspaceLayoutMetrics.horizontalPadding(for: proxy.size.width)
+                let columnCount = WorkspaceLayoutMetrics.columnCount(
+                    for: proxy.size.width,
+                    minCardWidth: 310,
+                    maxColumns: 3,
+                    horizontalPadding: horizontalPadding
+                )
+                let columns = Array(
+                    repeating: GridItem(.flexible(minimum: 310), spacing: BoostaSpace.lg, alignment: .top),
+                    count: columnCount
+                )
+
+                ScrollView {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: BoostaSpace.lg) {
+                        heroCard
+                            .gridCellColumns(columnCount)
+
+                        todayCard
+                        heatmapCard
+
+                        milestonesCard
+                            .gridCellColumns(min(2, columnCount))
+
+                        missionsCard
+                        achievementsCard
+
+                        pushNotificationsCard
+                            .gridCellColumns(min(2, columnCount))
+
+                        liveActivitiesCard
+                            .gridCellColumns(min(2, columnCount))
+
+                        notificationRulesCard
+                            .gridCellColumns(columnCount)
+                    }
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.vertical, BoostaSpace.md)
                 }
-                .padding(BoostaSpace.md)
             }
         }
         .navigationTitle("Streak")
@@ -51,37 +79,63 @@ struct StreakCenterView: View {
     private var heroCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                HStack(alignment: .center, spacing: BoostaSpace.md) {
-                    ZStack {
-                        StreakProgressRing(
-                            currentStreak: summary.currentStreak,
-                            progress: summary.progressToNextMilestone
-                        )
-                            .frame(width: 118, height: 118)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: BoostaSpace.md) {
+                        heroProgressRing
+                        heroCopy
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(summary.identityLine)
-                            .font(BoostaType.section)
-                            .foregroundStyle(BoostaColor.primaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(summary.statusTitle)
-                            .font(BoostaType.bodyStrong)
-                            .foregroundStyle(summary.statusTint)
-                            .lineLimit(2)
-                        Text(summary.microcopy)
-                            .font(BoostaType.body)
-                            .foregroundStyle(BoostaColor.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                        heroProgressRing
+                        heroCopy
                     }
                 }
 
-                HStack(spacing: BoostaSpace.sm) {
-                    MetricPill(title: "Weekly", value: "\(summary.weeklyActiveDays)/7", color: BoostaColor.accent)
-                    MetricPill(title: "Level", value: summary.careerLevel, color: BoostaColor.accentSecondary)
-                    MetricPill(title: "Best", value: "\(summary.longestStreak)d", color: BoostaColor.success)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: BoostaSpace.sm) {
+                        heroMetricPills
+                    }
+
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        heroMetricPills
+                    }
                 }
             }
+        }
+    }
+
+    private var heroProgressRing: some View {
+        ZStack {
+            StreakProgressRing(
+                currentStreak: summary.currentStreak,
+                progress: summary.progressToNextMilestone
+            )
+            .frame(width: 118, height: 118)
+        }
+    }
+
+    private var heroCopy: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(summary.identityLine)
+                .font(BoostaType.section)
+                .foregroundStyle(BoostaColor.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(summary.statusTitle)
+                .font(BoostaType.bodyStrong)
+                .foregroundStyle(summary.statusTint)
+                .lineLimit(2)
+            Text(summary.microcopy)
+                .font(BoostaType.body)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var heroMetricPills: some View {
+        Group {
+            MetricPill(title: "Weekly", value: "\(summary.weeklyActiveDays)/7", color: BoostaColor.accent)
+            MetricPill(title: "Level", value: summary.careerLevel, color: BoostaColor.accentSecondary)
+            MetricPill(title: "Best", value: "\(summary.longestStreak)d", color: BoostaColor.success)
         }
     }
 
@@ -247,7 +301,7 @@ struct StreakCenterView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
                 SectionHeader(title: "Achievements", subtitle: "Professional energy, subtle dopamine")
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: BoostaSpace.sm) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: BoostaSpace.sm)], spacing: BoostaSpace.sm) {
                     ForEach(summary.achievements) { achievement in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(achievement.title)
@@ -271,18 +325,224 @@ struct StreakCenterView: View {
         }
     }
 
-    private var remindersCard: some View {
+    private var pushNotificationsCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                SectionHeader(title: "Reminder Style", subtitle: "Friendly, short, not cringe")
+                SectionHeader(title: "Push Notifications", subtitle: "Calm, useful, premium assistant tone")
 
-                ForEach(summary.notificationIdeas, id: \.self) { line in
-                    Text("• \(line)")
-                        .font(BoostaType.body)
-                        .foregroundStyle(BoostaColor.secondaryText)
+                ForEach(pushNotificationSections) { section in
+                    previewSectionView(section)
                 }
             }
         }
+    }
+
+    private var liveActivitiesCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "Live Activities", subtitle: "Only for active sessions and timelines")
+
+                ForEach(liveActivitySections) { section in
+                    previewSectionView(section)
+                }
+            }
+        }
+    }
+
+    private var notificationRulesCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "Notification Rules", subtitle: "No spam, no fake urgency")
+
+                ForEach(notificationRules, id: \.self) { rule in
+                    HStack(alignment: .top, spacing: BoostaSpace.xs) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(BoostaColor.success)
+                            .padding(.top, 2)
+                        Text(rule)
+                            .font(BoostaType.body)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Text("CVBoosta notifications should feel calm, professional, intelligent, and useful — like a premium AI career assistant.")
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func previewSectionView(_ section: NotificationPreviewSection) -> some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: BoostaSpace.sm) {
+                Text(section.title)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+
+                if let frequency = section.frequency {
+                    Text(frequency)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                }
+            }
+
+            ForEach(section.examples, id: \.self) { example in
+                HStack(alignment: .top, spacing: BoostaSpace.xs) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(BoostaColor.accent)
+                        .padding(.top, 2)
+                    Text(example)
+                        .font(BoostaType.body)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(BoostaSpace.sm)
+        .background(BoostaColor.surfaceInteractive)
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+    }
+
+    private var pushNotificationSections: [NotificationPreviewSection] {
+        [
+            .init(
+                title: "ATS & Resume Insights",
+                frequency: "1-2x per week",
+                examples: [
+                    "Your resume score increased by 12%.",
+                    "3 important keywords are missing for this role.",
+                    "Your resume is now more ATS-friendly.",
+                    "This resume version performs better for recruiters.",
+                    "Your Backend Developer resume can still be optimized.",
+                    "Adding measurable results could improve interview chances.",
+                    "Your strongest resume version reached a 91 ATS score."
+                ]
+            ),
+            .init(
+                title: "Weekly Progress",
+                frequency: "Once per week",
+                examples: [
+                    "This week: 12 applications • 3 interviews.",
+                    "Your ATS score average improved this week.",
+                    "You applied to more jobs than last week.",
+                    "Your application consistency is improving."
+                ]
+            ),
+            .init(
+                title: "Application Tracking",
+                frequency: "Event-based only",
+                examples: [
+                    "2 applications may need a follow-up.",
+                    "A recruiter viewed your application recently.",
+                    "No response yet — consider updating this resume version."
+                ]
+            ),
+            .init(
+                title: "Gentle Reminders",
+                frequency: "Maximum 2x per week",
+                examples: [
+                    "Haven’t applied this week yet.",
+                    "A small improvement today can create more opportunities tomorrow.",
+                    "Your resume hasn’t been updated in 7 days.",
+                    "Stay consistent. Small steps compound over time."
+                ]
+            ),
+            .init(
+                title: "Streaks & Motivation",
+                frequency: "Low priority / optional",
+                examples: [
+                    "5-day career growth streak.",
+                    "Consistency builds momentum.",
+                    "You’re improving faster than last month.",
+                    "Another optimized application completed.",
+                    "Your weekly activity is improving.",
+                    "Small progress compounds over time.",
+                    "You stayed consistent this week."
+                ]
+            )
+        ]
+    }
+
+    private var liveActivitySections: [NotificationPreviewSection] {
+        [
+            .init(
+                title: "Interview Countdown",
+                frequency: "Only during active interview timeline",
+                examples: [
+                    "Backend Developer Interview • Starts in 3h 00m",
+                    "Frontend Developer Interview • Starts in 1h 24m",
+                    "Interview starts in 30m.",
+                    "Interview in progress."
+                ]
+            ),
+            .init(
+                title: "ATS Analysis",
+                frequency: "During ATS scan only",
+                examples: [
+                    "Analyzing ATS compatibility…",
+                    "Optimizing keywords… 87%",
+                    "Scanning formatting issues…",
+                    "Generating tailored resume…"
+                ]
+            ),
+            .init(
+                title: "Resume Optimization Session",
+                frequency: "During optimization session only",
+                examples: [
+                    "Tailoring resume for Product Manager.",
+                    "Improving ATS score…",
+                    "Matching resume with job description…",
+                    "Generating recruiter-friendly version…"
+                ]
+            ),
+            .init(
+                title: "Application Goals",
+                frequency: "Optional / short-term activity",
+                examples: [
+                    "Applications goal • 8 / 15 completed.",
+                    "Weekly target almost completed.",
+                    "3 applications left to hit your weekly goal."
+                ]
+            ),
+            .init(
+                title: "Job Hunt Momentum",
+                frequency: "Optional weekly activity",
+                examples: [
+                    "This week: 14 applications • 4 interviews.",
+                    "Interview rate improving this month.",
+                    "Your response rate increased by 18%."
+                ]
+            ),
+            .init(
+                title: "Streak Sessions",
+                frequency: "Only during active streak sessions",
+                examples: [
+                    "Career streak active • Day 6.",
+                    "Weekly consistency goal • 4 / 5 days completed.",
+                    "Application momentum maintained."
+                ]
+            )
+        ]
+    }
+
+    private var notificationRules: [String] {
+        [
+            "No spam notifications.",
+            "No fake urgency.",
+            "No aggressive retention tactics.",
+            "No guilt-based wording.",
+            "No daily marketing pushes."
+        ]
     }
 
     private func restoreYesterday() {
@@ -305,6 +565,13 @@ struct StreakCenterView: View {
         }
         return "\(dateText) • Career action completed"
     }
+}
+
+private struct NotificationPreviewSection: Identifiable {
+    let id = UUID()
+    let title: String
+    let frequency: String?
+    let examples: [String]
 }
 
 enum StreakActionKind: String, CaseIterable, Identifiable {
@@ -576,11 +843,11 @@ enum StreakEngine {
             missions: missions,
             achievements: achievements,
             notificationIdeas: [
-                "Your streak is waiting.",
-                "1 quick scan keeps your momentum alive.",
-                "Don’t let your career streak expire.",
-                "Future-you says thanks.",
-                "2 mins today > regret tomorrow."
+                "5-day career growth streak.",
+                "Consistency builds momentum.",
+                "Your weekly activity is improving.",
+                "Small progress compounds over time.",
+                "You stayed consistent this week."
             ]
         )
     }

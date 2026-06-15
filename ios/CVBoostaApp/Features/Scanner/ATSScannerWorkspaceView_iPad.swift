@@ -38,6 +38,7 @@ struct ATSScannerWorkspaceView_iPad: View {
 
                 GeometryReader { proxy in
                     let layout = ScannerWorkspaceLayout(width: proxy.size.width)
+                    let horizontalPadding = WorkspaceLayoutMetrics.horizontalPadding(for: proxy.size.width)
 
                     if layout.isWide {
                         HStack(alignment: .top, spacing: BoostaSpace.lg) {
@@ -47,7 +48,7 @@ struct ATSScannerWorkspaceView_iPad: View {
                             rightColumn
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         }
-                        .padding(.horizontal, BoostaSpace.xl)
+                        .padding(.horizontal, horizontalPadding)
                         .padding(.top, BoostaSpace.md)
                         .padding(.bottom, BoostaSpace.xl)
                         .frame(maxWidth: 1580)
@@ -209,21 +210,16 @@ struct ATSScannerWorkspaceView_iPad: View {
     private var workflowHeader: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                HStack(alignment: .top, spacing: BoostaSpace.sm) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("ATS Scan Workspace")
-                            .font(BoostaType.title)
-                            .foregroundStyle(BoostaColor.primaryText)
-                        Text("Upload → analyze → iterate. Results stay side-by-side on iPad.")
-                            .font(BoostaType.body)
-                            .foregroundStyle(BoostaColor.secondaryText)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                        workflowHeaderCopy
+                        Spacer(minLength: 0)
+                        workflowHeaderStatus
                     }
 
-                    Spacer(minLength: 0)
-
-                    HStack(spacing: BoostaSpace.sm) {
-                        MetricPill(title: "Session", value: "Active", color: BoostaColor.accent)
-                        MetricPill(title: "Expires", value: viewModel.scannerSessionLabel, color: BoostaColor.warning)
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        workflowHeaderCopy
+                        workflowHeaderStatus
                     }
                 }
 
@@ -235,26 +231,74 @@ struct ATSScannerWorkspaceView_iPad: View {
         }
     }
 
+    private var workflowHeaderCopy: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("ATS Scan Workspace")
+                .font(BoostaType.title)
+                .foregroundStyle(BoostaColor.primaryText)
+            Text("Upload → analyze → iterate. Results stay side-by-side on iPad.")
+                .font(BoostaType.body)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var workflowHeaderStatus: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: BoostaSpace.sm) {
+                workflowStatusPills
+            }
+
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                workflowStatusPills
+            }
+        }
+    }
+
+    private var workflowStatusPills: some View {
+        Group {
+            MetricPill(title: "Session", value: "Active", color: BoostaColor.accent)
+            MetricPill(title: "Expires", value: viewModel.scannerSessionLabel, color: BoostaColor.warning)
+        }
+    }
+
     private var resumeUploadCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Resume upload", subtitle: "PDF only, up to 10 MB")
 
-                HStack(spacing: BoostaSpace.sm) {
-                    WorkspaceActionButton(title: "Upload PDF", systemImage: "square.and.arrow.up") {
-                        viewModel.startImport()
-                    }
-                    .keyboardShortcut("o", modifiers: .command)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: BoostaSpace.sm) {
+                        uploadResumeButton
 
-                    if let fileName = viewModel.selectedFileName {
-                        Label(fileName, systemImage: "doc.richtext")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.secondaryText)
-                            .lineLimit(1)
+                        if let fileName = viewModel.selectedFileName {
+                            Label(fileName, systemImage: "doc.richtext")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        uploadResumeButton
+
+                        if let fileName = viewModel.selectedFileName {
+                            Label(fileName, systemImage: "doc.richtext")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private var uploadResumeButton: some View {
+        WorkspaceActionButton(title: "Upload PDF", systemImage: "square.and.arrow.up") {
+            viewModel.startImport()
+        }
+        .keyboardShortcut("o", modifiers: .command)
     }
 
     private var targetRoleCard: some View {
@@ -452,11 +496,13 @@ private struct ScannerWorkspaceLayout {
     let leftColumnWidth: CGFloat
 
     init(width: CGFloat) {
-        isWide = width >= 980
-        if width >= 1200 {
+        isWide = width >= 920
+        if width >= 1320 {
             leftColumnWidth = 500
+        } else if width >= 1080 {
+            leftColumnWidth = 480
         } else {
-            leftColumnWidth = 470
+            leftColumnWidth = 440
         }
     }
 }
@@ -556,8 +602,12 @@ private struct ATSResultsPanel_iPad: View {
     }
 
     private func resultsColumnCount(for width: CGFloat) -> Int {
-        if width >= 1100 { return 2 }
-        return 1
+        WorkspaceLayoutMetrics.columnCount(
+            for: width,
+            minCardWidth: 320,
+            maxColumns: 2,
+            horizontalPadding: 0
+        )
     }
 
     private func persistLatestScanIfNeeded() {
@@ -573,39 +623,53 @@ private struct ATSResultsPanel_iPad: View {
 
     private var overviewCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            HStack(alignment: .top, spacing: BoostaSpace.lg) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(result.resumeName)
-                        .font(BoostaType.title)
-                        .foregroundStyle(BoostaColor.primaryText)
-                    Text("\(result.targetRole) • \(result.experienceLevel) • \(result.targetMarket)")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                    resultsOverviewCopy
+                    Spacer(minLength: 0)
+                    resultsOverviewScore
                 }
 
-                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                    resultsOverviewCopy
+                    resultsOverviewScore
+                }
+            }
+        }
+    }
 
-                HStack(spacing: BoostaSpace.md) {
-                    ScoreRing(score: result.response.atsScore)
-                        .frame(width: 116, height: 116)
+    private var resultsOverviewCopy: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(result.resumeName)
+                .font(BoostaType.title)
+                .foregroundStyle(BoostaColor.primaryText)
+            Text("\(result.targetRole) • \(result.experienceLevel) • \(result.targetMarket)")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Baseline match")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.secondaryText)
-                        Text("\(result.response.atsScore)/100")
-                            .font(BoostaType.section)
-                        if let after = result.response.matchAfter, after != result.response.atsScore {
-                            Text("After: \(after)/100")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(after > result.response.atsScore ? BoostaColor.success : BoostaColor.secondaryText)
-                        }
-                        if result.isDemo {
-                            Text("Demo mode result")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.warning)
-                        }
-                    }
+    private var resultsOverviewScore: some View {
+        HStack(spacing: BoostaSpace.md) {
+            ScoreRing(score: result.response.atsScore)
+                .frame(width: 116, height: 116)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Baseline match")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                Text("\(result.response.atsScore)/100")
+                    .font(BoostaType.section)
+                if let after = result.response.matchAfter, after != result.response.atsScore {
+                    Text("After: \(after)/100")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(after > result.response.atsScore ? BoostaColor.success : BoostaColor.secondaryText)
+                }
+                if result.isDemo {
+                    Text("Demo mode result")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.warning)
                 }
             }
         }
@@ -672,19 +736,31 @@ private struct ATSResultsPanel_iPad: View {
                     .textSelection(.enabled)
                     .lineLimit(22)
 
-                HStack(spacing: BoostaSpace.sm) {
-                    SecondaryButton(title: "Copy optimized") {
-                        UIPasteboard.general.string = result.response.optimizedCV
-                        HapticsService.success()
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: BoostaSpace.sm) {
+                        optimizedCVActions
                     }
-                    .hoverEffect(.highlight)
 
-                    SecondaryButton(title: "Open Tailoring") {
-                        appRouter.open(.tailoring)
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        optimizedCVActions
                     }
-                    .hoverEffect(.highlight)
                 }
             }
+        }
+    }
+
+    private var optimizedCVActions: some View {
+        Group {
+            SecondaryButton(title: "Copy optimized") {
+                UIPasteboard.general.string = result.response.optimizedCV
+                HapticsService.success()
+            }
+            .hoverEffect(.highlight)
+
+            SecondaryButton(title: "Open Tailoring") {
+                appRouter.open(.tailoring)
+            }
+            .hoverEffect(.highlight)
         }
     }
 
