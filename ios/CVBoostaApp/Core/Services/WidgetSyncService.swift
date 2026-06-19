@@ -109,6 +109,71 @@ final class WidgetSyncService {
         persist()
     }
 
+    func syncAfterLatestScan(
+        result: ResumeScanResult,
+        user: AuthUser?,
+        scans: [ScanHistorySnapshot],
+        applications: [ApplicationRecord]
+    ) {
+        let now = Date()
+        let projectedScans = projectedScans(afterMerging: result, into: scans, now: now)
+        let currentScore = projectedScans.last?.matchAfter ?? projectedScans.last?.atsScore ?? (result.response.matchAfter ?? result.response.atsScore)
+        let streakSummary = StreakEngine.build(
+            now: now,
+            user: user,
+            scans: projectedScans,
+            applications: applications,
+            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
+        )
+
+        cachedSnapshot.updatedAt = now
+        if let user {
+            cachedSnapshot.firstName = displayName(from: user)
+        }
+        cachedSnapshot.currentATSScore = currentScore
+        cachedSnapshot.weeklyATSDelta = weeklyDelta(from: projectedScans)
+        cachedSnapshot.streakDays = streakSummary.currentStreak
+        cachedSnapshot.streakStatusTitle = streakSummary.statusTitle
+        cachedSnapshot.streakStatusDetail = streakSummary.microcopy
+        cachedSnapshot.weeklyActiveDays = streakSummary.weeklyActiveDays
+        cachedSnapshot.careerLevel = streakSummary.careerLevel
+        cachedSnapshot.nextMilestoneTitle = streakSummary.milestones.first(where: { !$0.isReached })?.title ?? "Elite"
+        cachedSnapshot.applicationsCount = applications.count
+        cachedSnapshot.interviewsCount = applications.filter { $0.status == .interview }.count
+        cachedSnapshot.offersCount = applications.filter { $0.status == .offer }.count
+        cachedSnapshot.responseRate = applications.isEmpty ? 0 : Int((Double(cachedSnapshot.interviewsCount + cachedSnapshot.offersCount) / Double(applications.count)) * 100)
+        cachedSnapshot.missingKeywords = Array(result.response.missingSkills.prefix(3))
+        cachedSnapshot.recentRole = result.targetRole.nilIfEmpty
+        cachedSnapshot.recentCompany = nil
+        cachedSnapshot.recentScanDate = now
+        cachedSnapshot.dailyFocusTitle = "Today's Focus"
+        cachedSnapshot.dailyFocusDetail = streakSummary.todayActions.first?.detail
+            ?? (result.response.missingSkills.isEmpty
+            ? "Your resume is in a healthy spot. Start applying while momentum is high."
+            : "Fix \(min(result.response.missingSkills.count, 3)) ATS keyword gaps for \(result.targetRole).")
+        cachedSnapshot.momentumTitle = "Career Momentum"
+        cachedSnapshot.momentumDetail = momentumDetail(
+            score: currentScore,
+            delta: cachedSnapshot.weeklyATSDelta,
+            streak: streakSummary.currentStreak
+        )
+
+        if let nextInterview = applications
+            .filter({ $0.status == .interview && ($0.interviewAt ?? .distantPast) > now })
+            .sorted(by: { ($0.interviewAt ?? .distantFuture) < ($1.interviewAt ?? .distantFuture) })
+            .first {
+            cachedSnapshot.nextInterviewTitle = "\(nextInterview.company) Interview"
+            cachedSnapshot.nextInterviewDate = nextInterview.interviewAt
+            cachedSnapshot.nextInterviewCompany = nextInterview.company
+        } else {
+            cachedSnapshot.nextInterviewTitle = nil
+            cachedSnapshot.nextInterviewDate = nil
+            cachedSnapshot.nextInterviewCompany = nil
+        }
+
+        persist()
+    }
+
     func mergeLocalApplications(_ applications: [ApplicationRecord]) {
         let streakSummary = StreakEngine.build(
             now: .now,
@@ -212,6 +277,26 @@ final class WidgetSyncService {
             return existing
         }
         return max(existing, 0) + 1
+    }
+
+    private func projectedScans(afterMerging result: ResumeScanResult, into scans: [ScanHistorySnapshot], now: Date) -> [ScanHistorySnapshot] {
+        var projected = scans.sorted(by: { $0.createdAt < $1.createdAt })
+        let projectedScan = ScanHistorySnapshot(
+            id: result.response.analysisID ?? syntheticScanID(from: now),
+            resumeFileName: result.resumeName,
+            targetRole: result.targetRole,
+            atsScore: result.response.atsScore,
+            createdAt: now,
+            matchBefore: result.response.matchBefore,
+            matchAfter: result.response.matchAfter,
+            company: nil
+        )
+        projected.append(projectedScan)
+        return projected
+    }
+
+    private func syntheticScanID(from date: Date) -> Int {
+        -max(Int(date.timeIntervalSince1970), 1)
     }
 }
 

@@ -1,9 +1,12 @@
 import SwiftUI
+import SwiftData
 import UniformTypeIdentifiers
 
 struct ATSScannerView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Query(sort: \ApplicationRecord.appliedAt, order: .reverse)
+    private var trackedApplications: [ApplicationRecord]
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var paywallContext: PaywallPresentationContext?
@@ -87,6 +90,18 @@ struct ATSScannerView: View {
                             detail: viewModel.progressMessage
                         )
                     }
+                }
+            }
+            .onChange(of: viewModel.scanResult) { _, newValue in
+                guard let result = newValue else { return }
+                WidgetSyncService.shared.syncAfterLatestScan(
+                    result: result,
+                    user: authViewModel.me?.user,
+                    scans: authViewModel.me?.scanHistory ?? [],
+                    applications: trackedApplications
+                )
+                Task {
+                    await authViewModel.refreshSharedState()
                 }
             }
             .fileImporter(
