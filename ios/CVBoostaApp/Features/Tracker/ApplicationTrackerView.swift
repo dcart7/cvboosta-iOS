@@ -15,30 +15,38 @@ struct ApplicationTrackerView: View {
 
     private let widgetSyncService = WidgetSyncService.shared
 
+    private var activeApplications: [ApplicationRecord] {
+        applications.filter { $0.status != .archived }
+    }
+
+    private var archivedApplications: [ApplicationRecord] {
+        applications.filter { $0.status == .archived }
+    }
+
     private var interviewCount: Int {
-        applications.filter { $0.status == .interview }.count
+        activeApplications.filter { $0.status == .interview }.count
     }
 
     private var offerCount: Int {
-        applications.filter { $0.status == .offer }.count
+        activeApplications.filter { $0.status == .offer }.count
     }
 
     private var responseRate: Int {
-        guard !applications.isEmpty else { return 0 }
-        let responses = applications.filter { $0.status == .interview || $0.status == .offer }.count
-        return Int((Double(responses) / Double(applications.count)) * 100)
+        guard !activeApplications.isEmpty else { return 0 }
+        let responses = activeApplications.filter { $0.status == .interview || $0.status == .offer }.count
+        return Int((Double(responses) / Double(activeApplications.count)) * 100)
     }
 
     private var urgentCount: Int {
-        applications.filter { priority(for: $0) == .urgent }.count
+        activeApplications.filter { priority(for: $0) == .urgent }.count
     }
 
     private var interviewSoonCount: Int {
-        applications.filter { priority(for: $0) == .interviewSoon }.count
+        activeApplications.filter { priority(for: $0) == .interviewSoon }.count
     }
 
     private var followUpCount: Int {
-        applications.filter { priority(for: $0) == .followUp }.count
+        activeApplications.filter { priority(for: $0) == .followUp }.count
     }
 
     private var widgetSyncSignature: [String] {
@@ -72,8 +80,11 @@ struct ApplicationTrackerView: View {
                     ScrollView {
                         VStack(spacing: BoostaSpace.sm) {
                             pipelineCard
-                            ForEach(applications) { app in
+                            ForEach(activeApplications) { app in
                                 applicationCard(app)
+                            }
+                            if !archivedApplications.isEmpty {
+                                archiveSection
                             }
                         }
                         .padding(BoostaSpace.md)
@@ -134,12 +145,12 @@ struct ApplicationTrackerView: View {
                 }
             }
             .onAppear {
-                widgetSyncService.mergeLocalApplications(applications)
+                syncWidgetSnapshot()
                 syncInterviewLiveActivity()
                 presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: widgetSyncSignature) { _, _ in
-                widgetSyncService.mergeLocalApplications(applications)
+                syncWidgetSnapshot()
                 syncInterviewLiveActivity()
                 presentPendingInterviewReflectionIfNeeded()
             }
@@ -152,7 +163,7 @@ struct ApplicationTrackerView: View {
                 SectionHeader(title: "Pipeline", subtitle: "Your job hunt operating system")
 
                 HStack(spacing: BoostaSpace.sm) {
-                    MetricPill(title: "Applied", value: "\(applications.count)", color: BoostaColor.accent)
+                    MetricPill(title: "Applied", value: "\(activeApplications.count)", color: BoostaColor.accent)
                     MetricPill(title: "Interviews", value: "\(interviewCount)", color: BoostaColor.warning)
                     MetricPill(title: "Offers", value: "\(offerCount)", color: BoostaColor.success)
                 }
@@ -166,6 +177,20 @@ struct ApplicationTrackerView: View {
                 Text(responseRate == 0 ? "Start tracking applications to unlock conversion insights." : "Current response rate: \(responseRate)%")
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+    }
+
+    private var archiveSection: some View {
+        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+            Text("Archive")
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, BoostaSpace.xs)
+
+            ForEach(archivedApplications) { app in
+                applicationCard(app)
             }
         }
     }
@@ -225,15 +250,31 @@ struct ApplicationTrackerView: View {
             editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button("Interview") {
-                updateStatus(id: app.id, to: .interview)
-            }
-            .tint(BoostaColor.warning)
+            if app.status == .archived {
+                Button {
+                    updateStatus(id: app.id, to: .saved)
+                } label: {
+                    Label("Restore", systemImage: "arrow.uturn.backward")
+                }
+                .tint(BoostaColor.accent)
+            } else {
+                Button {
+                    updateStatus(id: app.id, to: .archived)
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .tint(BoostaColor.secondaryText)
 
-            Button("Done") {
-                updateStatus(id: app.id, to: nextStatus(after: app.status))
+                Button("Interview") {
+                    updateStatus(id: app.id, to: .interview)
+                }
+                .tint(BoostaColor.warning)
+
+                Button("Done") {
+                    updateStatus(id: app.id, to: nextStatus(after: app.status))
+                }
+                .tint(BoostaColor.success)
             }
-            .tint(BoostaColor.success)
         }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             Button(role: .destructive) {
@@ -271,6 +312,8 @@ struct ApplicationTrackerView: View {
                 return "Review offer terms and compare total compensation."
             case .rejected:
                 return "Archive learnings and move the next role forward."
+            case .archived:
+                return "Restore this role if you want to bring it back into the active pipeline."
             }
         case .archived:
             return "Keep this archived for learning, then focus on active roles."
@@ -284,7 +327,7 @@ struct ApplicationTrackerView: View {
         if app.status == .offer {
             return .urgent
         }
-        if app.status == .rejected {
+        if app.status == .archived {
             return .archived
         }
         if app.status == .interview,
@@ -307,6 +350,7 @@ struct ApplicationTrackerView: View {
         case .interview: return BoostaColor.warning
         case .offer: return BoostaColor.success
         case .rejected: return BoostaColor.danger
+        case .archived: return BoostaColor.secondaryText
         }
     }
 
@@ -316,7 +360,8 @@ struct ApplicationTrackerView: View {
         case .applied: return .interview
         case .interview: return .offer
         case .offer: return .offer
-        case .rejected: return .rejected
+        case .rejected: return .archived
+        case .archived: return .archived
         }
     }
 
@@ -339,7 +384,7 @@ struct ApplicationTrackerView: View {
 
         do {
             try modelContext.save()
-            widgetSyncService.mergeLocalApplications(applications)
+            syncWidgetSnapshot()
             celebrateStreak(with: record.status)
             presentPipelineLiveActivityIfNeeded(for: record)
             showAddSheet = false
@@ -363,8 +408,10 @@ struct ApplicationTrackerView: View {
 
         do {
             try modelContext.save()
-            widgetSyncService.mergeLocalApplications(applications)
-            celebrateStreak(with: record.status)
+            syncWidgetSnapshot()
+            if record.status != .archived {
+                celebrateStreak(with: record.status)
+            }
             presentPipelineLiveActivityIfNeeded(for: record)
             editingContext = nil
         } catch {
@@ -379,7 +426,7 @@ struct ApplicationTrackerView: View {
 
         do {
             try modelContext.save()
-            widgetSyncService.mergeLocalApplications(applications)
+            syncWidgetSnapshot()
             presentPipelineLiveActivityIfNeeded(for: record)
         } catch {
             errorMessage = "Could not update application status."
@@ -393,7 +440,7 @@ struct ApplicationTrackerView: View {
 
         do {
             try modelContext.save()
-            widgetSyncService.mergeLocalApplications(applications.filter { $0.id != id })
+            syncWidgetSnapshot(applications.filter { $0.id != id })
             editingContext = nil
         } catch {
             errorMessage = "Could not delete application."
@@ -490,10 +537,21 @@ struct ApplicationTrackerView: View {
         case .interview: "Interview prep counts. Streak protected."
         case .offer: "Offer progress protected your streak."
         case .rejected: "You kept momentum alive by tracking the result."
+        case .archived: "Archive updated without breaking momentum."
         }
         Task {
             await LiveActivityManager.shared.celebrateDailyStreak(dayCount: summary.currentStreak, detail: detail)
         }
+    }
+
+    private func syncWidgetSnapshot(_ snapshotApplications: [ApplicationRecord]? = nil) {
+        let source = snapshotApplications ?? applications
+        widgetSyncService.mergeLocalApplications(source)
+        widgetSyncService.syncStreakState(
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: source
+        )
     }
 
     private func presentPipelineLiveActivityIfNeeded(for record: ApplicationRecord) {
@@ -579,6 +637,13 @@ struct AddApplicationView: View {
     @State private var hasInterviewDate = false
     @State private var interviewDate: Date = .now
 
+    private var selectableStatuses: [ApplicationStatus] {
+        if showsDelete, status == .archived {
+            return ApplicationStatus.userSelectableCases + [.archived]
+        }
+        return ApplicationStatus.userSelectableCases
+    }
+
     init(
         resumeNames: [String],
         initialDraft: NewApplicationDraft? = nil,
@@ -632,7 +697,7 @@ struct AddApplicationView: View {
                         )
 
                         Picker("Status", selection: $status) {
-                            ForEach(ApplicationStatus.allCases, id: \.self) { item in
+                            ForEach(selectableStatuses, id: \.self) { item in
                                 Text(item.rawValue.capitalized).tag(item)
                             }
                         }

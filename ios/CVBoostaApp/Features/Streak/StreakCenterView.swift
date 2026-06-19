@@ -668,6 +668,8 @@ enum StreakEngine {
                 add(.interviewPrep, on: application.interviewAt ?? application.appliedAt)
             case .rejected:
                 add(.applyToJob, on: application.appliedAt)
+            case .archived:
+                add(.applyToJob, on: application.appliedAt)
             }
         }
 

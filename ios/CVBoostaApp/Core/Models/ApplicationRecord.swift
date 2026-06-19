@@ -7,6 +7,11 @@ enum ApplicationStatus: String, Codable, CaseIterable {
     case interview
     case offer
     case rejected
+    case archived
+
+    static var userSelectableCases: [ApplicationStatus] {
+        [.saved, .applied, .interview, .offer, .rejected]
+    }
 }
 
 @Model

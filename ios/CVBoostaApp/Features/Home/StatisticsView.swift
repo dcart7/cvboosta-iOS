@@ -66,6 +66,10 @@ struct StatisticsView: View {
         )
     }
 
+    private var activeApplications: [ApplicationRecord] {
+        trackedApplications.filter { $0.status != .archived }
+    }
+
     private var latestScore: Int {
         sharedHistoryAscending.last.map { normalizedATSScore($0.matchAfter ?? $0.score) }
             ?? scans.last.map { normalizedATSScore($0.matchAfter ?? $0.atsScore) }
@@ -77,15 +81,15 @@ struct StatisticsView: View {
     }
 
     private var applicationsCount: Int {
-        trackedApplications.count
+        activeApplications.count
     }
 
     private var interviewsCount: Int {
-        trackedApplications.filter { $0.status == .interview }.count
+        activeApplications.filter { $0.status == .interview }.count
     }
 
     private var offersCount: Int {
-        trackedApplications.filter { $0.status == .offer }.count
+        activeApplications.filter { $0.status == .offer }.count
     }
 
     private var avgScore: Int {
@@ -108,7 +112,7 @@ struct StatisticsView: View {
     private var weeklyApplications: Int {
         let calendar = Calendar.current
         let now = Date()
-        return trackedApplications.filter {
+        return activeApplications.filter {
             calendar.isDate($0.appliedAt, equalTo: now, toGranularity: .weekOfYear)
         }.count
     }
@@ -122,9 +126,9 @@ struct StatisticsView: View {
     }
 
     private var responseRate: Int {
-        guard !trackedApplications.isEmpty else { return 0 }
-        let responsive = trackedApplications.filter { $0.status == .interview || $0.status == .offer }.count
-        return Int((Double(responsive) / Double(trackedApplications.count)) * 100)
+        guard !activeApplications.isEmpty else { return 0 }
+        let responsive = activeApplications.filter { $0.status == .interview || $0.status == .offer }.count
+        return Int((Double(responsive) / Double(activeApplications.count)) * 100)
     }
 
     private var interviewProbability: String {
@@ -137,13 +141,17 @@ struct StatisticsView: View {
     }
 
     private var trendPoints: [CareerTrendPoint] {
-        return filteredHistoryAscending.enumerated().map { index, item in
+        filteredHistoryAscending.enumerated().map { index, item in
             CareerTrendPoint(
                 id: index,
                 date: item.createdAt,
                 atsScore: normalizedATSScore(item.matchAfter ?? item.score)
             )
         }
+    }
+
+    private var visibleTrendPoints: [CareerTrendPoint] {
+        Array(trendPoints.prefix(max(animatedTrendCount, 0)))
     }
 
     private var trendInsight: String {
@@ -163,8 +171,8 @@ struct StatisticsView: View {
 
     private var funnelData: [CareerFunnelStage] {
         [
-            .init(title: "Saved", count: trackedApplications.filter { $0.status == .saved }.count, color: BoostaColor.secondaryText),
-            .init(title: "Applied", count: trackedApplications.filter { $0.status == .applied }.count, color: BoostaColor.accent),
+            .init(title: "Saved", count: activeApplications.filter { $0.status == .saved }.count, color: BoostaColor.secondaryText),
+            .init(title: "Applied", count: activeApplications.filter { $0.status == .applied }.count, color: BoostaColor.accent),
             .init(title: "Interview", count: interviewsCount, color: BoostaColor.warning),
             .init(title: "Offer", count: offersCount, color: BoostaColor.success)
         ]
@@ -411,24 +419,28 @@ struct StatisticsView: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    Chart(Array(trendPoints.prefix(max(animatedTrendCount, 0)))) { point in
-                        LineMark(x: .value("Date", point.date), y: .value("ATS", point.atsScore))
-                            .interpolationMethod(.catmullRom)
-                            .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                            .foregroundStyle(BoostaColor.accent)
-
-                        AreaMark(x: .value("Date", point.date), y: .value("ATS", point.atsScore))
-                            .foregroundStyle(
-                                .linearGradient(
-                                    colors: [BoostaColor.accent.opacity(0.18), BoostaColor.accent.opacity(0.02)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
+                    Chart {
+                        ForEach(visibleTrendPoints) { point in
+                            BarMark(
+                                x: .value("Date", point.date),
+                                y: .value("ATS", point.atsScore),
+                                width: .fixed(12)
                             )
+                            .foregroundStyle(
+                                point.id == visibleTrendPoints.last?.id
+                                    ? BoostaColor.accent
+                                    : BoostaColor.accent.opacity(0.42)
+                            )
+                        }
 
-                        PointMark(x: .value("Date", point.date), y: .value("ATS", point.atsScore))
-                            .foregroundStyle(BoostaColor.accent)
-                            .symbolSize(point.id == trendPoints.count - 1 ? 36 : 14)
+                        RuleMark(y: .value("Average", avgScore))
+                            .foregroundStyle(Color.white.opacity(0.18))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .annotation(position: .topTrailing, alignment: .trailing) {
+                                Text("Avg \(avgScore)")
+                                    .font(BoostaType.caption)
+                                    .foregroundStyle(BoostaColor.secondaryText)
+                            }
                     }
                     .chartYScale(domain: 0...100)
                     .chartYAxis {
@@ -456,6 +468,11 @@ struct StatisticsView: View {
                                 }
                             }
                         }
+                    }
+                    .chartPlotStyle { plot in
+                        plot
+                            .background(BoostaColor.surfaceMuted.opacity(0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                     }
                     .frame(height: 180)
 

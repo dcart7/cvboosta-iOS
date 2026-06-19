@@ -195,15 +195,28 @@ struct SettingsView: View {
     }
 
     private func row(_ title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(BoostaType.body)
-                .foregroundStyle(BoostaColor.secondaryText)
-            Spacer()
-            Text(value)
-                .font(BoostaType.bodyStrong)
-                .foregroundStyle(BoostaColor.primaryText)
-                .multilineTextAlignment(.trailing)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: BoostaSpace.sm) {
+                Text(title)
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                Spacer(minLength: BoostaSpace.sm)
+                Text(value)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                    .multilineTextAlignment(.trailing)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(BoostaType.body)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                Text(value)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

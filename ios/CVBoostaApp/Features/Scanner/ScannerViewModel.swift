@@ -266,11 +266,6 @@ final class ScannerViewModel: ObservableObject {
 
         if #available(iOS 16.1, *) {
             await LiveActivityManager.shared.complete(result: response)
-            let streakDayCount = CVBoostaWidgetStore.loadSnapshot().streakDays
-            await LiveActivityManager.shared.celebrateDailyStreak(
-                dayCount: streakDayCount,
-                detail: "Applications tracked today"
-            )
         }
     }
 

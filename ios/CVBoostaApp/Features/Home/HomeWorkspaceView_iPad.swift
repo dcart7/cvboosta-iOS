@@ -54,6 +54,10 @@ struct HomeWorkspaceView_iPad: View {
         )
     }
 
+    private var activeApplications: [ApplicationRecord] {
+        trackedApplications.filter { $0.status != .archived }
+    }
+
     private func normalizedATSScore(_ raw: Int) -> Int {
         if raw > 100 {
             return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
@@ -72,15 +76,15 @@ struct HomeWorkspaceView_iPad: View {
     private var weeklyApplications: Int {
         let calendar = Calendar.current
         let now = Date()
-        return trackedApplications.filter {
+        return activeApplications.filter {
             calendar.isDate($0.appliedAt, equalTo: now, toGranularity: .weekOfYear)
         }.count
     }
 
     private var responseRate: Int {
-        guard !trackedApplications.isEmpty else { return 0 }
-        let responsive = trackedApplications.filter { $0.status == .interview || $0.status == .offer }.count
-        return Int((Double(responsive) / Double(trackedApplications.count)) * 100)
+        guard !activeApplications.isEmpty else { return 0 }
+        let responsive = activeApplications.filter { $0.status == .interview || $0.status == .offer }.count
+        return Int((Double(responsive) / Double(activeApplications.count)) * 100)
     }
 
     private var trendScores: [Int] {
@@ -94,7 +98,7 @@ struct HomeWorkspaceView_iPad: View {
     private var overdueFollowUps: Int {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        return trackedApplications.filter { app in
+        return activeApplications.filter { app in
             app.status == .applied
                 && calendar.date(byAdding: .day, value: 5, to: calendar.startOfDay(for: app.appliedAt)).map { $0 <= today } == true
         }.count
@@ -103,7 +107,7 @@ struct HomeWorkspaceView_iPad: View {
     private var upcomingInterviews: Int {
         let now = Date()
         guard let sevenDays = Calendar.current.date(byAdding: .day, value: 7, to: now) else { return 0 }
-        return trackedApplications.filter { app in
+        return activeApplications.filter { app in
             guard app.status == .interview, let interviewAt = app.interviewAt else { return false }
             return interviewAt >= now && interviewAt <= sevenDays
         }.count

@@ -39,11 +39,11 @@ struct StatisticsWorkspaceView_iPad: View {
     }
 
     private var applicationsCount: Int {
-        trackedApplications.count
+        activeApplications.count
     }
 
     private var interviewsCount: Int {
-        trackedApplications.filter { $0.status == .interview }.count
+        activeApplications.filter { $0.status == .interview }.count
     }
 
     private var sharedHistoryAscending: [HistoryListItem] {
@@ -79,6 +79,10 @@ struct StatisticsWorkspaceView_iPad: View {
             applications: trackedApplications,
             manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
         )
+    }
+
+    private var activeApplications: [ApplicationRecord] {
+        trackedApplications.filter { $0.status != .archived }
     }
 
     private var avgScore: Int {
@@ -420,24 +424,28 @@ struct StatisticsWorkspaceView_iPad: View {
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    Chart(trendPoints) { point in
-                        LineMark(x: .value("Date", point.date), y: .value("ATS", point.score))
-                            .interpolationMethod(.catmullRom)
-                            .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                            .foregroundStyle(BoostaColor.accent)
-
-                        AreaMark(x: .value("Date", point.date), y: .value("ATS", point.score))
-                            .foregroundStyle(
-                                .linearGradient(
-                                    colors: [BoostaColor.accent.opacity(0.18), BoostaColor.accent.opacity(0.02)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
+                    Chart {
+                        ForEach(trendPoints) { point in
+                            BarMark(
+                                x: .value("Date", point.date),
+                                y: .value("ATS", point.score),
+                                width: .fixed(14)
                             )
+                            .foregroundStyle(
+                                point.id == trendPoints.last?.id
+                                    ? BoostaColor.accent
+                                    : BoostaColor.accent.opacity(0.42)
+                            )
+                        }
 
-                        PointMark(x: .value("Date", point.date), y: .value("ATS", point.score))
-                            .foregroundStyle(BoostaColor.accent)
-                            .symbolSize(point.id == trendPoints.count - 1 ? 34 : 14)
+                        RuleMark(y: .value("Average", avgScore))
+                            .foregroundStyle(Color.white.opacity(0.18))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .annotation(position: .topTrailing, alignment: .trailing) {
+                                Text("Avg \(avgScore)")
+                                    .font(BoostaType.caption)
+                                    .foregroundStyle(BoostaColor.secondaryText)
+                            }
                     }
                     .chartYScale(domain: 0...100)
                     .chartYAxis {
@@ -465,6 +473,11 @@ struct StatisticsWorkspaceView_iPad: View {
                                 }
                             }
                         }
+                    }
+                    .chartPlotStyle { plot in
+                        plot
+                            .background(BoostaColor.surfaceMuted.opacity(0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                     }
                     .frame(height: 180)
 

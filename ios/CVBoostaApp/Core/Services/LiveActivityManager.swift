@@ -385,7 +385,9 @@ final class LiveActivityManager {
         if currentSupportActivity == nil {
             await restoreSupportActivityIfPossible()
         }
-        guard currentSupportMode == .dailyStreak else { return }
+        guard let state = currentSupportActivity?.content.state,
+              state.mode == .dailyStreak,
+              isProtectionStreakState(state) else { return }
         await clearSupportActivity()
     }
 
@@ -867,6 +869,10 @@ final class LiveActivityManager {
         return true
     }
 
+    private func isProtectionStreakState(_ state: CVBoostaActivityAttributes.ContentState) -> Bool {
+        state.mode == .dailyStreak && state.etaText == "Applications tracked today"
+    }
+
     private func shouldPresentPipelineUpdate(fingerprint: String) -> Bool {
         let lastFingerprint = defaults.string(forKey: pipelineFingerprintStorageKey)
         let lastPresentedAt = defaults.object(forKey: pipelinePresentedAtStorageKey) as? Date
@@ -952,6 +958,7 @@ final class LiveActivityManager {
         }
 
         if let activity = currentSupportActivity, activity.content.state.mode == state.mode {
+            guard activity.content.state != state else { return }
             await activity.update(.init(state: state, staleDate: staleDate))
             return
         }

@@ -17,6 +17,14 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
     private let widgetSyncService = WidgetSyncService.shared
 
+    private var activeApplications: [ApplicationRecord] {
+        applications.filter { $0.status != .archived }
+    }
+
+    private var archivedApplications: [ApplicationRecord] {
+        applications.filter { $0.status == .archived }
+    }
+
     private var selectedApplication: ApplicationRecord? {
         guard let id = selectedApplicationID else { return applications.first }
         return applications.first(where: { $0.id == id }) ?? applications.first
@@ -24,18 +32,18 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
     private var countsByStatus: [(title: String, value: Int, color: Color)] {
         [
-            ("Saved", applications.filter { $0.status == .saved }.count, BoostaColor.secondaryText),
-            ("Applied", applications.filter { $0.status == .applied }.count, BoostaColor.accent),
-            ("Interview", applications.filter { $0.status == .interview }.count, BoostaColor.success),
-            ("Offer", applications.filter { $0.status == .offer }.count, BoostaColor.warning),
+            ("Saved", activeApplications.filter { $0.status == .saved }.count, BoostaColor.secondaryText),
+            ("Applied", activeApplications.filter { $0.status == .applied }.count, BoostaColor.accent),
+            ("Interview", activeApplications.filter { $0.status == .interview }.count, BoostaColor.success),
+            ("Offer", activeApplications.filter { $0.status == .offer }.count, BoostaColor.warning),
         ]
     }
 
     private var priorityCounts: [(title: String, value: Int, color: Color)] {
         [
-            ("Urgent", applications.filter { priority(for: $0) == .urgent }.count, BoostaColor.danger),
-            ("Follow up", applications.filter { priority(for: $0) == .followUp }.count, BoostaColor.warning),
-            ("Interview soon", applications.filter { priority(for: $0) == .interviewSoon }.count, BoostaColor.accentSecondary),
+            ("Urgent", activeApplications.filter { priority(for: $0) == .urgent }.count, BoostaColor.danger),
+            ("Follow up", activeApplications.filter { priority(for: $0) == .followUp }.count, BoostaColor.warning),
+            ("Interview soon", activeApplications.filter { priority(for: $0) == .interviewSoon }.count, BoostaColor.accentSecondary),
         ]
     }
 
@@ -143,12 +151,12 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 if selectedApplicationID == nil {
                     selectedApplicationID = applications.first?.id
                 }
-                widgetSyncService.mergeLocalApplications(applications)
+                syncWidgetSnapshot()
                 syncInterviewLiveActivity()
                 presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: widgetSyncSignature) { _, _ in
-                widgetSyncService.mergeLocalApplications(applications)
+                syncWidgetSnapshot()
                 syncInterviewLiveActivity()
                 presentPendingInterviewReflectionIfNeeded()
             }
@@ -192,7 +200,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     private var summaryCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.md) {
-                SectionHeader(title: "Pipeline", subtitle: "\(applications.count) total")
+                SectionHeader(title: "Pipeline", subtitle: "\(activeApplications.count) active")
 
                 HStack(spacing: BoostaSpace.sm) {
                     ForEach(Array(countsByStatus.enumerated()), id: \.offset) { _, item in
@@ -215,7 +223,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 SectionHeader(title: "Applications", subtitle: "Tap to focus details on the right")
 
                 LazyVStack(spacing: BoostaSpace.sm) {
-                    ForEach(applications) { app in
+                    ForEach(activeApplications) { app in
                         Button {
                             withAnimation(BoostaMotion.smooth) {
                                 selectedApplicationID = app.id
@@ -224,6 +232,25 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                             applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    if !archivedApplications.isEmpty {
+                        Text("Archive")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, BoostaSpace.sm)
+
+                        ForEach(archivedApplications) { app in
+                            Button {
+                                withAnimation(BoostaMotion.smooth) {
+                                    selectedApplicationID = app.id
+                                }
+                            } label: {
+                                applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
             }
@@ -306,14 +333,23 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
                 }
 
-                HStack(spacing: BoostaSpace.sm) {
-                    WorkspaceActionButton(title: "Advance", systemImage: "arrow.right") {
-                        updateStatus(id: app.id, to: nextStatus(after: app.status))
-                    }
+                if app.status != .archived {
+                    HStack(spacing: BoostaSpace.sm) {
+                        WorkspaceActionButton(title: "Advance", systemImage: "arrow.right") {
+                            updateStatus(id: app.id, to: nextStatus(after: app.status))
+                        }
 
-                    WorkspaceActionButton(title: "Mark Interview", systemImage: "calendar") {
-                        updateStatus(id: app.id, to: .interview)
+                        WorkspaceActionButton(title: "Mark Interview", systemImage: "calendar") {
+                            updateStatus(id: app.id, to: .interview)
+                        }
                     }
+                }
+
+                WorkspaceActionButton(
+                    title: app.status == .archived ? "Restore to Active" : "Move to Archive",
+                    systemImage: app.status == .archived ? "arrow.uturn.backward" : "archivebox"
+                ) {
+                    updateStatus(id: app.id, to: app.status == .archived ? .saved : .archived)
                 }
 
                 Divider()
@@ -406,6 +442,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             case .interview: return "Sharpen examples, metrics, and company-specific answers."
             case .offer: return "Review compensation and compare against your goals."
             case .rejected: return "Archive learnings and move the next role forward."
+            case .archived: return "Restore this role any time if it becomes relevant again."
             }
         case .archived:
             return "Keep this for context, but focus daily energy on active pipeline work."
@@ -417,7 +454,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         let today = calendar.startOfDay(for: Date())
 
         if app.status == .offer { return .urgent }
-        if app.status == .rejected { return .archived }
+        if app.status == .archived { return .archived }
         if app.status == .interview,
            let interviewAt = app.interviewAt,
            interviewAt <= (calendar.date(byAdding: .day, value: 3, to: today) ?? today) {
@@ -438,6 +475,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         case .interview: return BoostaColor.warning
         case .offer: return BoostaColor.success
         case .rejected: return BoostaColor.danger
+        case .archived: return BoostaColor.secondaryText
         }
     }
 
@@ -447,7 +485,8 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         case .applied: return .interview
         case .interview: return .offer
         case .offer: return .offer
-        case .rejected: return .rejected
+        case .rejected: return .archived
+        case .archived: return .archived
         }
     }
 
@@ -472,7 +511,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             if selectedApplicationID == nil {
                 selectedApplicationID = record.id
             }
-            widgetSyncService.mergeLocalApplications(applications)
+            syncWidgetSnapshot()
             celebrateStreak(with: record.status)
             presentPipelineLiveActivityIfNeeded(for: record)
         } catch {
@@ -494,8 +533,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
         do {
             try modelContext.save()
-            widgetSyncService.mergeLocalApplications(applications)
-            celebrateStreak(with: record.status)
+            syncWidgetSnapshot()
+            if record.status != .archived {
+                celebrateStreak(with: record.status)
+            }
             presentPipelineLiveActivityIfNeeded(for: record)
             editingContext = nil
         } catch {
@@ -509,7 +550,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
         do {
             try modelContext.save()
-            widgetSyncService.mergeLocalApplications(applications)
+            syncWidgetSnapshot()
             presentPipelineLiveActivityIfNeeded(for: record)
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
@@ -522,7 +563,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
         do {
             try modelContext.save()
-            widgetSyncService.mergeLocalApplications(applications.filter { $0.id != id })
+            syncWidgetSnapshot(applications.filter { $0.id != id })
             editingContext = nil
             if selectedApplicationID == id {
                 selectedApplicationID = applications.first(where: { $0.id != id })?.id
@@ -631,10 +672,21 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         case .interview: "Interview prep counts. Streak protected."
         case .offer: "Offer progress protected your streak."
         case .rejected: "You kept momentum alive by tracking the result."
+        case .archived: "Archive updated without breaking momentum."
         }
         Task {
             await LiveActivityManager.shared.celebrateDailyStreak(dayCount: summary.currentStreak, detail: detail)
         }
+    }
+
+    private func syncWidgetSnapshot(_ snapshotApplications: [ApplicationRecord]? = nil) {
+        let source = snapshotApplications ?? applications
+        widgetSyncService.mergeLocalApplications(source)
+        widgetSyncService.syncStreakState(
+            user: authViewModel.me?.user,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: source
+        )
     }
 
     private func presentPipelineLiveActivityIfNeeded(for record: ApplicationRecord) {

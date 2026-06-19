@@ -144,6 +144,12 @@ struct ATSScannerWorkspaceView_iPad: View {
                     applications: trackedApplications
                 )
                 Task {
+                    if #available(iOS 16.1, *) {
+                        await LiveActivityManager.shared.celebrateDailyStreak(
+                            dayCount: CVBoostaWidgetStore.loadSnapshot().streakDays,
+                            detail: "ATS analysis completed. Momentum maintained."
+                        )
+                    }
                     await authViewModel.refreshSharedState()
                 }
             }
