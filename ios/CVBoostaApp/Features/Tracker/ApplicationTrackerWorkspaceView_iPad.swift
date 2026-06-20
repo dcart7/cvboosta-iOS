@@ -6,6 +6,7 @@ import SwiftData
 struct ApplicationTrackerWorkspaceView_iPad: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.modelContext) private var modelContext
+    @ObservedObject private var profileWorkspaceService = ProfileWorkspaceService.shared
 
     @Query(sort: \ApplicationFolder.createdAt, order: .forward)
     private var folders: [ApplicationFolder]
@@ -77,6 +78,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             ("Follow up", activeApplications.filter { priority(for: $0) == .followUp }.count, BoostaColor.warning),
             ("Interview soon", activeApplications.filter { priority(for: $0) == .interviewSoon }.count, BoostaColor.accentSecondary),
         ]
+    }
+
+    private var availableResumeNames: [String] {
+        profileWorkspaceService.mergedResumeNames(remoteNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [])
     }
 
     private var widgetSyncSignature: [String] {
@@ -157,7 +162,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             .sheet(isPresented: $showAddSheet) {
                 NavigationStack {
                     AddApplicationView(
-                        resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        resumeNames: availableResumeNames,
                         folderOptions: folderOptions
                     ) { draft in
                         createApplication(draft)
@@ -167,7 +172,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             .sheet(item: $editingContext) { context in
                 NavigationStack {
                     AddApplicationView(
-                        resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        resumeNames: availableResumeNames,
                         folderOptions: folderOptions,
                         initialDraft: context.draft,
                         saveTitle: "Save Changes",

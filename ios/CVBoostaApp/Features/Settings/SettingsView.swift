@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var profileWorkspaceService = ProfileWorkspaceService.shared
     @Query private var trackedApplications: [ApplicationRecord]
     @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
     @AppStorage(AppPreferenceKeys.notificationsEnabled) private var notificationsEnabled = true
@@ -14,9 +15,9 @@ struct SettingsView: View {
     @State private var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
 
     private var userName: String {
-        authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? authViewModel.me?.user.displayName ?? "-"
-            : "-"
+        profileWorkspaceService.effectiveDisplayName(fallback: authViewModel.me?.user.displayName).isEmpty
+            ? "-"
+            : profileWorkspaceService.effectiveDisplayName(fallback: authViewModel.me?.user.displayName)
     }
 
     private var email: String {
@@ -75,6 +76,16 @@ struct SettingsView: View {
                 row("Email", value: email)
                 row("Subscription", value: planTitle)
 
+                NavigationLink {
+                    ProfileDashboardView()
+                } label: {
+                    settingsNavigationRow(
+                        title: "Profile",
+                        subtitle: "Manage your photo, primary resume, progress, and account details"
+                    )
+                }
+                .buttonStyle(.plain)
+
                 PrimaryButton(title: "Log out") {
                     Task {
                         await authViewModel.logout()
@@ -130,7 +141,7 @@ struct SettingsView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Data")
-                row("Resume history", value: "\(authViewModel.me?.savedResumes.count ?? 0)")
+                row("Resume history", value: "\(profileWorkspaceService.combinedResumeCount(remoteNames: authViewModel.me?.savedResumes.map(\.fileName) ?? []))")
                 row("Scan history", value: "\(authViewModel.me?.scanHistory.count ?? 0)")
                 row("Applications", value: "\(trackedApplications.count)")
 
@@ -231,6 +242,35 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private func settingsNavigationRow(title: String, subtitle: String) -> some View {
+        HStack(alignment: .top, spacing: BoostaSpace.sm) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                Text(subtitle)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(BoostaColor.secondaryText)
+                .padding(.top, 4)
+        }
+        .padding(.horizontal, BoostaSpace.sm)
+        .padding(.vertical, 12)
+        .background(BoostaColor.surfaceInteractive)
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
     }
 
     @ViewBuilder

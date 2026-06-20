@@ -9,6 +9,7 @@ struct ATSScannerView: View {
     private var trackedApplications: [ApplicationRecord]
     @StateObject private var viewModel = ScannerViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var profileWorkspaceService = ProfileWorkspaceService.shared
     @State private var paywallContext: PaywallPresentationContext?
     @State private var currentStep: ScannerWizardStep = .upload
     @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -118,10 +119,10 @@ struct ATSScannerView: View {
                 switch result {
                 case .success(let urls):
                     if let url = urls.first {
-                        viewModel.handlePickerResult(.success(url))
+                        _ = viewModel.handlePickerResult(.success(url))
                     }
                 case .failure(let error):
-                    viewModel.handlePickerResult(.failure(error))
+                    _ = viewModel.handlePickerResult(.failure(error))
                 }
             }
             .navigationDestination(isPresented: Binding(
@@ -143,6 +144,21 @@ struct ATSScannerView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
+            .overlay(alignment: .top) {
+                if let message = viewModel.primaryResumeBubbleMessage {
+                    ResumeFlowBubble(message: message)
+                        .padding(.horizontal, BoostaSpace.md)
+                        .padding(.top, 10)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
+                                withAnimation(BoostaMotion.smooth) {
+                                    viewModel.clearPrimaryResumeBubble()
+                                }
+                            }
+                        }
+                }
+            }
         }
     }
 
@@ -151,14 +167,49 @@ struct ATSScannerView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(title: "Step 1 • Upload CV", subtitle: "PDF only, up to 10 MB")
 
+                if viewModel.selectedFileName == nil, let primaryResume = profileWorkspaceService.primaryResume {
+                    ResumeAutofillPromptCard(
+                        title: "Use Primary Resume?",
+                        subtitle: "\(primaryResume.displayName) is ready to reuse instantly.",
+                        primaryTitle: "Continue",
+                        secondaryTitle: "Upload Another",
+                        primaryAction: {
+                            viewModel.usePrimaryResumeIfAvailable()
+                        },
+                        secondaryAction: {
+                            viewModel.startImport()
+                        }
+                    )
+                } else if viewModel.selectedFileName == nil, profileWorkspaceService.shouldShowPrimarySetupTip {
+                    primaryResumeTipCard
+                }
+
                 SecondaryButton(title: "Upload Resume PDF") {
                     viewModel.startImport()
                 }
 
                 if let fileName = viewModel.selectedFileName {
-                    Label(fileName, systemImage: "doc.richtext")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
+                    HStack(spacing: 8) {
+                        Label(fileName, systemImage: "doc.richtext")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                        if profileWorkspaceService.primaryResume?.displayName == fileName {
+                            PrimaryResumeBadge()
+                        }
+                    }
+                }
+
+                if let suggestion = viewModel.primaryResumeSuggestion {
+                    ResumeRepeatedUploadSuggestionCard(
+                        fileName: suggestion.displayName,
+                        uploadCount: suggestion.uploadCount,
+                        makePrimary: {
+                            viewModel.saveSelectedResumeAsPrimary()
+                        },
+                        dismiss: {
+                            viewModel.dismissPrimaryResumeSuggestion()
+                        }
+                    )
                 }
             }
         }
@@ -429,6 +480,29 @@ struct ATSScannerView: View {
                 Text("You can wait until \(optimizationStatus.resetDate.formatted(date: .omitted, time: .shortened)) for the next free run, or unlock unlimited optimizations now.")
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
+            }
+        }
+    }
+
+    private var primaryResumeTipCard: some View {
+        GlassCard(padding: BoostaSpace.sm) {
+            HStack(alignment: .top, spacing: BoostaSpace.xs) {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundStyle(BoostaColor.warning)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Add one primary resume and CVBoosta will offer it automatically in Scanner, Tailoring, and quick resume flows.")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Hide tip") {
+                        profileWorkspaceService.dismissPrimarySetupTip()
+                    }
+                    .buttonStyle(.plain)
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.accent)
+                }
+                Spacer(minLength: 0)
             }
         }
     }

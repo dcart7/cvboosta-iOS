@@ -9,6 +9,7 @@ struct TailoringWorkspaceView_iPad: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appRouter: AppRouter
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var profileWorkspaceService = ProfileWorkspaceService.shared
 
     @Query(filter: #Predicate<LatestScanReport> { $0.id == "latest" })
     private var latestReports: [LatestScanReport]
@@ -45,6 +46,20 @@ struct TailoringWorkspaceView_iPad: View {
                             if let payload = latestPayload {
                                 workspaceBody(payload: payload, width: proxy.size.width)
                             } else {
+                                if let primaryResume = profileWorkspaceService.primaryResume {
+                                    ResumeAutofillPromptCard(
+                                        title: "Use Primary Resume?",
+                                        subtitle: "Continue with \(primaryResume.displayName) or upload another PDF.",
+                                        primaryTitle: "Continue",
+                                        secondaryTitle: "Upload Another",
+                                        primaryAction: {
+                                            continueWithPrimaryResume()
+                                        },
+                                        secondaryAction: {
+                                            uploadAnotherResumeFromTailoring()
+                                        }
+                                    )
+                                }
                                 emptyStateCard
                             }
                         }
@@ -496,6 +511,16 @@ struct TailoringWorkspaceView_iPad: View {
                 .filter { $0.count > 24 }
                 .prefix(3)
         )
+    }
+
+    private func continueWithPrimaryResume() {
+        profileWorkspaceService.queueScannerLaunchAction(.usePrimaryResume)
+        appRouter.open(.scanner)
+    }
+
+    private func uploadAnotherResumeFromTailoring() {
+        profileWorkspaceService.queueScannerLaunchAction(.uploadAnother)
+        appRouter.open(.scanner)
     }
 }
 

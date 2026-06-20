@@ -192,6 +192,7 @@ final class ResumeExportController: ObservableObject {
                 await MainActor.run {
                     self.isExporting = false
                     self.shareItem = ResumeExportShareItem(url: file.url, format: format)
+                    ProfileWorkspaceService.shared.recordExport(format: format, resumeName: resumeName)
                     self.setSuccessMessage(format.shareSuccessMessage)
                     HapticsService.success()
                 }

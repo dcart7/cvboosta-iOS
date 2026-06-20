@@ -8,6 +8,7 @@ struct SettingsWorkspaceView_iPad: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var profileWorkspaceService = ProfileWorkspaceService.shared
     @Query private var trackedApplications: [ApplicationRecord]
     @AppStorage(AppPreferenceKeys.appearance) private var appearanceMode = AppAppearancePreference.system.rawValue
     @AppStorage(AppPreferenceKeys.notificationsEnabled) private var notificationsEnabled = true
@@ -18,9 +19,9 @@ struct SettingsWorkspaceView_iPad: View {
     @State private var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
 
     private var userName: String {
-        authViewModel.me?.user.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? authViewModel.me?.user.displayName ?? "-"
-            : "-"
+        profileWorkspaceService.effectiveDisplayName(fallback: authViewModel.me?.user.displayName).isEmpty
+            ? "-"
+            : profileWorkspaceService.effectiveDisplayName(fallback: authViewModel.me?.user.displayName)
     }
 
     private var email: String {
@@ -170,6 +171,13 @@ struct SettingsWorkspaceView_iPad: View {
 
     private var settingsHeaderButtons: some View {
         Group {
+            NavigationLink {
+                ProfileDashboardView()
+            } label: {
+                settingsActionLabel(title: "Profile", systemImage: "person.crop.circle")
+            }
+            .buttonStyle(.plain)
+
             WorkspaceActionButton(title: "Upgrade", systemImage: "crown", isDisabled: subscriptionService.isPremium) {
                 showPaywall = true
             }
@@ -206,12 +214,18 @@ struct SettingsWorkspaceView_iPad: View {
             infoRow("Name", value: userName)
             infoRow("Email", value: email)
             infoRow("Subscription", value: planTitle)
+            NavigationLink {
+                ProfileDashboardView()
+            } label: {
+                settingsProfileRow
+            }
+            .buttonStyle(.plain)
         }
     }
 
     private var accountSecondaryDetails: some View {
         VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-            infoRow("Resume history", value: "\(authViewModel.me?.savedResumes.count ?? 0)")
+            infoRow("Resume history", value: "\(profileWorkspaceService.combinedResumeCount(remoteNames: authViewModel.me?.savedResumes.map(\.fileName) ?? []))")
             infoRow("Scan history", value: "\(authViewModel.me?.scanHistory.count ?? 0)")
             infoRow("Applications", value: "\(trackedApplications.count)")
         }
@@ -384,6 +398,49 @@ struct SettingsWorkspaceView_iPad: View {
         let fallback = UIApplication.openSettingsURLString
         guard let url = URL(string: rawValue.isEmpty ? fallback : rawValue) else { return }
         openURL(url)
+    }
+
+    private func settingsActionLabel(title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(BoostaType.bodyStrong)
+            .foregroundStyle(BoostaColor.primaryText)
+            .padding(.horizontal, BoostaSpace.md)
+            .padding(.vertical, 10)
+            .background(BoostaColor.surfaceInteractive)
+            .overlay(
+                RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                    .stroke(BoostaColor.glassStroke, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+    }
+
+    private var settingsProfileRow: some View {
+        HStack(alignment: .top, spacing: BoostaSpace.sm) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Profile")
+                    .font(BoostaType.bodyStrong)
+                    .foregroundStyle(BoostaColor.primaryText)
+                Text("Photo, primary resume, progress, and account details")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(BoostaColor.secondaryText)
+                .padding(.top, 4)
+        }
+        .padding(.horizontal, BoostaSpace.sm)
+        .padding(.vertical, 12)
+        .background(BoostaColor.surfaceInteractive)
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
     }
 }
 

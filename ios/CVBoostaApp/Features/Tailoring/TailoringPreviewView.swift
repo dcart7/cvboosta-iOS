@@ -9,6 +9,7 @@ struct TailoringPreviewView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appRouter: AppRouter
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var profileWorkspaceService = ProfileWorkspaceService.shared
 
     @Query(filter: #Predicate<LatestScanReport> { $0.id == "latest" })
     private var latestReports: [LatestScanReport]
@@ -48,6 +49,20 @@ struct TailoringPreviewView: View {
                             recommendationsCard(payload)
                             optimizedPreviewCard(payload)
                         } else {
+                            if let primaryResume = profileWorkspaceService.primaryResume {
+                                ResumeAutofillPromptCard(
+                                    title: "Use Primary Resume?",
+                                    subtitle: "Continue with \(primaryResume.displayName) or upload another PDF.",
+                                    primaryTitle: "Continue",
+                                    secondaryTitle: "Upload Another",
+                                    primaryAction: {
+                                        continueWithPrimaryResume()
+                                    },
+                                    secondaryAction: {
+                                        uploadAnotherResumeFromTailoring()
+                                    }
+                                )
+                            }
                             emptyStateCard
                         }
 
@@ -522,6 +537,16 @@ struct TailoringPreviewView: View {
         } else {
             WorkspaceSessionService.shared.ensureSession(for: .tailoring)
         }
+    }
+
+    private func continueWithPrimaryResume() {
+        profileWorkspaceService.queueScannerLaunchAction(.usePrimaryResume)
+        appRouter.open(.scanner)
+    }
+
+    private func uploadAnotherResumeFromTailoring() {
+        profileWorkspaceService.queueScannerLaunchAction(.uploadAnother)
+        appRouter.open(.scanner)
     }
 
     private func compactChangePairs(payload: LatestScanPayload) -> [(before: String, after: String)] {

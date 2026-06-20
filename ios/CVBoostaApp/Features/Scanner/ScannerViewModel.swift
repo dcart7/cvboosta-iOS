@@ -27,6 +27,8 @@ final class ScannerViewModel: ObservableObject {
     @Published var selectedFileName: String?
     @Published private(set) var selectedFileURL: URL?
     @Published var isFileImporterPresented: Bool = false
+    @Published private(set) var primaryResumeSuggestion: ResumeUploadObservation?
+    @Published var primaryResumeBubbleMessage: String?
 
     @Published var isScanning: Bool = false
     @Published var scanProgress: Double = 0
@@ -46,6 +48,7 @@ final class ScannerViewModel: ObservableObject {
     private let widgetSyncService: WidgetSyncService
     private let sessionService: WorkspaceSessionService
     private let scanLimitService: ScanLimitService
+    private let profileWorkspaceService: ProfileWorkspaceService
     private var scanTask: Task<Void, Never>?
 
     init(
@@ -53,13 +56,15 @@ final class ScannerViewModel: ObservableObject {
         subscriptionService: SubscriptionService? = nil,
         widgetSyncService: WidgetSyncService? = nil,
         sessionService: WorkspaceSessionService? = nil,
-        scanLimitService: ScanLimitService = .shared
+        scanLimitService: ScanLimitService = .shared,
+        profileWorkspaceService: ProfileWorkspaceService? = nil
     ) {
         self.atsService = atsService ?? ATSService.shared
         self.subscriptionService = subscriptionService ?? .shared
         self.widgetSyncService = widgetSyncService ?? .shared
         self.sessionService = sessionService ?? .shared
         self.scanLimitService = scanLimitService
+        self.profileWorkspaceService = profileWorkspaceService ?? .shared
     }
 
     func onAppear() {
@@ -67,6 +72,7 @@ final class ScannerViewModel: ObservableObject {
         if !sessionExpiredAndReset() {
             sessionService.ensureSession(for: .scanner)
         }
+        handlePendingScannerLaunchAction()
     }
 
     func startImport() {
@@ -115,7 +121,8 @@ final class ScannerViewModel: ObservableObject {
         }
     }
 
-    func handlePickerResult(_ result: Result<URL, Error>) {
+    @discardableResult
+    func handlePickerResult(_ result: Result<URL, Error>) -> Bool {
         switch result {
         case .success(let url):
             do {
@@ -129,17 +136,24 @@ final class ScannerViewModel: ObservableObject {
                 let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
                 if size > 10 * 1024 * 1024 {
                     errorMessage = "PDF file must be 10 MB or smaller."
-                    return
+                    return false
                 }
                 selectedFileURL = url
                 selectedFileName = url.lastPathComponent
                 errorMessage = nil
+                primaryResumeSuggestion = try? profileWorkspaceService.observeResumeUpload(from: url)
+                if primaryResumeSuggestion?.shouldSuggestPrimary == false {
+                    primaryResumeSuggestion = nil
+                }
                 sessionService.touch(.scanner)
+                return true
             } catch {
                 errorMessage = "Unable to read selected PDF."
+                return false
             }
         case .failure(let error):
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -186,6 +200,47 @@ final class ScannerViewModel: ObservableObject {
             scansRemaining: totalRemaining,
             resetDate: freeStatus.resetDate
         )
+    }
+
+    func usePrimaryResumeIfAvailable() {
+        do {
+            let selection = try profileWorkspaceService.primaryResumeSelection()
+            selectedFileURL = selection.fileURL
+            selectedFileName = selection.summary.displayName
+            errorMessage = nil
+            primaryResumeSuggestion = nil
+            sessionService.touch(.scanner)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func saveSelectedResumeAsPrimary() {
+        guard let selectedFileURL else {
+            errorMessage = "Please upload a PDF resume."
+            return
+        }
+
+        do {
+            let storedResume = try profileWorkspaceService.importResume(
+                from: selectedFileURL,
+                suggestedName: selectedFileName,
+                makePrimary: true
+            )
+            selectedFileName = storedResume.displayName
+            primaryResumeSuggestion = nil
+            primaryResumeBubbleMessage = "\(storedResume.displayName) is now your primary resume."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func dismissPrimaryResumeSuggestion() {
+        primaryResumeSuggestion = nil
+    }
+
+    func clearPrimaryResumeBubble() {
+        primaryResumeBubbleMessage = nil
     }
 
     private func runScan(pdfURL: URL, role: String) async {
@@ -252,6 +307,9 @@ final class ScannerViewModel: ObservableObject {
         if let scanResult {
             widgetSyncService.mergeLatestScan(result: scanResult)
         }
+        if profileWorkspaceService.consumeFirstScanPrimaryBubbleEligibility() {
+            primaryResumeBubbleMessage = "Tip: save a primary resume once and CVBoosta will auto-fill it next time."
+        }
 
         let fallbackFreeRemaining = scanLimitService.status(isPremium: false).scansRemaining
         if subscriptionService.shouldUseConsumableScanCredit(fallbackFreeRemaining: fallbackFreeRemaining) {
@@ -306,6 +364,8 @@ final class ScannerViewModel: ObservableObject {
         targetMarket = .unitedStates
         selectedFileName = nil
         selectedFileURL = nil
+        primaryResumeSuggestion = nil
+        primaryResumeBubbleMessage = nil
         scanResult = nil
         errorMessage = nil
         isScanning = false
@@ -314,5 +374,16 @@ final class ScannerViewModel: ObservableObject {
         progressStepIndex = 0
         scanTask?.cancel()
         scanTask = nil
+    }
+
+    private func handlePendingScannerLaunchAction() {
+        switch profileWorkspaceService.consumeScannerLaunchAction() {
+        case .usePrimaryResume:
+            usePrimaryResumeIfAvailable()
+        case .uploadAnother:
+            startImport()
+        case .none:
+            break
+        }
     }
 }
