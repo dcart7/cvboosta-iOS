@@ -50,6 +50,7 @@ final class ScannerViewModel: ObservableObject {
     private let scanLimitService: ScanLimitService
     private let profileWorkspaceService: ProfileWorkspaceService
     private var scanTask: Task<Void, Never>?
+    private var resumeObservationTask: Task<Void, Never>?
 
     init(
         atsService: ATSServiceProtocol? = nil,
@@ -138,12 +139,24 @@ final class ScannerViewModel: ObservableObject {
                     errorMessage = "PDF file must be 10 MB or smaller."
                     return false
                 }
+                resumeObservationTask?.cancel()
                 selectedFileURL = url
                 selectedFileName = url.lastPathComponent
                 errorMessage = nil
-                primaryResumeSuggestion = try? profileWorkspaceService.observeResumeUpload(from: url)
-                if primaryResumeSuggestion?.shouldSuggestPrimary == false {
-                    primaryResumeSuggestion = nil
+                primaryResumeSuggestion = nil
+                resumeObservationTask = Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        let observation = try await self.profileWorkspaceService.observeResumeUpload(from: url)
+                        guard !Task.isCancelled, self.selectedFileURL == url else { return }
+                        self.primaryResumeSuggestion = observation.shouldSuggestPrimary ? observation : nil
+                    } catch {
+                        guard !Task.isCancelled, self.selectedFileURL == url else { return }
+                        self.selectedFileURL = nil
+                        self.selectedFileName = nil
+                        self.primaryResumeSuggestion = nil
+                        self.errorMessage = error.localizedDescription
+                    }
                 }
                 sessionService.touch(.scanner)
                 return true
@@ -221,17 +234,23 @@ final class ScannerViewModel: ObservableObject {
             return
         }
 
-        do {
-            let storedResume = try profileWorkspaceService.importResume(
-                from: selectedFileURL,
-                suggestedName: selectedFileName,
-                makePrimary: true
-            )
-            selectedFileName = storedResume.displayName
-            primaryResumeSuggestion = nil
-            primaryResumeBubbleMessage = "\(storedResume.displayName) is now your primary resume."
-        } catch {
-            errorMessage = error.localizedDescription
+        errorMessage = nil
+        let suggestedName = selectedFileName
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let storedResume = try await self.profileWorkspaceService.importResume(
+                    from: selectedFileURL,
+                    suggestedName: suggestedName,
+                    makePrimary: true
+                )
+                self.selectedFileName = storedResume.displayName
+                self.primaryResumeSuggestion = nil
+                self.primaryResumeBubbleMessage = "\(storedResume.displayName) is now your primary resume."
+            } catch {
+                self.errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -372,6 +391,8 @@ final class ScannerViewModel: ObservableObject {
         scanProgress = 0
         progressMessage = "Ready"
         progressStepIndex = 0
+        resumeObservationTask?.cancel()
+        resumeObservationTask = nil
         scanTask?.cancel()
         scanTask = nil
     }

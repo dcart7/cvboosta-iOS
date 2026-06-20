@@ -68,6 +68,42 @@ struct PrimaryResumeSelection {
     let fileURL: URL
 }
 
+private struct ProfileResumeResource: Sendable {
+    let data: Data
+    let fileName: String
+    let fileHash: String
+}
+
+private func loadProfileResumeResource(from url: URL) throws -> ProfileResumeResource {
+    let scoped = url.startAccessingSecurityScopedResource()
+    defer {
+        if scoped {
+            url.stopAccessingSecurityScopedResource()
+        }
+    }
+
+    do {
+        let values = try url.resourceValues(forKeys: [.nameKey, .fileSizeKey])
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        if let size = values.fileSize, size > 10 * 1024 * 1024 {
+            throw ProfileWorkspaceService.WorkspaceError.fileTooLarge
+        }
+        if data.count > 10 * 1024 * 1024 {
+            throw ProfileWorkspaceService.WorkspaceError.fileTooLarge
+        }
+
+        return ProfileResumeResource(
+            data: data,
+            fileName: values.name ?? url.lastPathComponent,
+            fileHash: SHA256.hash(data: data).compactMap { String(format: "%02x", $0) }.joined()
+        )
+    } catch let error as ProfileWorkspaceService.WorkspaceError {
+        throw error
+    } catch {
+        throw ProfileWorkspaceService.WorkspaceError.unreadableFile
+    }
+}
+
 @MainActor
 final class ProfileWorkspaceService: ObservableObject {
     static let shared = ProfileWorkspaceService()
@@ -190,15 +226,23 @@ final class ProfileWorkspaceService: ObservableObject {
         persistSettings()
     }
 
-    func saveAvatarData(_ data: Data?) throws {
+    func saveAvatarData(_ data: Data?) async throws {
         if let data {
             let fileName = settings.avatarFileName ?? "profile-avatar.jpg"
             try ensureDirectoryExists(at: baseDirectoryURL)
-            try data.write(to: avatarURL(fileName: fileName), options: .atomic)
+            let destinationURL = avatarURL(fileName: fileName)
+            try await Task.detached(priority: .userInitiated) {
+                try data.write(to: destinationURL, options: .atomic)
+            }.value
             settings.avatarFileName = fileName
             avatarData = data
         } else if let fileName = settings.avatarFileName {
-            try? fileManager.removeItem(at: avatarURL(fileName: fileName))
+            let destinationURL = avatarURL(fileName: fileName)
+            try? await Task.detached(priority: .utility) {
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+            }.value
             settings.avatarFileName = nil
             avatarData = nil
         } else {
@@ -212,8 +256,8 @@ final class ProfileWorkspaceService: ObservableObject {
         from url: URL,
         suggestedName: String? = nil,
         makePrimary: Bool = false
-    ) throws -> StoredResumeSummary {
-        let resource = try readResumeResource(from: url)
+    ) async throws -> StoredResumeSummary {
+        let resource = try await readResumeResource(from: url)
         let displayName = normalizedDisplayName(
             suggestedName?.trimmingCharacters(in: .whitespacesAndNewlines),
             fallbackFileName: resource.fileName
@@ -242,7 +286,10 @@ final class ProfileWorkspaceService: ObservableObject {
 
         try ensureDirectoryExists(at: resumesDirectoryURL)
         let storageFileName = "\(UUID().uuidString).pdf"
-        try resource.data.write(to: resumeURL(fileName: storageFileName), options: .atomic)
+        let destinationURL = resumeURL(fileName: storageFileName)
+        try await Task.detached(priority: .userInitiated) {
+            try resource.data.write(to: destinationURL, options: .atomic)
+        }.value
 
         var summary = StoredResumeSummary(
             id: UUID(),
@@ -272,8 +319,8 @@ final class ProfileWorkspaceService: ObservableObject {
         return summary
     }
 
-    func observeResumeUpload(from url: URL) throws -> ResumeUploadObservation {
-        let resource = try readResumeResource(from: url)
+    func observeResumeUpload(from url: URL) async throws -> ResumeUploadObservation {
+        let resource = try await readResumeResource(from: url)
         let now = Date()
 
         if let existingIndex = savedResumes.firstIndex(where: { $0.fileHash == resource.fileHash }) {
@@ -456,7 +503,7 @@ final class ProfileWorkspaceService: ObservableObject {
 
     private func loadAvatarData() -> Data? {
         guard let fileName = settings.avatarFileName else { return nil }
-        return try? Data(contentsOf: avatarURL(fileName: fileName))
+        return try? Data(contentsOf: avatarURL(fileName: fileName), options: .mappedIfSafe)
     }
 
     private func normalizedDisplayName(_ candidate: String?, fallbackFileName: String) -> String {
@@ -473,40 +520,10 @@ final class ProfileWorkspaceService: ObservableObject {
         return cleaned.isEmpty ? "Resume" : cleaned
     }
 
-    private struct ResumeResource {
-        let data: Data
-        let fileName: String
-        let fileHash: String
-    }
-
-    private func readResumeResource(from url: URL) throws -> ResumeResource {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer {
-            if scoped {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        do {
-            let values = try url.resourceValues(forKeys: [.nameKey, .fileSizeKey])
-            let data = try Data(contentsOf: url, options: .mappedIfSafe)
-            if let size = values.fileSize, size > 10 * 1024 * 1024 {
-                throw WorkspaceError.fileTooLarge
-            }
-            if data.count > 10 * 1024 * 1024 {
-                throw WorkspaceError.fileTooLarge
-            }
-
-            return ResumeResource(
-                data: data,
-                fileName: values.name ?? url.lastPathComponent,
-                fileHash: SHA256.hash(data: data).compactMap { String(format: "%02x", $0) }.joined()
-            )
-        } catch let error as WorkspaceError {
-            throw error
-        } catch {
-            throw WorkspaceError.unreadableFile
-        }
+    private func readResumeResource(from url: URL) async throws -> ProfileResumeResource {
+        try await Task.detached(priority: .userInitiated) {
+            try loadProfileResumeResource(from: url)
+        }.value
     }
 
     private var baseDirectoryURL: URL {

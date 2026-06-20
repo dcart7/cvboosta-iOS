@@ -512,22 +512,28 @@ struct ProfileDashboardView: View {
     }
 
     private func addResumeFromProfile(url: URL) {
-        do {
-            let resume = try profileWorkspaceService.importResume(from: url)
-            toastMessage = profileWorkspaceService.primaryResume?.id == resume.id
-                ? "\(resume.displayName) added as your primary resume."
-                : "\(resume.displayName) added to My Resumes."
-        } catch {
-            errorMessage = error.localizedDescription
+        errorMessage = nil
+        Task {
+            do {
+                let resume = try await profileWorkspaceService.importResume(from: url)
+                toastMessage = profileWorkspaceService.primaryResume?.id == resume.id
+                    ? "\(resume.displayName) added as your primary resume."
+                    : "\(resume.displayName) added to My Resumes."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     private func removeAvatar() {
-        do {
-            try profileWorkspaceService.saveAvatarData(nil)
-            toastMessage = "Profile photo removed."
-        } catch {
-            errorMessage = error.localizedDescription
+        errorMessage = nil
+        Task {
+            do {
+                try await profileWorkspaceService.saveAvatarData(nil)
+                toastMessage = "Profile photo removed."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -536,7 +542,7 @@ struct ProfileDashboardView: View {
         do {
             guard let data = try await selectedAvatarItem.loadTransferable(type: Data.self) else { return }
             let normalizedData = UIImage.profileAvatarData(from: data) ?? data
-            try profileWorkspaceService.saveAvatarData(normalizedData)
+            try await profileWorkspaceService.saveAvatarData(normalizedData)
             toastMessage = "Profile photo updated."
         } catch {
             errorMessage = error.localizedDescription

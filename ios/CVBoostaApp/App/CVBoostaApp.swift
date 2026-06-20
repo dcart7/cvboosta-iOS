@@ -71,6 +71,8 @@ struct AppRootView: View {
     @State private var accountSyncTicker = Timer.publish(every: 180, on: .main, in: .common).autoconnect()
     @StateObject private var subscriptionService = SubscriptionService.shared
     @State private var authPaywallContext: PaywallPresentationContext?
+    @State private var isAccountSyncInFlight = false
+    @State private var hasPendingAccountSyncRequest = false
 
     private var accountApplicationsSignature: String {
         authViewModel.me?.applications
@@ -101,9 +103,7 @@ struct AppRootView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active, authViewModel.state == .loggedIn else { return }
-            Task {
-                await performAccountSync()
-            }
+            requestAccountSync()
         }
         .onChange(of: authViewModel.pendingFreshAuthEvent) { _, event in
             guard let event, authViewModel.state == .loggedIn, !subscriptionService.isPremium else { return }
@@ -117,9 +117,7 @@ struct AppRootView: View {
         }
         .onReceive(accountSyncTicker) { _ in
             guard scenePhase == .active, authViewModel.state == .loggedIn else { return }
-            Task {
-                await performAccountSync()
-            }
+            requestAccountSync()
         }
         .sheet(item: $authPaywallContext) { context in
             NavigationStack {
@@ -131,8 +129,9 @@ struct AppRootView: View {
         }
     }
 
+    @MainActor
     private func syncAccountApplications() {
-        guard let accountApplications = authViewModel.me?.applications, !accountApplications.isEmpty else { return }
+        let accountApplications = authViewModel.me?.applications ?? []
 
         let existingRecords = (try? modelContext.fetch(FetchDescriptor<ApplicationRecord>())) ?? []
         let existingByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.id, $0) })
@@ -165,10 +164,44 @@ struct AppRootView: View {
             modelContext.delete(record)
         }
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            // Keep the UI alive even if SwiftData persistence temporarily fails.
+        }
     }
 
+    @MainActor
+    private func requestAccountSync() {
+        if isAccountSyncInFlight {
+            hasPendingAccountSyncRequest = true
+            return
+        }
+
+        Task {
+            await performAccountSync()
+        }
+    }
+
+    @MainActor
     private func performAccountSync() async {
+        guard !isAccountSyncInFlight else {
+            hasPendingAccountSyncRequest = true
+            return
+        }
+
+        isAccountSyncInFlight = true
+        defer {
+            isAccountSyncInFlight = false
+
+            if hasPendingAccountSyncRequest {
+                hasPendingAccountSyncRequest = false
+                Task {
+                    await performAccountSync()
+                }
+            }
+        }
+
         await authViewModel.refreshSharedState()
         _ = await subscriptionService.syncFromBackend()
         syncAccountApplications()
