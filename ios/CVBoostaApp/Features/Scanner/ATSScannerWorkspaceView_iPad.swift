@@ -590,6 +590,7 @@ private struct ATSResultsPanel_iPad: View {
 
     let result: ResumeScanResult
 
+    @StateObject private var exportController = ResumeExportController()
     @State private var didPersistLatestScan = false
 
     var body: some View {
@@ -619,6 +620,30 @@ private struct ATSResultsPanel_iPad: View {
             .animation(BoostaMotion.smooth, value: columnCount)
         }
         .frame(minHeight: 10)
+        .confirmationDialog(
+            "Download Resume",
+            isPresented: $exportController.isExportOptionsPresented,
+            titleVisibility: .visible
+        ) {
+            ForEach(ResumeExportFormat.allCases) { format in
+                Button(format.title) {
+                    exportController.export(
+                        resumeName: result.resumeName,
+                        optimizedText: result.response.optimizedCV,
+                        format: format
+                    )
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose the export format to share or save.")
+        }
+        .sheet(item: $exportController.shareItem, onDismiss: {
+            exportController.cleanupSharedFile()
+        }) { item in
+            ShareSheet(items: [item.url])
+        }
     }
 
     private func resultsColumnCount(for width: CGFloat) -> Int {
@@ -787,17 +812,43 @@ private struct ATSResultsPanel_iPad: View {
     private var actionsCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Next")
+                SectionHeader(
+                    title: "Download Resume",
+                    subtitle: "Share this optimized version in the format you need."
+                )
 
-                PrimaryButton(title: "Open Tailoring") {
-                    appRouter.open(.tailoring)
+                PrimaryButton(
+                    title: exportController.primaryActionTitle,
+                    isLoading: exportController.isExporting
+                ) {
+                    exportController.presentOptions()
                 }
                 .hoverEffect(.lift)
 
-                SecondaryButton(title: "Save Report") {
-                    HapticsService.success()
+                SecondaryButton(title: "Open Tailoring") {
+                    appRouter.open(.tailoring)
                 }
                 .hoverEffect(.highlight)
+
+                ResumeExportCapabilitiesView()
+
+                if let successMessage = exportController.successMessage {
+                    Text(successMessage)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.success)
+                }
+
+                if let errorMessage = exportController.errorMessage {
+                    Text(errorMessage)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    SecondaryButton(title: "Retry Export") {
+                        exportController.retryLastExport()
+                    }
+                    .hoverEffect(.highlight)
+                }
             }
         }
     }

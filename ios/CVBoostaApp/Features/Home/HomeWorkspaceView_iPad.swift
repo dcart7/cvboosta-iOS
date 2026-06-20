@@ -22,6 +22,8 @@ struct HomeWorkspaceView_iPad: View {
     @State private var previewDocument: HistoryPDFPreviewDocument?
     @State private var animateSparkline = false
     @State private var showStreakCenter = false
+    @State private var streakSupportSyncTask: Task<Void, Never>?
+    @State private var didBootstrapSupportLiveActivity = false
 
     private let resumeService = ResumeService.shared
 
@@ -52,6 +54,21 @@ struct HomeWorkspaceView_iPad: View {
                 frozenDayStamp: frozenDayStamp
             )
         )
+    }
+
+    private var streakSupportSignature: [String] {
+        let scanSignature = (authViewModel.me?.scanHistory ?? []).map {
+            "scan:\($0.id):\($0.createdAt.timeIntervalSince1970):\($0.matchAfter ?? $0.atsScore)"
+        }
+        let applicationSignature = trackedApplications.map {
+            "app:\($0.id.uuidString):\($0.status.rawValue):\($0.appliedAt.timeIntervalSince1970):\($0.interviewAt?.timeIntervalSince1970 ?? 0)"
+        }
+
+        return [
+            "restore:\(restoredDayStamp)",
+            "freeze:\(frozenDayStamp)",
+            "user:\(authViewModel.me?.user.id ?? 0)"
+        ] + scanSignature + applicationSignature
     }
 
     private var activeApplications: [ApplicationRecord] {
@@ -210,34 +227,42 @@ struct HomeWorkspaceView_iPad: View {
                 withAnimation(.easeOut(duration: 0.7)) {
                     animateSparkline = true
                 }
-                syncSupportLiveActivity()
+                didBootstrapSupportLiveActivity = true
+                scheduleSupportLiveActivitySync()
             }
-            .onChange(of: authViewModel.me?.scanHistory.count ?? 0) { _, _ in
-                syncSupportLiveActivity()
+            .onChange(of: streakSupportSignature) { _, _ in
+                guard didBootstrapSupportLiveActivity else { return }
+                scheduleSupportLiveActivitySync()
             }
-            .onChange(of: trackedApplications.count) { _, _ in
-                syncSupportLiveActivity()
+            .onDisappear {
+                streakSupportSyncTask?.cancel()
+                streakSupportSyncTask = nil
             }
         }
     }
 
-    private func syncSupportLiveActivity() {
+    private func scheduleSupportLiveActivitySync() {
         guard #available(iOS 16.1, *) else { return }
-        let summary = StreakEngine.build(
-            now: .now,
-            user: authViewModel.me?.user,
-            scans: authViewModel.me?.scanHistory ?? [],
-            applications: trackedApplications,
-            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps(
-                restoredDayStamp: restoredDayStamp,
-                frozenDayStamp: frozenDayStamp
+        streakSupportSyncTask?.cancel()
+        streakSupportSyncTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+
+            let summary = StreakEngine.build(
+                now: .now,
+                user: authViewModel.me?.user,
+                scans: authViewModel.me?.scanHistory ?? [],
+                applications: trackedApplications,
+                manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps(
+                    restoredDayStamp: restoredDayStamp,
+                    frozenDayStamp: frozenDayStamp
+                )
             )
-        )
-        let hour = Calendar.current.component(.hour, from: .now)
-        Task {
+            let hour = Calendar.current.component(.hour, from: .now)
+
             guard !summary.todayActions.isEmpty,
                   summary.currentStreak >= 2,
-                  !summary.statusTitle.contains("protected"),
+                  !summary.statusTitle.localizedCaseInsensitiveContains("protected"),
                   hour >= 20 else {
                 await LiveActivityManager.shared.clearStreakProtection()
                 return

@@ -23,6 +23,10 @@ struct StatisticsWorkspaceView_iPad: View {
     @State private var selectedSection: StatisticsWorkspaceSection = .overview
     @State private var selectedRange: StatisticsTimeRange_iPad = .thirtyDays
     @State private var showStreakCenter = false
+    @State private var snapshot = StatisticsSnapshot.empty
+    @State private var selectedHeatmapDay: StatisticsHeatmapDay?
+    @State private var hasLoadedSharedHistory = false
+    @State private var historyDetailTask: Task<Void, Never>?
 
     private let resumeService = ResumeService.shared
 
@@ -38,76 +42,28 @@ struct StatisticsWorkspaceView_iPad: View {
         return "there"
     }
 
-    private var applicationsCount: Int {
-        activeApplications.count
+    private var historySignature: Int {
+        StatisticsSnapshotBuilder.signature(for: historyItems)
     }
 
-    private var interviewsCount: Int {
-        activeApplications.filter { $0.status == .interview }.count
+    private var applicationsSignature: Int {
+        StatisticsSnapshotBuilder.signature(for: trackedApplications)
     }
 
-    private var sharedHistoryAscending: [HistoryListItem] {
-        historyItems.sorted(by: { $0.createdAt < $1.createdAt })
+    private var scanSignature: Int {
+        StatisticsSnapshotBuilder.signature(for: authViewModel.me?.scanHistory ?? [])
     }
 
-    private var filteredHistoryAscending: [HistoryListItem] {
-        guard let days = selectedRange.dayWindow else { return sharedHistoryAscending }
-        guard let start = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else {
-            return sharedHistoryAscending
-        }
-        return sharedHistoryAscending.filter { $0.createdAt >= start }
-    }
-
-    private func normalizedATSScore(_ raw: Int) -> Int {
-        if raw > 100 {
-            return min(max(Int((Double(raw) / 10.0).rounded()), 0), 100)
-        }
-        return min(max(raw, 0), 100)
-    }
-
-    private var latestScore: Int {
-        sharedHistoryAscending.last.map { normalizedATSScore($0.matchAfter ?? $0.score) }
-            ?? authViewModel.me?.scanHistory.first.map { normalizedATSScore($0.matchAfter ?? $0.atsScore) }
-            ?? 0
-    }
-
-    private var streakSummary: StreakSummary {
-        StreakEngine.build(
-            now: .now,
-            user: authViewModel.me?.user,
-            scans: authViewModel.me?.scanHistory ?? [],
-            applications: trackedApplications,
-            manuallyProtectedDayStamps: SharedStreakState.protectedDayStamps()
-        )
-    }
-
-    private var activeApplications: [ApplicationRecord] {
-        trackedApplications.filter { $0.status != .archived }
-    }
-
-    private var avgScore: Int {
-        let values = filteredHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
-        guard !values.isEmpty else { return 0 }
-        let total = values.reduce(0, +)
-        return total / values.count
-    }
-
-    private var atsTrendScores: [Int] {
-        filteredHistoryAscending.map { normalizedATSScore($0.matchAfter ?? $0.score) }
-    }
-
-    private var trendPoints: [StatisticsChartPoint] {
-        filteredHistoryAscending.enumerated().map { index, item in
-            StatisticsChartPoint(
-                id: index,
-                date: item.createdAt,
-                score: normalizedATSScore(item.matchAfter ?? item.score)
-            )
-        }
-    }
-
-    private var streakDays: Int {
-        streakSummary.currentStreak
+    private var statisticsInputSignature: Int {
+        var hasher = Hasher()
+        hasher.combine(selectedRange.rawValue)
+        hasher.combine(historySignature)
+        hasher.combine(applicationsSignature)
+        hasher.combine(scanSignature)
+        hasher.combine(latestHistoryDetail?.id ?? -1)
+        hasher.combine(latestHistoryDetail?.matchAfter ?? -1)
+        hasher.combine(authViewModel.me?.user.id ?? -1)
+        return hasher.finalize()
     }
 
     private var latestPayload: LatestScanPayload? {
@@ -169,7 +125,10 @@ struct StatisticsWorkspaceView_iPad: View {
             }
             .task {
                 await authViewModel.refreshSharedState()
-                await loadSharedHistory()
+                await ensureSharedHistoryLoaded()
+            }
+            .task(id: statisticsInputSignature) {
+                rebuildSnapshot()
             }
             .sheet(item: $previewDocument) { document in
                 HistoryPDFPreviewSheet(document: document)
@@ -186,6 +145,9 @@ struct StatisticsWorkspaceView_iPad: View {
                         .padding(.horizontal, BoostaSpace.xl)
                         .padding(.top, BoostaSpace.sm)
                 }
+            }
+            .onDisappear {
+                historyDetailTask?.cancel()
             }
         }
     }
@@ -302,6 +264,7 @@ struct StatisticsWorkspaceView_iPad: View {
                 .gridCellColumns(min(2, columnCount))
             atsTrendCard
                 .gridCellColumns(min(2, columnCount))
+            activityHeatmapCard
             recentScanCard
             if latestPayload != nil || latestHistoryDetail != nil {
                 insightsCard
@@ -355,13 +318,13 @@ struct StatisticsWorkspaceView_iPad: View {
 
     private var overviewLead: some View {
         HStack(spacing: BoostaSpace.md) {
-            ScoreRing(score: latestScore)
+            ScoreRing(score: snapshot.careerScore)
                 .frame(width: 120, height: 120)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(latestScore == 0 ? "No scans yet" : "Latest ATS Score")
+                Text(snapshot.careerScore == 0 ? "No scans yet" : "Latest ATS Score")
                     .font(BoostaType.bodyStrong)
-                Text(latestScore == 0 ? "Run one scan to get a baseline and unlock insights." : "Keep refining role keywords and measurable impact.")
+                Text(snapshot.careerScore == 0 ? "Run one scan to get a baseline and unlock insights." : "Keep refining role keywords and measurable impact.")
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -382,9 +345,9 @@ struct StatisticsWorkspaceView_iPad: View {
             }
 
             HStack(spacing: BoostaSpace.sm) {
-                StatisticsMetricRing_iPad(title: "Career", value: latestScore == 0 ? "—" : "\(latestScore)", progress: Double(latestScore) / 100, tint: BoostaColor.accent)
-                StatisticsMetricRing_iPad(title: "Interviews", value: "\(interviewsCount)", progress: min(Double(interviewsCount) / 5, 1), tint: BoostaColor.success)
-                StatisticsMetricRing_iPad(title: "Streak", value: streakDays == 0 ? "Start" : "\(streakDays)d", progress: min(Double(streakDays) / 10, 1), tint: BoostaColor.warning)
+                StatisticsMetricRing_iPad(title: "Career", value: snapshot.careerScore == 0 ? "—" : "\(snapshot.careerScore)", progress: Double(snapshot.careerScore) / 100, tint: BoostaColor.accent)
+                StatisticsMetricRing_iPad(title: "Interviews", value: "\(snapshot.interviewsCount)", progress: min(Double(snapshot.interviewsCount) / 5, 1), tint: BoostaColor.success)
+                StatisticsMetricRing_iPad(title: "Streak", value: snapshot.streakDays == 0 ? "Start" : "\(snapshot.streakDays)d", progress: min(Double(snapshot.streakDays) / 10, 1), tint: BoostaColor.warning)
             }
 
             Divider()
@@ -398,9 +361,9 @@ struct StatisticsWorkspaceView_iPad: View {
 
     private var overviewMetricPills: some View {
         Group {
-            MetricPill(title: "Applications", value: "\(applicationsCount)", color: BoostaColor.accent)
-            MetricPill(title: "Interviews", value: "\(interviewsCount)", color: BoostaColor.success)
-            MetricPill(title: "Avg. ATS", value: avgScore == 0 ? "—" : "\(avgScore)", color: BoostaColor.warning)
+            MetricPill(title: "Applications", value: "\(snapshot.applicationsCount)", color: BoostaColor.accent)
+            MetricPill(title: "Interviews", value: "\(snapshot.interviewsCount)", color: BoostaColor.success)
+            MetricPill(title: "Avg. ATS", value: snapshot.averageScore == 0 ? "—" : "\(snapshot.averageScore)", color: BoostaColor.warning)
         }
     }
 
@@ -409,7 +372,7 @@ struct StatisticsWorkspaceView_iPad: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
                     title: "ATS Trend",
-                    subtitle: atsTrendScores.isEmpty ? "No trend yet" : "\(atsTrendScores.count) shared history items"
+                    subtitle: snapshot.trendSubtitle
                 )
 
                 Picker("Trend range", selection: $selectedRange) {
@@ -419,109 +382,67 @@ struct StatisticsWorkspaceView_iPad: View {
                 }
                 .pickerStyle(.segmented)
 
-                if atsTrendScores.count < 2 {
+                if snapshot.trendPoints.count < 2 {
                     Text("More shared history will make the full account trend clearer.")
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 } else {
-                    Chart {
-                        ForEach(trendPoints) { point in
-                            BarMark(
-                                x: .value("Date", point.date),
-                                y: .value("ATS", point.score),
-                                width: .fixed(14)
-                            )
-                            .foregroundStyle(
-                                point.id == trendPoints.last?.id
-                                    ? BoostaColor.accent
-                                    : BoostaColor.accent.opacity(0.42)
-                            )
-                        }
-
-                        RuleMark(y: .value("Average", avgScore))
-                            .foregroundStyle(Color.white.opacity(0.18))
-                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                            .annotation(position: .topTrailing, alignment: .trailing) {
-                                Text("Avg \(avgScore)")
-                                    .font(BoostaType.caption)
-                                    .foregroundStyle(BoostaColor.secondaryText)
-                            }
-                    }
-                    .chartYScale(domain: 0...100)
-                    .chartYAxis {
-                        AxisMarks(position: .leading, values: [0, 50, 100]) { value in
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.8))
-                                .foregroundStyle(Color.white.opacity(0.08))
-                            AxisValueLabel {
-                                if let intValue = value.as(Int.self) {
-                                    Text("\(intValue)")
-                                        .font(BoostaType.caption)
-                                        .foregroundStyle(BoostaColor.secondaryText)
-                                }
-                            }
-                        }
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: min(max(trendPoints.count, 2), 6))) { value in
-                            AxisGridLine().foregroundStyle(.clear)
-                            AxisTick().foregroundStyle(Color.white.opacity(0.16))
-                            AxisValueLabel {
-                                if let dateValue = value.as(Date.self) {
-                                    Text(dateValue.formatted(.dateTime.month(.abbreviated).day()))
-                                        .font(BoostaType.caption)
-                                        .foregroundStyle(BoostaColor.secondaryText)
-                                }
-                            }
-                        }
-                    }
-                    .chartPlotStyle { plot in
-                        plot
-                            .background(BoostaColor.surfaceMuted.opacity(0.2))
-                            .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
-                    }
-                    .frame(height: 180)
+                    StatisticsTrendChartView(
+                        points: snapshot.trendPoints,
+                        axisDates: snapshot.trendAxisDates,
+                        benchmarkScore: snapshot.benchmarkScore
+                    )
+                    .frame(height: 232)
 
                     HStack {
-                        Text("Avg \(avgScore == 0 ? "—" : "\(avgScore)")")
+                        Text("Avg \(snapshot.averageScore == 0 ? "—" : "\(snapshot.averageScore)")")
                             .font(BoostaType.caption)
                             .foregroundStyle(BoostaColor.secondaryText)
 
                         Spacer()
 
-                        if let first = atsTrendScores.first, let last = atsTrendScores.last {
-                            let delta = last - first
-                            Text(deltaLabel(delta))
-                                .font(BoostaType.caption)
-                                .foregroundStyle(delta >= 0 ? BoostaColor.success : BoostaColor.warning)
-                        }
+                        Text(deltaLabel(snapshot.monthlyDelta))
+                            .font(BoostaType.caption)
+                            .foregroundStyle(snapshot.monthlyDelta >= 0 ? BoostaColor.success : BoostaColor.warning)
                     }
 
-                    Text(trendInsight)
+                    HStack(spacing: BoostaSpace.sm) {
+                        MetricPill(title: "Current", value: "\(snapshot.careerScore)", color: BoostaColor.accent)
+                        MetricPill(title: "Benchmark", value: "\(snapshot.benchmarkScore)", color: BoostaColor.secondaryText)
+                        MetricPill(title: "Scans", value: "\(snapshot.trendPoints.count)", color: BoostaColor.warning)
+                    }
+
+                    Text(snapshot.trendInsight)
                         .font(BoostaType.body)
                         .foregroundStyle(BoostaColor.secondaryText)
                 }
             }
         }
-        .frame(minHeight: 240, alignment: .top)
+        .frame(minHeight: 264, alignment: .top)
     }
 
-    private var trendInsight: String {
-        guard let first = atsTrendScores.first, let last = atsTrendScores.last, atsTrendScores.count > 1 else {
-            return "Your trend becomes more valuable as shared account history grows."
-        }
+    private var activityHeatmapCard: some View {
+        GlassCard(padding: BoostaSpace.lg) {
+            VStack(alignment: .leading, spacing: BoostaSpace.md) {
+                SectionHeader(title: "ATS Activity Heatmap", subtitle: "When you scanned and improved")
 
-        let delta = last - first
-        if delta > 0 {
-            return "Your ATS performance is improving across the full shared history."
-        } else if delta < 0 {
-            return "Recent history is softer than your earlier baseline — worth revisiting targeting and tailoring."
-        } else {
-            return "ATS performance is stable across your shared account history."
+                StatisticsHeatmapGrid(days: snapshot.heatmapDays, selectedDay: $selectedHeatmapDay)
+
+                if let selectedHeatmapDay {
+                    Text(selectedHeatmapDay.detailLine)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                } else {
+                    Text("Tap any day to inspect ATS activity intensity.")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
+                }
+            }
         }
     }
 
     private var interviewPipelineCard: some View {
-        let readiness = min(Double(interviewsCount) / max(Double(applicationsCount), 1), 1)
+        let readiness = min(Double(snapshot.interviewsCount) / max(Double(snapshot.applicationsCount), 1), 1)
 
         return GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
@@ -529,9 +450,9 @@ struct StatisticsWorkspaceView_iPad: View {
 
                 HStack(alignment: .top, spacing: BoostaSpace.md) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(interviewsCount) interview\(interviewsCount == 1 ? "" : "s")")
+                        Text("\(snapshot.interviewsCount) interview\(snapshot.interviewsCount == 1 ? "" : "s")")
                             .font(BoostaType.bodyStrong)
-                        Text("from \(applicationsCount) application\(applicationsCount == 1 ? "" : "s")")
+                        Text("from \(snapshot.applicationsCount) application\(snapshot.applicationsCount == 1 ? "" : "s")")
                             .font(BoostaType.caption)
                             .foregroundStyle(BoostaColor.secondaryText)
                     }
@@ -548,9 +469,9 @@ struct StatisticsWorkspaceView_iPad: View {
                     .opacity(0.35)
 
                 VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                    readinessRow("Tailor resume for role", done: latestScore > 0)
+                    readinessRow("Tailor resume for role", done: snapshot.careerScore > 0)
                     readinessRow("Scan with job description", done: (authViewModel.me?.scanHistory.first?.targetRole.isEmpty == false))
-                    readinessRow("Track applications consistently", done: applicationsCount > 0)
+                    readinessRow("Track applications consistently", done: snapshot.applicationsCount > 0)
                 }
             }
         }
@@ -666,7 +587,7 @@ struct StatisticsWorkspaceView_iPad: View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.xs) {
                 SectionHeader(title: "Job Search Streak")
-                Text(streakDays == 0 ? "Start your streak today." : "\(streakDays) active day\(streakDays == 1 ? "" : "s")")
+                Text(snapshot.streakDays == 0 ? "Start your streak today." : "\(snapshot.streakDays) active day\(snapshot.streakDays == 1 ? "" : "s")")
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
 
@@ -740,12 +661,8 @@ struct StatisticsWorkspaceView_iPad: View {
                 SectionHeader(title: "Weekly Summary", subtitle: "Momentum across your shared account")
 
                 let keywordsImproved = latestHistoryDetail?.addedKeywords.count ?? latestPayload?.response.addedKeywords.count ?? 0
-                let latestDelta = {
-                    guard let first = atsTrendScores.first, let last = atsTrendScores.last else { return 0 }
-                    return last - first
-                }()
 
-                Text(weeklySummaryText(delta: latestDelta, keywordsImproved: keywordsImproved))
+                Text(weeklySummaryText(delta: snapshot.monthlyDelta, keywordsImproved: keywordsImproved))
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
             }
@@ -804,7 +721,7 @@ struct StatisticsWorkspaceView_iPad: View {
         let atsSummary = delta >= 0
             ? "ATS is up \(delta)"
             : "ATS is \(abs(delta)) below your strongest baseline"
-        return "\(atsSummary), \(applicationsCount) tracked applications, \(interviewsCount) interviews in pipeline, \(keywordsImproved) keywords improved."
+        return "\(atsSummary), \(snapshot.applicationsCount) tracked applications, \(snapshot.interviewsCount) interviews in pipeline, \(keywordsImproved) keywords improved."
     }
 
     private func historySubtitle(for item: HistoryListItem) -> String {
@@ -815,18 +732,35 @@ struct StatisticsWorkspaceView_iPad: View {
         return date
     }
 
+    private func ensureSharedHistoryLoaded() async {
+        guard !hasLoadedSharedHistory else { return }
+        hasLoadedSharedHistory = true
+        await loadSharedHistory()
+    }
+
     private func loadSharedHistory() async {
+        historyDetailTask?.cancel()
         isLoadingHistory = true
-        defer { isLoadingHistory = false }
 
         do {
             let items = try await resumeService.history().sorted { $0.createdAt > $1.createdAt }
             historyItems = items
+            latestHistoryDetail = nil
             historyErrorMessage = nil
+            isLoadingHistory = false
             if let first = items.first {
-                latestHistoryDetail = try? await resumeService.historyDetail(id: first.id)
+                historyDetailTask = Task {
+                    let detail = try? await resumeService.historyDetail(id: first.id)
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        if self.historyItems.first?.id == first.id {
+                            self.latestHistoryDetail = detail
+                        }
+                    }
+                }
             }
         } catch {
+            isLoadingHistory = false
             historyErrorMessage = "Could not load shared account history."
         }
     }
@@ -846,6 +780,21 @@ struct StatisticsWorkspaceView_iPad: View {
             historyErrorMessage = nil
         } catch {
             historyErrorMessage = "Could not open browser-generated PDF in the app."
+        }
+    }
+
+    private func rebuildSnapshot() {
+        snapshot = StatisticsSnapshotBuilder.build(
+            historyItems: historyItems,
+            latestHistoryDetail: latestHistoryDetail,
+            scans: authViewModel.me?.scanHistory ?? [],
+            applications: trackedApplications,
+            user: authViewModel.me?.user,
+            selectedDayWindow: selectedRange.dayWindow
+        )
+
+        if let selectedHeatmapDay {
+            self.selectedHeatmapDay = snapshot.heatmapDays.first(where: { $0.id == selectedHeatmapDay.id })
         }
     }
 }
@@ -915,12 +864,6 @@ private enum StatisticsTimeRange_iPad: String, CaseIterable, Identifiable {
         case .all: return nil
         }
     }
-}
-
-private struct StatisticsChartPoint: Identifiable {
-    let id: Int
-    let date: Date
-    let score: Int
 }
 
 private struct StatisticsMetricRing_iPad: View {

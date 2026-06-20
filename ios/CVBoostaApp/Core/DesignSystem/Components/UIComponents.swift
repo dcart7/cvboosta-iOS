@@ -92,6 +92,47 @@ struct SecondaryButton: View {
     }
 }
 
+struct ResumeExportCapabilitiesView: View {
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: BoostaSpace.xs) {
+                exportPill(for: .pdf)
+                exportPill(for: .docx)
+                exportPill(for: .txt)
+            }
+
+            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                exportPill(for: .pdf)
+                exportPill(for: .docx)
+                exportPill(for: .txt)
+            }
+        }
+    }
+
+    private func exportPill(for format: ResumeExportFormat) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(format.title)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.primaryText)
+                .lineLimit(1)
+
+            Text(format.subtitle)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, BoostaSpace.sm)
+        .padding(.vertical, 10)
+        .background(BoostaColor.surfaceMuted)
+        .overlay(
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(BoostaColor.glassStroke, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+    }
+}
+
 struct TextInputField: View {
     let title: String
     let placeholder: String

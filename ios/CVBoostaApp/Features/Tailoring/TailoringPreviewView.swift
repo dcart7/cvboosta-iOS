@@ -3,7 +3,7 @@ import SwiftData
 import UIKit
 
 /// Lightweight companion Tailoring experience.
-/// Full tailoring, editing, and exports live on the web.
+/// Full editing stays on the web, while exports are available natively on iOS.
 struct TailoringPreviewView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.modelContext) private var modelContext
@@ -16,6 +16,7 @@ struct TailoringPreviewView: View {
     @Query(sort: \SavedTailoringSuggestion.createdAt, order: .reverse)
     private var savedSuggestions: [SavedTailoringSuggestion]
 
+    @StateObject private var exportController = ResumeExportController()
     @State private var toastMessage: String?
     @State private var errorMessage: String?
     @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -72,6 +73,32 @@ struct TailoringPreviewView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Download Resume",
+            isPresented: $exportController.isExportOptionsPresented,
+            titleVisibility: .visible
+        ) {
+            if let payload = latestPayload {
+                ForEach(ResumeExportFormat.allCases) { format in
+                    Button(format.title) {
+                        exportController.export(
+                            resumeName: payload.resumeName,
+                            optimizedText: payload.response.optimizedCV,
+                            format: format
+                        )
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose the export format that fits your application flow.")
+        }
+        .sheet(item: $exportController.shareItem, onDismiss: {
+            exportController.cleanupSharedFile()
+        }) { item in
+            ShareSheet(items: [item.url])
+        }
         .overlay(alignment: .top) {
             if let toastMessage {
                 toastView(message: toastMessage)
@@ -94,7 +121,7 @@ struct TailoringPreviewView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
                     title: "AI Tailoring",
-                    subtitle: "Fast rewrite preview on iPhone. Deep editing stays on web."
+                    subtitle: "Fast rewrite preview on iPhone. Full editing stays on web."
                 )
 
                 HStack(alignment: .top, spacing: BoostaSpace.sm) {
@@ -251,6 +278,32 @@ struct TailoringPreviewView: View {
                     }
                 }
 
+                PrimaryButton(
+                    title: exportController.primaryActionTitle,
+                    isLoading: exportController.isExporting
+                ) {
+                    exportController.presentOptions()
+                }
+
+                ResumeExportCapabilitiesView()
+
+                if let successMessage = exportController.successMessage {
+                    Text(successMessage)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.success)
+                }
+
+                if let exportError = exportController.errorMessage {
+                    Text(exportError)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    SecondaryButton(title: "Retry Export") {
+                        exportController.retryLastExport()
+                    }
+                }
+
                 if !payload.response.addedKeywords.isEmpty {
                     let limit = subscriptionService.isPremium ? 10 : 5
                     VStack(alignment: .leading, spacing: 8) {
@@ -362,7 +415,7 @@ struct TailoringPreviewView: View {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
                 SectionHeader(
                     title: "Continue on CVBoosta Studio",
-                    subtitle: "Deep resume editing, exports, and advanced AI are on web."
+                    subtitle: "Deep resume editing and advanced AI stay on web."
                 )
 
                 PrimaryButton(title: "Open Studio") {

@@ -5,6 +5,9 @@ struct ApplicationTrackerView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.modelContext) private var modelContext
 
+    @Query(sort: \ApplicationFolder.createdAt, order: .forward)
+    private var folders: [ApplicationFolder]
+
     @Query(sort: \ApplicationRecord.appliedAt, order: .reverse)
     private var applications: [ApplicationRecord]
 
@@ -12,15 +15,36 @@ struct ApplicationTrackerView: View {
     @State private var showAddSheet = false
     @State private var editingContext: ApplicationEditingContext?
     @State private var interviewReflectionTarget: ApplicationRecord?
+    @State private var showFolderManager = false
+    @State private var folderAssignmentTarget: ApplicationRecord?
+    @State private var statusChangeTarget: ApplicationRecord?
+    @State private var selectedScope: TrackerListScope = .active
+    @State private var selectedFolderID: UUID?
 
     private let widgetSyncService = WidgetSyncService.shared
+
+    private var foldersByID: [UUID: ApplicationFolder] {
+        Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
+    }
 
     private var activeApplications: [ApplicationRecord] {
         applications.filter { $0.status != .archived }
     }
 
-    private var archivedApplications: [ApplicationRecord] {
-        applications.filter { $0.status == .archived }
+    private var scopedApplications: [ApplicationRecord] {
+        switch selectedScope {
+        case .active:
+            return activeApplications
+        case .archive:
+            return applications.filter { $0.status == .archived }
+        case .all:
+            return applications
+        }
+    }
+
+    private var visibleApplications: [ApplicationRecord] {
+        guard let selectedFolderID else { return scopedApplications }
+        return scopedApplications.filter { $0.folderID == selectedFolderID }
     }
 
     private var interviewCount: Int {
@@ -55,6 +79,17 @@ struct ApplicationTrackerView: View {
         }
     }
 
+    private var folderOptions: [ApplicationFolderOption] {
+        folders.map(ApplicationFolderOption.init)
+    }
+
+    private var folderUsageCounts: [UUID: Int] {
+        Dictionary(grouping: applications.compactMap { app -> UUID? in
+            guard let folderID = app.folderID else { return nil }
+            return folderID
+        }, by: { $0 }).mapValues(\.count)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -78,13 +113,14 @@ struct ApplicationTrackerView: View {
                     .padding(BoostaSpace.md)
                 } else {
                     ScrollView {
-                        VStack(spacing: BoostaSpace.sm) {
+                        LazyVStack(spacing: BoostaSpace.sm) {
                             pipelineCard
-                            ForEach(activeApplications) { app in
-                                applicationCard(app)
-                            }
-                            if !archivedApplications.isEmpty {
-                                archiveSection
+                            if visibleApplications.isEmpty {
+                                trackerEmptyStateCard
+                            } else {
+                                ForEach(visibleApplications) { app in
+                                    applicationCard(app)
+                                }
                             }
                         }
                         .padding(BoostaSpace.md)
@@ -93,7 +129,13 @@ struct ApplicationTrackerView: View {
             }
             .navigationTitle("Tracker")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        showFolderManager = true
+                    } label: {
+                        Image(systemName: "folder.badge.gearshape")
+                    }
+
                     Button {
                         showAddSheet = true
                     } label: {
@@ -103,7 +145,10 @@ struct ApplicationTrackerView: View {
             }
             .sheet(isPresented: $showAddSheet) {
                 NavigationStack {
-                    AddApplicationView(resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? []) { draft in
+                    AddApplicationView(
+                        resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        folderOptions: folderOptions
+                    ) { draft in
                         createApplication(draft)
                     }
                 }
@@ -112,6 +157,7 @@ struct ApplicationTrackerView: View {
                 NavigationStack {
                     AddApplicationView(
                         resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        folderOptions: folderOptions,
                         initialDraft: context.draft,
                         saveTitle: "Save Changes",
                         showsDelete: true,
@@ -123,6 +169,46 @@ struct ApplicationTrackerView: View {
                         }
                     )
                 }
+            }
+            .sheet(isPresented: $showFolderManager) {
+                NavigationStack {
+                    TrackerFolderManagerView(
+                        folders: folderOptions,
+                        applicationCountByFolder: folderUsageCounts,
+                        onCreate: createFolder,
+                        onUpdate: updateFolder,
+                        onDelete: deleteFolder
+                    )
+                }
+            }
+            .sheet(item: $folderAssignmentTarget) { application in
+                NavigationStack {
+                    TrackerFolderAssignmentView(
+                        applicationTitle: "\(application.company) • \(application.role)",
+                        folderOptions: folderOptions,
+                        selectedFolderID: application.folderID
+                    ) { folderID in
+                        assignFolder(folderID, to: application.id)
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Change Status",
+                isPresented: Binding(
+                    get: { statusChangeTarget != nil },
+                    set: { if !$0 { statusChangeTarget = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: statusChangeTarget
+            ) { application in
+                ForEach(TrackerListScope.statusOptions(for: application.status), id: \.self) { status in
+                    Button(status.rawValue.capitalized) {
+                        updateStatus(id: application.id, to: status)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { application in
+                Text("\(application.company) • \(application.role)")
             }
             .sheet(item: $interviewReflectionTarget) { application in
                 NavigationStack {
@@ -154,6 +240,12 @@ struct ApplicationTrackerView: View {
                 syncInterviewLiveActivity()
                 presentPendingInterviewReflectionIfNeeded()
             }
+            .onChange(of: selectedScope) { _, _ in
+                guard let selectedFolderID else { return }
+                if !folders.contains(where: { $0.id == selectedFolderID }) {
+                    self.selectedFolderID = nil
+                }
+            }
         }
     }
 
@@ -177,20 +269,76 @@ struct ApplicationTrackerView: View {
                 Text(responseRate == 0 ? "Start tracking applications to unlock conversion insights." : "Current response rate: \(responseRate)%")
                     .font(BoostaType.body)
                     .foregroundStyle(BoostaColor.secondaryText)
+
+                Picker("Tracker scope", selection: $selectedScope) {
+                    ForEach(TrackerListScope.allCases) { scope in
+                        Text(scope.title).tag(scope)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                folderFilterStrip
             }
         }
     }
 
-    private var archiveSection: some View {
-        VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-            Text("Archive")
-                .font(BoostaType.caption)
-                .foregroundStyle(BoostaColor.secondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, BoostaSpace.xs)
+    private var folderFilterStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: BoostaSpace.xs) {
+                TrackerFolderChip(
+                    title: "All folders",
+                    emoji: "🗂",
+                    count: scopedApplications.count,
+                    isSelected: selectedFolderID == nil
+                ) {
+                    selectedFolderID = nil
+                }
 
-            ForEach(archivedApplications) { app in
-                applicationCard(app)
+                ForEach(folderOptions) { folder in
+                    TrackerFolderChip(
+                        title: folder.name,
+                        emoji: folder.emoji,
+                        count: scopedApplications.filter { $0.folderID == folder.id }.count,
+                        isSelected: selectedFolderID == folder.id
+                    ) {
+                        selectedFolderID = folder.id
+                    }
+                }
+
+                Button {
+                    showFolderManager = true
+                } label: {
+                    Label("Manage", systemImage: "slider.horizontal.3")
+                        .font(BoostaType.caption)
+                        .padding(.horizontal, BoostaSpace.sm)
+                        .padding(.vertical, 8)
+                        .background(BoostaColor.surfaceInteractive)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private var trackerEmptyStateCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(title: "Nothing in this view", subtitle: emptyTrackerSubtitle)
+
+                HStack(spacing: BoostaSpace.sm) {
+                    if selectedFolderID != nil {
+                        SecondaryButton(title: "Clear Folder") {
+                            selectedFolderID = nil
+                        }
+                    }
+
+                    if selectedScope != .active {
+                        SecondaryButton(title: "Back to Active") {
+                            selectedScope = .active
+                        }
+                    }
+                }
             }
         }
     }
@@ -207,6 +355,9 @@ struct ApplicationTrackerView: View {
                         Text(app.role)
                             .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
+                        if let folderLabel = folderLabel(for: app) {
+                            ApplicationBadge(title: folderLabel, tint: BoostaColor.accentSecondary)
+                        }
                     }
 
                     Spacer()
@@ -264,24 +415,28 @@ struct ApplicationTrackerView: View {
                     Label("Archive", systemImage: "archivebox")
                 }
                 .tint(BoostaColor.secondaryText)
-
-                Button("Interview") {
-                    updateStatus(id: app.id, to: .interview)
-                }
-                .tint(BoostaColor.warning)
-
-                Button("Done") {
-                    updateStatus(id: app.id, to: nextStatus(after: app.status))
-                }
-                .tint(BoostaColor.success)
             }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+
+            Button {
+                statusChangeTarget = app
+            } label: {
+                Label("Status", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .tint(BoostaColor.warning)
+
             Button(role: .destructive) {
                 deleteApplication(id: app.id)
             } label: {
                 Label("Delete", systemImage: "trash")
             }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
+                folderAssignmentTarget = app
+            } label: {
+                Label("Folder", systemImage: "folder.badge.plus")
+            }
+            .tint(BoostaColor.accentSecondary)
 
             Button {
                 editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
@@ -378,6 +533,7 @@ struct ApplicationTrackerView: View {
             notes: draft.notes,
             resumeUsed: draft.resumeUsed,
             jobLink: draft.jobLink,
+            folderID: draft.folderID,
             atsScore: nil
         )
         modelContext.insert(record)
@@ -405,6 +561,7 @@ struct ApplicationTrackerView: View {
         record.notes = draft.notes
         record.resumeUsed = draft.resumeUsed
         record.jobLink = draft.jobLink
+        record.folderID = draft.folderID
 
         do {
             try modelContext.save()
@@ -426,6 +583,7 @@ struct ApplicationTrackerView: View {
 
         do {
             try modelContext.save()
+            statusChangeTarget = nil
             syncWidgetSnapshot()
             presentPipelineLiveActivityIfNeeded(for: record)
         } catch {
@@ -487,6 +645,59 @@ struct ApplicationTrackerView: View {
         }
     }
 
+    private func assignFolder(_ folderID: UUID?, to applicationID: UUID) {
+        guard let record = applications.first(where: { $0.id == applicationID }) else { return }
+        record.folderID = folderID
+
+        do {
+            try modelContext.save()
+            folderAssignmentTarget = nil
+        } catch {
+            errorMessage = "Could not update folder."
+        }
+    }
+
+    private func createFolder(_ draft: FolderDraft) {
+        let folder = ApplicationFolder(name: draft.name, emoji: draft.emoji)
+        modelContext.insert(folder)
+
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = "Could not create folder."
+        }
+    }
+
+    private func updateFolder(id: UUID, with draft: FolderDraft) {
+        guard let folder = folders.first(where: { $0.id == id }) else { return }
+        folder.name = draft.name
+        folder.emoji = draft.emoji
+
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = "Could not update folder."
+        }
+    }
+
+    private func deleteFolder(id: UUID) {
+        guard let folder = folders.first(where: { $0.id == id }) else { return }
+
+        for application in applications where application.folderID == id {
+            application.folderID = nil
+        }
+        modelContext.delete(folder)
+
+        do {
+            try modelContext.save()
+            if selectedFolderID == id {
+                selectedFolderID = nil
+            }
+        } catch {
+            errorMessage = "Could not delete folder."
+        }
+    }
+
     private func syncInterviewLiveActivity() {
         guard #available(iOS 16.1, *) else { return }
         let now = Date()
@@ -518,8 +729,29 @@ struct ApplicationTrackerView: View {
             interviewAt: app.interviewAt,
             notes: app.notes,
             resumeUsed: app.resumeUsed,
-            jobLink: app.jobLink
+            jobLink: app.jobLink,
+            folderID: app.folderID
         )
+    }
+
+    private func folderLabel(for app: ApplicationRecord) -> String? {
+        guard let folderID = app.folderID, let folder = foldersByID[folderID] else { return nil }
+        return "\(folder.emoji) \(folder.name)"
+    }
+
+    private var emptyTrackerSubtitle: String {
+        if let selectedFolderID, let folder = foldersByID[selectedFolderID] {
+            return "No roles in \(folder.emoji) \(folder.name) for the current view."
+        }
+
+        switch selectedScope {
+        case .active:
+            return "Active roles will show up here."
+        case .archive:
+            return "Archived roles stay here until you restore them."
+        case .all:
+            return "No applications match the current filters."
+        }
     }
 
     private func celebrateStreak(with status: ApplicationStatus) {
@@ -611,6 +843,7 @@ struct NewApplicationDraft: Hashable {
     let notes: String?
     let resumeUsed: String?
     let jobLink: String?
+    let folderID: UUID?
 }
 
 struct ApplicationEditingContext: Identifiable {
@@ -622,6 +855,7 @@ struct AddApplicationView: View {
     @Environment(\.dismiss) private var dismiss
 
     let resumeNames: [String]
+    let folderOptions: [ApplicationFolderOption]
     let saveTitle: String
     let showsDelete: Bool
     let onSave: (NewApplicationDraft) -> Void
@@ -633,6 +867,7 @@ struct AddApplicationView: View {
     @State private var status: ApplicationStatus = .saved
     @State private var appliedAt: Date = .now
     @State private var selectedResume: String = ""
+    @State private var selectedFolderID: UUID?
     @State private var notes = ""
     @State private var hasInterviewDate = false
     @State private var interviewDate: Date = .now
@@ -646,6 +881,7 @@ struct AddApplicationView: View {
 
     init(
         resumeNames: [String],
+        folderOptions: [ApplicationFolderOption] = [],
         initialDraft: NewApplicationDraft? = nil,
         saveTitle: String = "Save Application",
         showsDelete: Bool = false,
@@ -653,6 +889,7 @@ struct AddApplicationView: View {
         onDelete: (() -> Void)? = nil
     ) {
         self.resumeNames = resumeNames
+        self.folderOptions = folderOptions
         self.saveTitle = saveTitle
         self.showsDelete = showsDelete
         self.onSave = onSave
@@ -664,6 +901,7 @@ struct AddApplicationView: View {
         _status = State(initialValue: initialDraft?.status ?? .saved)
         _appliedAt = State(initialValue: initialDraft?.appliedAt ?? .now)
         _selectedResume = State(initialValue: initialDraft?.resumeUsed ?? "")
+        _selectedFolderID = State(initialValue: initialDraft?.folderID)
         _notes = State(initialValue: initialDraft?.notes ?? "")
         _hasInterviewDate = State(initialValue: initialDraft?.interviewAt != nil)
         _interviewDate = State(initialValue: initialDraft?.interviewAt ?? .now)
@@ -713,6 +951,15 @@ struct AddApplicationView: View {
                         }
                         .pickerStyle(.menu)
 
+                        Picker("Folder", selection: $selectedFolderID) {
+                            Text("No folder").tag(Optional<UUID>.none)
+                            ForEach(folderOptions) { folder in
+                                Text("\(folder.emoji) \(folder.name)")
+                                    .tag(Optional(folder.id))
+                            }
+                        }
+                        .pickerStyle(.menu)
+
                         VStack(alignment: .leading, spacing: BoostaSpace.xs) {
                             Text("Notes")
                                 .font(BoostaType.caption)
@@ -738,7 +985,8 @@ struct AddApplicationView: View {
                                 interviewAt: hasInterviewDate ? interviewDate : nil,
                                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
                                 resumeUsed: selectedResume.isEmpty ? nil : selectedResume,
-                                jobLink: jobLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobLink
+                                jobLink: jobLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobLink,
+                                folderID: selectedFolderID
                             )
                             onSave(draft)
                         }
@@ -775,6 +1023,305 @@ private struct ApplicationBadge: View {
             .padding(.vertical, BoostaSpace.xxs)
             .background(tint.opacity(0.12))
             .clipShape(Capsule())
+    }
+}
+
+enum TrackerListScope: String, CaseIterable, Identifiable {
+    case active
+    case archive
+    case all
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .active: return "Active"
+        case .archive: return "Archive"
+        case .all: return "All"
+        }
+    }
+
+    static func statusOptions(for current: ApplicationStatus) -> [ApplicationStatus] {
+        if current == .archived {
+            return [.saved, .applied, .interview, .offer, .rejected]
+        }
+        return ApplicationStatus.userSelectableCases + [.archived]
+    }
+}
+
+struct ApplicationFolderOption: Identifiable, Hashable {
+    let id: UUID
+    let name: String
+    let emoji: String
+
+    init(folder: ApplicationFolder) {
+        id = folder.id
+        name = folder.name
+        emoji = folder.emoji
+    }
+}
+
+struct FolderDraft: Hashable {
+    let name: String
+    let emoji: String
+}
+
+private struct FolderEditorContext: Identifiable {
+    let id: UUID?
+    let name: String
+    let emoji: String
+}
+
+struct TrackerFolderChip: View {
+    let title: String
+    let emoji: String
+    let count: Int
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(emoji)
+                Text(title)
+                Text("\(count)")
+                    .foregroundStyle(BoostaColor.secondaryText)
+            }
+            .font(BoostaType.caption)
+            .padding(.horizontal, BoostaSpace.sm)
+            .padding(.vertical, 8)
+            .background(isSelected ? BoostaColor.surfaceInteractiveStrong : BoostaColor.surfaceInteractive)
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? BoostaColor.accent : BoostaColor.glassStroke, lineWidth: 1)
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct TrackerFolderManagerView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let folders: [ApplicationFolderOption]
+    let applicationCountByFolder: [UUID: Int]
+    let onCreate: (FolderDraft) -> Void
+    let onUpdate: (UUID, FolderDraft) -> Void
+    let onDelete: (UUID) -> Void
+
+    @State private var editorContext: FolderEditorContext?
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [BoostaColor.pageTop, BoostaColor.pageBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        SectionHeader(title: "Folders", subtitle: "Organize roles by lane, company set, or hiring focus.")
+
+                        PrimaryButton(title: "Create Folder") {
+                            editorContext = FolderEditorContext(id: nil, name: "", emoji: "🗂")
+                        }
+
+                        if folders.isEmpty {
+                            Text("No folders yet.")
+                                .font(BoostaType.body)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                        } else {
+                            ForEach(folders) { folder in
+                                HStack(spacing: BoostaSpace.sm) {
+                                    Text(folder.emoji)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(folder.name)
+                                            .font(BoostaType.bodyStrong)
+                                        Text("\(applicationCountByFolder[folder.id] ?? 0) role(s)")
+                                            .font(BoostaType.caption)
+                                            .foregroundStyle(BoostaColor.secondaryText)
+                                    }
+
+                                    Spacer()
+
+                                    Button("Edit") {
+                                        editorContext = FolderEditorContext(id: folder.id, name: folder.name, emoji: folder.emoji)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(BoostaColor.accent)
+
+                                    Button("Delete", role: .destructive) {
+                                        onDelete(folder.id)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                }
+                .padding(BoostaSpace.md)
+            }
+        }
+        .navigationTitle("Manage Folders")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close") { dismiss() }
+            }
+        }
+        .sheet(item: $editorContext) { context in
+            NavigationStack {
+                TrackerFolderEditorView(
+                    initialName: context.name,
+                    initialEmoji: context.emoji,
+                    saveTitle: context.id == nil ? "Create Folder" : "Save Folder"
+                ) { draft in
+                    if let id = context.id {
+                        onUpdate(id, draft)
+                    } else {
+                        onCreate(draft)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct TrackerFolderEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let initialName: String
+    let initialEmoji: String
+    let saveTitle: String
+    let onSave: (FolderDraft) -> Void
+
+    @State private var name: String
+    @State private var emoji: String
+
+    init(
+        initialName: String,
+        initialEmoji: String,
+        saveTitle: String,
+        onSave: @escaping (FolderDraft) -> Void
+    ) {
+        self.initialName = initialName
+        self.initialEmoji = initialEmoji
+        self.saveTitle = saveTitle
+        self.onSave = onSave
+        _name = State(initialValue: initialName)
+        _emoji = State(initialValue: initialEmoji)
+    }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [BoostaColor.pageTop, BoostaColor.pageBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        TextInputField(title: "Emoji", placeholder: "🗂", text: $emoji)
+                        TextInputField(title: "Folder name", placeholder: "Priority Roles", text: $name)
+
+                        PrimaryButton(title: saveTitle, isDisabled: !canSave) {
+                            onSave(
+                                FolderDraft(
+                                    name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    emoji: emoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "🗂" : emoji.trimmingCharacters(in: .whitespacesAndNewlines)
+                                )
+                            )
+                            dismiss()
+                        }
+                    }
+                }
+                .padding(BoostaSpace.md)
+            }
+        }
+        .navigationTitle("Folder")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close") { dismiss() }
+            }
+        }
+    }
+}
+
+struct TrackerFolderAssignmentView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let applicationTitle: String
+    let folderOptions: [ApplicationFolderOption]
+    let selectedFolderID: UUID?
+    let onAssign: (UUID?) -> Void
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [BoostaColor.pageTop, BoostaColor.pageBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        SectionHeader(title: "Move to Folder", subtitle: applicationTitle)
+
+                        Button {
+                            onAssign(nil)
+                            dismiss()
+                        } label: {
+                            folderRow(title: "No folder", emoji: "🗂", isSelected: selectedFolderID == nil)
+                        }
+                        .buttonStyle(.plain)
+
+                        ForEach(folderOptions) { folder in
+                            Button {
+                                onAssign(folder.id)
+                                dismiss()
+                            } label: {
+                                folderRow(title: folder.name, emoji: folder.emoji, isSelected: selectedFolderID == folder.id)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(BoostaSpace.md)
+            }
+        }
+        .navigationTitle("Folder")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close") { dismiss() }
+            }
+        }
+    }
+
+    private func folderRow(title: String, emoji: String, isSelected: Bool) -> some View {
+        HStack(spacing: BoostaSpace.sm) {
+            Text(emoji)
+            Text(title)
+                .font(BoostaType.bodyStrong)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(BoostaColor.accent)
+            }
+        }
+        .padding(.vertical, 6)
     }
 }
 

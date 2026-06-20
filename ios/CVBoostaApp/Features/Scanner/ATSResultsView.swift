@@ -9,6 +9,7 @@ struct ATSResultsView: View {
 
     let result: ResumeScanResult
 
+    @StateObject private var exportController = ResumeExportController()
     @State private var didPersistLatestScan = false
     @State private var animatedScore = 0
     @State private var revealHero = false
@@ -36,6 +37,30 @@ struct ATSResultsView: View {
         .onAppear {
             persistLatestScanIfNeeded()
             animateHeroScore()
+        }
+        .confirmationDialog(
+            "Download Resume",
+            isPresented: $exportController.isExportOptionsPresented,
+            titleVisibility: .visible
+        ) {
+            ForEach(ResumeExportFormat.allCases) { format in
+                Button(format.title) {
+                    exportController.export(
+                        resumeName: result.resumeName,
+                        optimizedText: result.response.optimizedCV,
+                        format: format
+                    )
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose the format that fits your application flow.")
+        }
+        .sheet(item: $exportController.shareItem, onDismiss: {
+            exportController.cleanupSharedFile()
+        }) { item in
+            ShareSheet(items: [item.url])
         }
     }
 
@@ -181,13 +206,42 @@ struct ATSResultsView: View {
     }
 
     private var actionsCard: some View {
-        VStack(spacing: BoostaSpace.sm) {
-            PrimaryButton(title: "Improve This Resume") {
-                appRouter.open(.tailoring)
-            }
+        GlassCard {
+            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                SectionHeader(
+                    title: "Download Resume",
+                    subtitle: "Generate a polished export from this optimized version."
+                )
 
-            SecondaryButton(title: "Save Report") {
-                HapticsService.success()
+                PrimaryButton(
+                    title: exportController.primaryActionTitle,
+                    isLoading: exportController.isExporting
+                ) {
+                    exportController.presentOptions()
+                }
+
+                SecondaryButton(title: "Improve This Resume") {
+                    appRouter.open(.tailoring)
+                }
+
+                ResumeExportCapabilitiesView()
+
+                if let successMessage = exportController.successMessage {
+                    Text(successMessage)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.success)
+                }
+
+                if let errorMessage = exportController.errorMessage {
+                    Text(errorMessage)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    SecondaryButton(title: "Retry Export") {
+                        exportController.retryLastExport()
+                    }
+                }
             }
         }
     }

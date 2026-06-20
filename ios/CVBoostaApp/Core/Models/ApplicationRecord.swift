@@ -15,6 +15,26 @@ enum ApplicationStatus: String, Codable, CaseIterable {
 }
 
 @Model
+final class ApplicationFolder {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var emoji: String
+    var createdAt: Date
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        emoji: String = "🗂",
+        createdAt: Date = .now
+    ) {
+        self.id = id
+        self.name = name
+        self.emoji = emoji
+        self.createdAt = createdAt
+    }
+}
+
+@Model
 final class ApplicationRecord {
     @Attribute(.unique) var id: UUID
     var company: String
@@ -26,6 +46,7 @@ final class ApplicationRecord {
     var notes: String?
     var resumeUsed: String?
     var jobLink: String?
+    var folderID: UUID?
     var atsScore: Int?
     var interviewReflectionRating: Int?
     var interviewReflectionOutcome: String?
@@ -43,6 +64,7 @@ final class ApplicationRecord {
         notes: String? = nil,
         resumeUsed: String? = nil,
         jobLink: String? = nil,
+        folderID: UUID? = nil,
         atsScore: Int? = nil,
         interviewReflectionRating: Int? = nil,
         interviewReflectionOutcome: String? = nil,
@@ -59,6 +81,7 @@ final class ApplicationRecord {
         self.notes = notes
         self.resumeUsed = resumeUsed
         self.jobLink = jobLink
+        self.folderID = folderID
         self.atsScore = atsScore
         self.interviewReflectionRating = interviewReflectionRating
         self.interviewReflectionOutcome = interviewReflectionOutcome

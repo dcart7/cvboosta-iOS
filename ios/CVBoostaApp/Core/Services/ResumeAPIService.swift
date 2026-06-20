@@ -109,7 +109,9 @@ final class ResumeAPIService: ResumeAPIServiceProtocol {
         experienceLevel: String,
         targetMarket: String
     ) async throws -> ResumeScanResponse {
-        let pdfData = try Data(contentsOf: fileURL)
+        let pdfData = try await Task.detached(priority: .userInitiated) {
+            try Data(contentsOf: fileURL)
+        }.value
         let parsed: ParsedCvResponse = try await apiClient.uploadMultipart(
             path: "/analyze/upload",
             fields: [:],

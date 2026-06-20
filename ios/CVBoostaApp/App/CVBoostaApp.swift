@@ -12,6 +12,7 @@ struct CVBoostaApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             ResumeProfile.self,
+            ApplicationFolder.self,
             ApplicationRecord.self,
             ATSInsight.self,
             LatestScanReport.self,
@@ -238,6 +239,7 @@ enum PreviewModelContainer {
     static let shared: ModelContainer = {
         let schema = Schema([
             ResumeProfile.self,
+            ApplicationFolder.self,
             ApplicationRecord.self,
             ATSInsight.self,
             LatestScanReport.self,

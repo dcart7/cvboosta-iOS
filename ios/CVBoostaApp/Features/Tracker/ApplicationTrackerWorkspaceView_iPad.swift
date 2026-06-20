@@ -7,6 +7,9 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.modelContext) private var modelContext
 
+    @Query(sort: \ApplicationFolder.createdAt, order: .forward)
+    private var folders: [ApplicationFolder]
+
     @Query(sort: \ApplicationRecord.appliedAt, order: .reverse)
     private var applications: [ApplicationRecord]
 
@@ -14,6 +17,11 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     @State private var showAddSheet = false
     @State private var editingContext: ApplicationEditingContext?
     @State private var interviewReflectionTarget: ApplicationRecord?
+    @State private var showFolderManager = false
+    @State private var folderAssignmentTarget: ApplicationRecord?
+    @State private var statusChangeTarget: ApplicationRecord?
+    @State private var selectedScope: TrackerListScope = .active
+    @State private var selectedFolderID: UUID?
 
     private let widgetSyncService = WidgetSyncService.shared
 
@@ -21,13 +29,37 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         applications.filter { $0.status != .archived }
     }
 
-    private var archivedApplications: [ApplicationRecord] {
-        applications.filter { $0.status == .archived }
+    private var foldersByID: [UUID: ApplicationFolder] {
+        Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
+    }
+
+    private var folderOptions: [ApplicationFolderOption] {
+        folders.map(ApplicationFolderOption.init)
+    }
+
+    private var folderUsageCounts: [UUID: Int] {
+        Dictionary(grouping: applications.compactMap { $0.folderID }, by: { $0 }).mapValues(\.count)
+    }
+
+    private var scopedApplications: [ApplicationRecord] {
+        switch selectedScope {
+        case .active:
+            return activeApplications
+        case .archive:
+            return applications.filter { $0.status == .archived }
+        case .all:
+            return applications
+        }
+    }
+
+    private var visibleApplications: [ApplicationRecord] {
+        guard let selectedFolderID else { return scopedApplications }
+        return scopedApplications.filter { $0.folderID == selectedFolderID }
     }
 
     private var selectedApplication: ApplicationRecord? {
-        guard let id = selectedApplicationID else { return applications.first }
-        return applications.first(where: { $0.id == id }) ?? applications.first
+        guard let id = selectedApplicationID else { return visibleApplications.first }
+        return visibleApplications.first(where: { $0.id == id }) ?? visibleApplications.first
     }
 
     private var countsByStatus: [(title: String, value: Int, color: Color)] {
@@ -103,6 +135,13 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
+                        showFolderManager = true
+                    } label: {
+                        Image(systemName: "folder.badge.gearshape")
+                    }
+                    .hoverEffect(.lift)
+
+                    Button {
                         showAddSheet = true
                     } label: {
                         Label("Add", systemImage: "plus")
@@ -113,7 +152,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             }
             .sheet(isPresented: $showAddSheet) {
                 NavigationStack {
-                    AddApplicationView(resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? []) { draft in
+                    AddApplicationView(
+                        resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        folderOptions: folderOptions
+                    ) { draft in
                         createApplication(draft)
                     }
                 }
@@ -122,6 +164,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 NavigationStack {
                     AddApplicationView(
                         resumeNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [],
+                        folderOptions: folderOptions,
                         initialDraft: context.draft,
                         saveTitle: "Save Changes",
                         showsDelete: true,
@@ -133,6 +176,46 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                         }
                     )
                 }
+            }
+            .sheet(isPresented: $showFolderManager) {
+                NavigationStack {
+                    TrackerFolderManagerView(
+                        folders: folderOptions,
+                        applicationCountByFolder: folderUsageCounts,
+                        onCreate: createFolder,
+                        onUpdate: updateFolder,
+                        onDelete: deleteFolder
+                    )
+                }
+            }
+            .sheet(item: $folderAssignmentTarget) { application in
+                NavigationStack {
+                    TrackerFolderAssignmentView(
+                        applicationTitle: "\(application.company) • \(application.role)",
+                        folderOptions: folderOptions,
+                        selectedFolderID: application.folderID
+                    ) { folderID in
+                        assignFolder(folderID, to: application.id)
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Change Status",
+                isPresented: Binding(
+                    get: { statusChangeTarget != nil },
+                    set: { if !$0 { statusChangeTarget = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: statusChangeTarget
+            ) { application in
+                ForEach(TrackerListScope.statusOptions(for: application.status), id: \.self) { status in
+                    Button(status.rawValue.capitalized) {
+                        updateStatus(id: application.id, to: status)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { application in
+                Text("\(application.company) • \(application.role)")
             }
             .sheet(item: $interviewReflectionTarget) { application in
                 NavigationStack {
@@ -159,6 +242,16 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 syncWidgetSnapshot()
                 syncInterviewLiveActivity()
                 presentPendingInterviewReflectionIfNeeded()
+            }
+            .onChange(of: selectedScope) { _, _ in
+                if let selected = selectedApplication?.id {
+                    selectedApplicationID = selected
+                }
+            }
+            .onChange(of: selectedFolderID) { _, _ in
+                if let selected = selectedApplication?.id {
+                    selectedApplicationID = selected
+                }
             }
         }
     }
@@ -213,6 +306,15 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                         MetricPill(title: item.title, value: "\(item.value)", color: item.color)
                     }
                 }
+
+                Picker("Tracker scope", selection: $selectedScope) {
+                    ForEach(TrackerListScope.allCases) { scope in
+                        Text(scope.title).tag(scope)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                folderFilterStrip
             }
         }
     }
@@ -223,25 +325,13 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 SectionHeader(title: "Applications", subtitle: "Tap to focus details on the right")
 
                 LazyVStack(spacing: BoostaSpace.sm) {
-                    ForEach(activeApplications) { app in
-                        Button {
-                            withAnimation(BoostaMotion.smooth) {
-                                selectedApplicationID = app.id
-                            }
-                        } label: {
-                            applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if !archivedApplications.isEmpty {
-                        Text("Archive")
-                            .font(BoostaType.caption)
+                    if visibleApplications.isEmpty {
+                        Text(emptyTrackerSubtitle)
+                            .font(BoostaType.body)
                             .foregroundStyle(BoostaColor.secondaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, BoostaSpace.sm)
-
-                        ForEach(archivedApplications) { app in
+                    } else {
+                        ForEach(visibleApplications) { app in
                             Button {
                                 withAnimation(BoostaMotion.smooth) {
                                     selectedApplicationID = app.id
@@ -257,6 +347,33 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         }
     }
 
+    private var folderFilterStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: BoostaSpace.xs) {
+                TrackerFolderChip(
+                    title: "All folders",
+                    emoji: "🗂",
+                    count: scopedApplications.count,
+                    isSelected: selectedFolderID == nil
+                ) {
+                    selectedFolderID = nil
+                }
+
+                ForEach(folderOptions) { folder in
+                    TrackerFolderChip(
+                        title: folder.name,
+                        emoji: folder.emoji,
+                        count: scopedApplications.filter { $0.folderID == folder.id }.count,
+                        isSelected: selectedFolderID == folder.id
+                    ) {
+                        selectedFolderID = folder.id
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
     private func applicationRow(_ app: ApplicationRecord, isSelected: Bool) -> some View {
         let priority = priority(for: app)
 
@@ -268,6 +385,11 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 Text(app.role)
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
+                if let folderLabel = folderLabel(for: app) {
+                    Text(folderLabel)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.accentSecondary)
+                }
             }
 
             Spacer(minLength: 0)
@@ -345,6 +467,16 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     }
                 }
 
+                HStack(spacing: BoostaSpace.sm) {
+                    WorkspaceActionButton(title: "Change Status", systemImage: "arrow.triangle.2.circlepath") {
+                        statusChangeTarget = app
+                    }
+
+                    WorkspaceActionButton(title: "Move Folder", systemImage: "folder.badge.plus") {
+                        folderAssignmentTarget = app
+                    }
+                }
+
                 WorkspaceActionButton(
                     title: app.status == .archived ? "Restore to Active" : "Move to Archive",
                     systemImage: app.status == .archived ? "arrow.uturn.backward" : "archivebox"
@@ -363,6 +495,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
                 if let resume = app.resumeUsed, !resume.isEmpty {
                     infoRow("Resume used", value: resume)
+                }
+
+                if let folderLabel = folderLabel(for: app) {
+                    infoRow("Folder", value: folderLabel)
                 }
 
                 if let link = app.jobLink, !link.isEmpty {
@@ -501,6 +637,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             notes: draft.notes,
             resumeUsed: draft.resumeUsed,
             jobLink: draft.jobLink,
+            folderID: draft.folderID,
             atsScore: nil
         )
         modelContext.insert(record)
@@ -530,6 +667,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         record.notes = draft.notes
         record.resumeUsed = draft.resumeUsed
         record.jobLink = draft.jobLink
+        record.folderID = draft.folderID
 
         do {
             try modelContext.save()
@@ -550,6 +688,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
         do {
             try modelContext.save()
+            statusChangeTarget = nil
             syncWidgetSnapshot()
             presentPipelineLiveActivityIfNeeded(for: record)
         } catch {
@@ -653,8 +792,65 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             interviewAt: app.interviewAt,
             notes: app.notes,
             resumeUsed: app.resumeUsed,
-            jobLink: app.jobLink
+            jobLink: app.jobLink,
+            folderID: app.folderID
         )
+    }
+
+    private func folderLabel(for app: ApplicationRecord) -> String? {
+        guard let folderID = app.folderID, let folder = foldersByID[folderID] else { return nil }
+        return "\(folder.emoji) \(folder.name)"
+    }
+
+    private var emptyTrackerSubtitle: String {
+        if let selectedFolderID, let folder = foldersByID[selectedFolderID] {
+            return "No roles in \(folder.emoji) \(folder.name) for the current view."
+        }
+
+        switch selectedScope {
+        case .active:
+            return "Active roles will show up here."
+        case .archive:
+            return "Archived roles stay here until you restore them."
+        case .all:
+            return "No applications match the current filters."
+        }
+    }
+
+    private func assignFolder(_ folderID: UUID?, to applicationID: UUID) {
+        guard let record = applications.first(where: { $0.id == applicationID }) else { return }
+        record.folderID = folderID
+
+        do {
+            try modelContext.save()
+            folderAssignmentTarget = nil
+        } catch {
+            // Best effort local folder update.
+        }
+    }
+
+    private func createFolder(_ draft: FolderDraft) {
+        modelContext.insert(ApplicationFolder(name: draft.name, emoji: draft.emoji))
+        try? modelContext.save()
+    }
+
+    private func updateFolder(id: UUID, with draft: FolderDraft) {
+        guard let folder = folders.first(where: { $0.id == id }) else { return }
+        folder.name = draft.name
+        folder.emoji = draft.emoji
+        try? modelContext.save()
+    }
+
+    private func deleteFolder(id: UUID) {
+        guard let folder = folders.first(where: { $0.id == id }) else { return }
+        for application in applications where application.folderID == id {
+            application.folderID = nil
+        }
+        modelContext.delete(folder)
+        try? modelContext.save()
+        if selectedFolderID == id {
+            selectedFolderID = nil
+        }
     }
 
     private func celebrateStreak(with status: ApplicationStatus) {

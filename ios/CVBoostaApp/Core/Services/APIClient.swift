@@ -33,11 +33,13 @@ final class APIClient {
     private let baseURL: URL
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private let session: URLSession
 
-    init(baseURL: URL) {
+    init(baseURL: URL, session: URLSession? = nil) {
         self.baseURL = baseURL
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
+        self.session = session ?? Self.makeSession()
         self.decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let value = try container.decode(String.self)
@@ -108,7 +110,7 @@ final class APIClient {
         request.timeoutInterval = 30
         request.addValue("application/json", forHTTPHeaderField: "Accept")
         apply(headers: headers, to: &request)
-        let data = try await perform(request: request)
+        let data = try await perform(request: request, retryCount: 1)
         return try decode(T.self, from: data)
     }
 
@@ -151,6 +153,20 @@ final class APIClient {
         _ = try await perform(request: request)
     }
 
+    private static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.waitsForConnectivity = true
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 120
+        configuration.requestCachePolicy = .useProtocolCachePolicy
+        configuration.urlCache = URLCache(
+            memoryCapacity: 20 * 1024 * 1024,
+            diskCapacity: 60 * 1024 * 1024,
+            diskPath: "cvboosta-api-cache"
+        )
+        return URLSession(configuration: configuration)
+    }
+
     private func makeURL(path: String) throws -> URL {
         let normalized = path.hasPrefix("/") ? String(path.dropFirst()) : path
         guard let url = URL(string: normalized, relativeTo: baseURL)?.absoluteURL else {
@@ -165,18 +181,36 @@ final class APIClient {
         return url
     }
 
-    private func perform(request: URLRequest) async throws -> Data {
+    private func perform(request: URLRequest, retryCount: Int = 0) async throws -> Data {
+        let response = try await performRequest(request: request, retryCount: retryCount)
+        return response.data
+    }
+
+    private func performRequest(
+        request: URLRequest,
+        retryCount: Int = 0
+    ) async throws -> (data: Data, response: HTTPURLResponse) {
         let data: Data
         let response: URLResponse
 
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await session.data(for: request)
         } catch {
+            if retryCount > 0, shouldRetryTransport(error, for: request) {
+                try? await Task.sleep(for: .milliseconds(350))
+                return try await performRequest(request: request, retryCount: retryCount - 1)
+            }
             throw APIError.transport(error)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
+        }
+
+        if retryCount > 0,
+           shouldRetryStatusCode(httpResponse.statusCode, for: request) {
+            try? await Task.sleep(for: .milliseconds(350))
+            return try await performRequest(request: request, retryCount: retryCount - 1)
         }
 
         guard (200 ... 299).contains(httpResponse.statusCode) else {
@@ -191,7 +225,7 @@ final class APIClient {
             throw APIError.server(statusCode: httpResponse.statusCode, message: message)
         }
 
-        return data
+        return (data, httpResponse)
     }
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
@@ -277,6 +311,29 @@ private extension APIClient {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
+
+    func shouldRetryTransport(_ error: Error, for request: URLRequest) -> Bool {
+        guard request.httpMethod?.uppercased() == "GET" else { return false }
+        guard let urlError = error as? URLError else { return false }
+
+        switch urlError.code {
+        case .timedOut,
+             .networkConnectionLost,
+             .notConnectedToInternet,
+             .cannotFindHost,
+             .cannotConnectToHost,
+             .dnsLookupFailed,
+             .resourceUnavailable:
+            return true
+        default:
+            return false
+        }
+    }
+
+    func shouldRetryStatusCode(_ statusCode: Int, for request: URLRequest) -> Bool {
+        guard request.httpMethod?.uppercased() == "GET" else { return false }
+        return [408, 429, 500, 502, 503, 504].contains(statusCode)
+    }
 }
 
 private extension Data {

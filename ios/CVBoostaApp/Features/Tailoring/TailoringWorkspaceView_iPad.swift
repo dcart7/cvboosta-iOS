@@ -16,6 +16,7 @@ struct TailoringWorkspaceView_iPad: View {
     @Query(sort: \SavedTailoringSuggestion.createdAt, order: .reverse)
     private var savedSuggestions: [SavedTailoringSuggestion]
 
+    @StateObject private var exportController = ResumeExportController()
     @State private var toastMessage: String?
     @State private var errorMessage: String?
     @State private var sessionTicker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -84,6 +85,32 @@ struct TailoringWorkspaceView_iPad: View {
                     .hoverEffect(.lift)
                 }
             }
+        }
+        .confirmationDialog(
+            "Download Resume",
+            isPresented: $exportController.isExportOptionsPresented,
+            titleVisibility: .visible
+        ) {
+            if let payload = latestPayload {
+                ForEach(ResumeExportFormat.allCases) { format in
+                    Button(format.title) {
+                        exportController.export(
+                            resumeName: payload.resumeName,
+                            optimizedText: payload.response.optimizedCV,
+                            format: format
+                        )
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose the export format you want to save or share.")
+        }
+        .sheet(item: $exportController.shareItem, onDismiss: {
+            exportController.cleanupSharedFile()
+        }) { item in
+            ShareSheet(items: [item.url])
         }
         .overlay(alignment: .top) {
             if let toastMessage {
@@ -231,6 +258,32 @@ struct TailoringWorkspaceView_iPad: View {
                     }
                     WorkspaceActionButton(title: "Save", systemImage: "bookmark") {
                         saveSuggestion(text: payload.response.optimizedCV, payload: payload)
+                    }
+                }
+
+                PrimaryButton(
+                    title: exportController.primaryActionTitle,
+                    isLoading: exportController.isExporting
+                ) {
+                    exportController.presentOptions()
+                }
+
+                ResumeExportCapabilitiesView()
+
+                if let successMessage = exportController.successMessage {
+                    Text(successMessage)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.success)
+                }
+
+                if let exportError = exportController.errorMessage {
+                    Text(exportError)
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    SecondaryButton(title: "Retry Export") {
+                        exportController.retryLastExport()
                     }
                 }
             }
