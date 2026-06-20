@@ -72,7 +72,7 @@ struct HomeWorkspaceView_iPad: View {
     }
 
     private var activeApplications: [ApplicationRecord] {
-        trackedApplications.filter { $0.status != .archived }
+        trackedApplications.filter { !$0.status.isArchiveBucket }
     }
 
     private func normalizedATSScore(_ raw: Int) -> Int {
@@ -568,7 +568,10 @@ private struct WorkspaceCTAButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.tap()
+            action()
+        } label: {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)

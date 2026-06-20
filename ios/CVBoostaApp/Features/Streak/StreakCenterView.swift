@@ -624,10 +624,13 @@ enum StreakEngine {
     }
 
     static func dayStamp(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar.current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
     }
 
     private static func collectActions(
@@ -771,10 +774,19 @@ enum StreakEngine {
     }
 
     private static func stampToDate(_ stamp: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar.current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: stamp)
+        let values = stamp.split(separator: "-")
+        guard values.count == 3,
+              let year = Int(values[0]),
+              let month = Int(values[1]),
+              let day = Int(values[2]) else {
+            return nil
+        }
+
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        return Calendar.current.date(from: components)
     }
 }
 

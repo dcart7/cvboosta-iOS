@@ -820,7 +820,7 @@ enum StatisticsSnapshotBuilder {
         let now = Date()
         let ascendingHistory = historyItems.sorted(by: { $0.createdAt < $1.createdAt })
         let filteredHistory = filter(historyItems: ascendingHistory, dayWindow: selectedDayWindow, now: now)
-        let activeApplications = applications.filter { $0.status != .archived }
+        let activeApplications = applications.filter { !$0.status.isArchiveBucket }
 
         let trendPoints = filteredHistory.enumerated().map { index, item in
             StatisticsTrendPoint(
@@ -1011,13 +1011,15 @@ struct StatisticsTrendChartView: View, Equatable {
     }
 
     var body: some View {
+        let renderedPoints = smoothedPoints
+
         Chart {
-            ForEach(points) { point in
+            ForEach(renderedPoints) { point in
                 AreaMark(
                     x: .value("Date", point.date),
                     y: .value("ATS", point.score)
                 )
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(.monotone)
                 .foregroundStyle(
                     LinearGradient(
                         colors: [BoostaColor.accent.opacity(0.34), BoostaColor.accent.opacity(0.03)],
@@ -1027,12 +1029,12 @@ struct StatisticsTrendChartView: View, Equatable {
                 )
             }
 
-            ForEach(points) { point in
+            ForEach(renderedPoints) { point in
                 LineMark(
                     x: .value("Date", point.date),
                     y: .value("ATS", point.score)
                 )
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(.monotone)
                 .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                 .foregroundStyle(
                     LinearGradient(
@@ -1100,6 +1102,25 @@ struct StatisticsTrendChartView: View, Equatable {
         }
         .transaction { transaction in
             transaction.animation = .easeOut(duration: 0.32)
+        }
+    }
+
+    private var smoothedPoints: [StatisticsTrendPoint] {
+        guard points.count > 2 else { return points }
+
+        return points.indices.map { index in
+            let lowerBound = max(0, index - 1)
+            let upperBound = min(points.count - 1, index + 1)
+            let window = points[lowerBound...upperBound]
+            let smoothedScore = Int(
+                (Double(window.map(\.score).reduce(0, +)) / Double(window.count)).rounded()
+            )
+
+            return StatisticsTrendPoint(
+                id: points[index].id,
+                date: points[index].date,
+                score: smoothedScore
+            )
         }
     }
 }

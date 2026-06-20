@@ -193,7 +193,7 @@ struct TrackedApplicationWorkspaceView: View {
             }
 
             Menu {
-                if application.status != .offer && application.status != .archived {
+                if application.status != .offer && !application.status.isArchiveBucket {
                     Button("Advance Stage", systemImage: "arrow.right.circle") {
                         onAdvance()
                     }
@@ -212,8 +212,8 @@ struct TrackedApplicationWorkspaceView: View {
                 }
 
                 Button(
-                    application.status == .archived ? "Restore to Active" : "Move to Archive",
-                    systemImage: application.status == .archived ? "arrow.uturn.backward.circle" : "archivebox"
+                    application.status.isArchiveBucket ? "Restore to Active" : "Move to Archive",
+                    systemImage: application.status.isArchiveBucket ? "arrow.uturn.backward.circle" : "archivebox"
                 ) {
                     onArchiveToggle()
                 }
@@ -1126,7 +1126,10 @@ private struct WorkspaceHeaderButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.tap()
+            action()
+        } label: {
             WorkspaceHeaderButtonLabel(title: title, systemImage: systemImage, tint: tint)
         }
         .buttonStyle(.plain)
@@ -1191,7 +1194,10 @@ private struct ProgressStageNode: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.selection()
+            action()
+        } label: {
             VStack(spacing: 6) {
                 Image(systemName: stage.icon)
                     .font(.system(size: 14, weight: .semibold))
@@ -1365,7 +1371,10 @@ private struct TrackerQuickActionButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.tap()
+            action()
+        } label: {
             HStack(spacing: BoostaSpace.xs) {
                 Image(systemName: systemImage)
                     .font(.system(size: 14, weight: .semibold))

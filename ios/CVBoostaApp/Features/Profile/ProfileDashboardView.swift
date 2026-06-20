@@ -55,7 +55,7 @@ struct ProfileDashboardView: View {
     }
 
     private var activeApplications: [ApplicationRecord] {
-        trackedApplications.filter { $0.status != .archived }
+        trackedApplications.filter { !$0.status.isArchiveBucket }
     }
 
     private var averageATSScore: Int {
@@ -577,7 +577,10 @@ private struct ProfileMiniActionButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.tap()
+            action()
+        } label: {
             Text(title)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(tint)

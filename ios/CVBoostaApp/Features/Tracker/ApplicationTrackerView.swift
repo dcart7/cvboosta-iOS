@@ -29,7 +29,7 @@ struct ApplicationTrackerView: View {
     }
 
     private var activeApplications: [ApplicationRecord] {
-        applications.filter { $0.status != .archived }
+        applications.filter { !$0.status.isArchiveBucket }
     }
 
     private var scopedApplications: [ApplicationRecord] {
@@ -37,7 +37,7 @@ struct ApplicationTrackerView: View {
         case .active:
             return activeApplications
         case .archive:
-            return applications.filter { $0.status == .archived }
+            return applications.filter { $0.status.isArchiveBucket }
         case .all:
             return applications
         }
@@ -82,6 +82,10 @@ struct ApplicationTrackerView: View {
 
     private var availableResumeNames: [String] {
         profileWorkspaceService.mergedResumeNames(remoteNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [])
+    }
+
+    private var folderSelectionCandidates: [FolderAssignableApplicationOption] {
+        activeApplications.map(FolderAssignableApplicationOption.init)
     }
 
     private var folderOptions: [ApplicationFolderOption] {
@@ -180,6 +184,7 @@ struct ApplicationTrackerView: View {
                     TrackerFolderManagerView(
                         folders: folderOptions,
                         applicationCountByFolder: folderUsageCounts,
+                        availableApplications: folderSelectionCandidates,
                         onCreate: createFolder,
                         onUpdate: updateFolder,
                         onDelete: deleteFolder
@@ -364,7 +369,7 @@ struct ApplicationTrackerView: View {
                     statusChangeTarget = app
                 },
                 onArchiveToggle: {
-                    updateStatus(id: app.id, to: app.status == .archived ? .saved : .archived)
+                    updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
                 },
                 onMoveFolder: {
                     folderAssignmentTarget = app
@@ -431,36 +436,6 @@ struct ApplicationTrackerView: View {
         }
         .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if app.status == .archived {
-                Button {
-                    updateStatus(id: app.id, to: .saved)
-                } label: {
-                    Label("Restore", systemImage: "arrow.uturn.backward")
-                }
-                .tint(BoostaColor.accent)
-            } else {
-                Button {
-                    updateStatus(id: app.id, to: .archived)
-                } label: {
-                    Label("Archive", systemImage: "archivebox")
-                }
-                .tint(BoostaColor.secondaryText)
-            }
-
-            Button {
-                statusChangeTarget = app
-            } label: {
-                Label("Status", systemImage: "arrow.triangle.2.circlepath")
-            }
-            .tint(BoostaColor.warning)
-
-            Button(role: .destructive) {
-                deleteApplication(id: app.id)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
             Button {
                 folderAssignmentTarget = app
             } label: {
@@ -474,6 +449,19 @@ struct ApplicationTrackerView: View {
                 Label("Edit", systemImage: "pencil")
             }
             .tint(BoostaColor.accent)
+
+            Button {
+                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+            } label: {
+                Label(app.status.isArchiveBucket ? "Restore" : "Archive", systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox")
+            }
+            .tint(app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText)
+
+            Button(role: .destructive) {
+                deleteApplication(id: app.id)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 
@@ -512,7 +500,7 @@ struct ApplicationTrackerView: View {
         if app.status == .offer {
             return .urgent
         }
-        if app.status == .archived {
+        if app.status.isArchiveBucket {
             return .archived
         }
         if app.status == .interview,
@@ -574,8 +562,10 @@ struct ApplicationTrackerView: View {
             celebrateStreak(with: record.status)
             presentPipelineLiveActivityIfNeeded(for: record)
             showAddSheet = false
+            HapticsService.success()
         } catch {
             errorMessage = "Could not save application."
+            HapticsService.error()
         }
     }
 
@@ -601,8 +591,10 @@ struct ApplicationTrackerView: View {
             }
             presentPipelineLiveActivityIfNeeded(for: record)
             editingContext = nil
+            HapticsService.success()
         } catch {
             errorMessage = "Could not update application."
+            HapticsService.error()
         }
     }
 
@@ -616,8 +608,14 @@ struct ApplicationTrackerView: View {
             statusChangeTarget = nil
             syncWidgetSnapshot()
             presentPipelineLiveActivityIfNeeded(for: record)
+            if status.isArchiveBucket {
+                HapticsService.warning()
+            } else {
+                HapticsService.success()
+            }
         } catch {
             errorMessage = "Could not update application status."
+            HapticsService.error()
         }
     }
 
@@ -630,8 +628,10 @@ struct ApplicationTrackerView: View {
             try modelContext.save()
             syncWidgetSnapshot(applications.filter { $0.id != id })
             editingContext = nil
+            HapticsService.warning()
         } catch {
             errorMessage = "Could not delete application."
+            HapticsService.error()
         }
     }
 
@@ -651,8 +651,10 @@ struct ApplicationTrackerView: View {
                     await LiveActivityManager.shared.clearPostInterviewReflection()
                 }
             }
+            HapticsService.success()
         } catch {
             errorMessage = "Could not save interview reflection."
+            HapticsService.error()
         }
     }
 
@@ -682,19 +684,28 @@ struct ApplicationTrackerView: View {
         do {
             try modelContext.save()
             folderAssignmentTarget = nil
+            HapticsService.selection()
         } catch {
             errorMessage = "Could not update folder."
+            HapticsService.error()
         }
     }
 
-    private func createFolder(_ draft: FolderDraft) {
-        let folder = ApplicationFolder(name: draft.name, emoji: draft.emoji)
+    private func createFolder(_ draft: FolderCreationDraft) {
+        let folder = ApplicationFolder(name: draft.folder.name, emoji: draft.folder.emoji)
         modelContext.insert(folder)
+
+        for application in applications where draft.applicationIDs.contains(application.id) {
+            application.folderID = folder.id
+        }
 
         do {
             try modelContext.save()
+            selectedFolderID = folder.id
+            HapticsService.success()
         } catch {
             errorMessage = "Could not create folder."
+            HapticsService.error()
         }
     }
 
@@ -705,8 +716,10 @@ struct ApplicationTrackerView: View {
 
         do {
             try modelContext.save()
+            HapticsService.selection()
         } catch {
             errorMessage = "Could not update folder."
+            HapticsService.error()
         }
     }
 
@@ -723,8 +736,10 @@ struct ApplicationTrackerView: View {
             if selectedFolderID == id {
                 selectedFolderID = nil
             }
+            HapticsService.warning()
         } catch {
             errorMessage = "Could not delete folder."
+            HapticsService.error()
         }
     }
 
@@ -778,7 +793,7 @@ struct ApplicationTrackerView: View {
         case .active:
             return "Active roles will show up here."
         case .archive:
-            return "Archived roles stay here until you restore them."
+            return "Rejected and archived roles stay here until you restore them."
         case .all:
             return "No applications match the current filters."
         }
@@ -903,7 +918,7 @@ struct AddApplicationView: View {
     @State private var interviewDate: Date = .now
 
     private var selectableStatuses: [ApplicationStatus] {
-        if showsDelete, status == .archived {
+        if showsDelete, status.isArchiveBucket {
             return ApplicationStatus.userSelectableCases + [.archived]
         }
         return ApplicationStatus.userSelectableCases
@@ -1072,7 +1087,7 @@ enum TrackerListScope: String, CaseIterable, Identifiable {
     }
 
     static func statusOptions(for current: ApplicationStatus) -> [ApplicationStatus] {
-        if current == .archived {
+        if current.isArchiveBucket {
             return [.saved, .applied, .interview, .offer, .rejected]
         }
         return ApplicationStatus.userSelectableCases + [.archived]
@@ -1096,10 +1111,38 @@ struct FolderDraft: Hashable {
     let emoji: String
 }
 
+struct FolderCreationDraft: Hashable {
+    let folder: FolderDraft
+    let applicationIDs: Set<UUID>
+}
+
+struct FolderAssignableApplicationOption: Identifiable, Hashable {
+    let id: UUID
+    let company: String
+    let role: String
+    let appliedAt: Date
+
+    init(application: ApplicationRecord) {
+        id = application.id
+        company = application.company
+        role = application.role
+        appliedAt = application.appliedAt
+    }
+
+    var title: String {
+        "\(company) • \(role)"
+    }
+
+    var subtitle: String {
+        appliedAt.formatted(date: .abbreviated, time: .omitted)
+    }
+}
+
 private struct FolderEditorContext: Identifiable {
     let id: UUID?
     let name: String
     let emoji: String
+    let selectedApplicationIDs: Set<UUID>
 }
 
 struct TrackerFolderChip: View {
@@ -1110,7 +1153,10 @@ struct TrackerFolderChip: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.selection()
+            action()
+        } label: {
             HStack(spacing: 6) {
                 Text(emoji)
                 Text(title)
@@ -1136,7 +1182,8 @@ struct TrackerFolderManagerView: View {
 
     let folders: [ApplicationFolderOption]
     let applicationCountByFolder: [UUID: Int]
-    let onCreate: (FolderDraft) -> Void
+    let availableApplications: [FolderAssignableApplicationOption]
+    let onCreate: (FolderCreationDraft) -> Void
     let onUpdate: (UUID, FolderDraft) -> Void
     let onDelete: (UUID) -> Void
 
@@ -1157,7 +1204,7 @@ struct TrackerFolderManagerView: View {
                         SectionHeader(title: "Folders", subtitle: "Organize roles by lane, company set, or hiring focus.")
 
                         PrimaryButton(title: "Create Folder") {
-                            editorContext = FolderEditorContext(id: nil, name: "", emoji: "🗂")
+                            editorContext = FolderEditorContext(id: nil, name: "", emoji: "🗂", selectedApplicationIDs: [])
                         }
 
                         if folders.isEmpty {
@@ -1179,7 +1226,7 @@ struct TrackerFolderManagerView: View {
                                     Spacer()
 
                                     Button("Edit") {
-                                        editorContext = FolderEditorContext(id: folder.id, name: folder.name, emoji: folder.emoji)
+                                        editorContext = FolderEditorContext(id: folder.id, name: folder.name, emoji: folder.emoji, selectedApplicationIDs: [])
                                     }
                                     .buttonStyle(.plain)
                                     .foregroundStyle(BoostaColor.accent)
@@ -1208,12 +1255,15 @@ struct TrackerFolderManagerView: View {
                 TrackerFolderEditorView(
                     initialName: context.name,
                     initialEmoji: context.emoji,
-                    saveTitle: context.id == nil ? "Create Folder" : "Save Folder"
-                ) { draft in
+                    initialSelectedApplicationIDs: context.selectedApplicationIDs,
+                    availableApplications: availableApplications,
+                    saveTitle: context.id == nil ? "Create Folder" : "Save Folder",
+                    showsApplicationSelection: context.id == nil
+                ) { draft, selectedApplicationIDs in
                     if let id = context.id {
                         onUpdate(id, draft)
                     } else {
-                        onCreate(draft)
+                        onCreate(FolderCreationDraft(folder: draft, applicationIDs: selectedApplicationIDs))
                     }
                 }
             }
@@ -1226,24 +1276,35 @@ private struct TrackerFolderEditorView: View {
 
     let initialName: String
     let initialEmoji: String
+    let initialSelectedApplicationIDs: Set<UUID>
+    let availableApplications: [FolderAssignableApplicationOption]
     let saveTitle: String
-    let onSave: (FolderDraft) -> Void
+    let showsApplicationSelection: Bool
+    let onSave: (FolderDraft, Set<UUID>) -> Void
 
     @State private var name: String
     @State private var emoji: String
+    @State private var selectedApplicationIDs: Set<UUID>
 
     init(
         initialName: String,
         initialEmoji: String,
+        initialSelectedApplicationIDs: Set<UUID> = [],
+        availableApplications: [FolderAssignableApplicationOption] = [],
         saveTitle: String,
-        onSave: @escaping (FolderDraft) -> Void
+        showsApplicationSelection: Bool = false,
+        onSave: @escaping (FolderDraft, Set<UUID>) -> Void
     ) {
         self.initialName = initialName
         self.initialEmoji = initialEmoji
+        self.initialSelectedApplicationIDs = initialSelectedApplicationIDs
+        self.availableApplications = availableApplications
         self.saveTitle = saveTitle
+        self.showsApplicationSelection = showsApplicationSelection
         self.onSave = onSave
         _name = State(initialValue: initialName)
         _emoji = State(initialValue: initialEmoji)
+        _selectedApplicationIDs = State(initialValue: initialSelectedApplicationIDs)
     }
 
     private var canSave: Bool {
@@ -1265,12 +1326,52 @@ private struct TrackerFolderEditorView: View {
                         TextInputField(title: "Emoji", placeholder: "🗂", text: $emoji)
                         TextInputField(title: "Folder name", placeholder: "Priority Roles", text: $name)
 
+                        if showsApplicationSelection {
+                            VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                                SectionHeader(
+                                    title: "Add Vacancies Now",
+                                    subtitle: availableApplications.isEmpty
+                                        ? "No active vacancies available yet."
+                                        : "Pick which roles should go into this folder immediately."
+                                )
+
+                                if availableApplications.isEmpty {
+                                    Text("Create the folder now and add roles later from the swipe drawer.")
+                                        .font(BoostaType.caption)
+                                        .foregroundStyle(BoostaColor.secondaryText)
+                                } else {
+                                    ForEach(availableApplications) { application in
+                                        Button {
+                                            toggleApplicationSelection(application.id)
+                                        } label: {
+                                            HStack(spacing: BoostaSpace.sm) {
+                                                Image(systemName: selectedApplicationIDs.contains(application.id) ? "checkmark.circle.fill" : "circle")
+                                                    .foregroundStyle(selectedApplicationIDs.contains(application.id) ? BoostaColor.accent : BoostaColor.secondaryText)
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(application.title)
+                                                        .font(BoostaType.bodyStrong)
+                                                        .foregroundStyle(BoostaColor.primaryText)
+                                                    Text(application.subtitle)
+                                                        .font(BoostaType.caption)
+                                                        .foregroundStyle(BoostaColor.secondaryText)
+                                                }
+                                                Spacer(minLength: 0)
+                                            }
+                                            .padding(.vertical, 6)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+
                         PrimaryButton(title: saveTitle, isDisabled: !canSave) {
                             onSave(
                                 FolderDraft(
                                     name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                                     emoji: emoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "🗂" : emoji.trimmingCharacters(in: .whitespacesAndNewlines)
-                                )
+                                ),
+                                selectedApplicationIDs
                             )
                             dismiss()
                         }
@@ -1285,6 +1386,15 @@ private struct TrackerFolderEditorView: View {
                 Button("Close") { dismiss() }
             }
         }
+    }
+
+    private func toggleApplicationSelection(_ id: UUID) {
+        if selectedApplicationIDs.contains(id) {
+            selectedApplicationIDs.remove(id)
+        } else {
+            selectedApplicationIDs.insert(id)
+        }
+        HapticsService.selection()
     }
 }
 

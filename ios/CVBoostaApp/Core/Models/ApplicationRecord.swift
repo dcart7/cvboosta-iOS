@@ -12,6 +12,10 @@ enum ApplicationStatus: String, Codable, CaseIterable {
     static var userSelectableCases: [ApplicationStatus] {
         [.saved, .applied, .interview, .offer, .rejected]
     }
+
+    var isArchiveBucket: Bool {
+        self == .rejected || self == .archived
+    }
 }
 
 @Model

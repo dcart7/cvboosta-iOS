@@ -42,7 +42,7 @@ struct HomeView: View {
     }
 
     private var activeApplications: [ApplicationRecord] {
-        trackedApplications.filter { $0.status != .archived }
+        trackedApplications.filter { !$0.status.isArchiveBucket }
     }
 
     private var streakSummary: StreakSummary {

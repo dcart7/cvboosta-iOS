@@ -24,7 +24,7 @@ final class WidgetSyncService {
                 interviewAt: $0.interviewAt
             )
         }
-        let activeApplications = accountBackedApplications.filter { $0.status != .archived }
+        let activeApplications = accountBackedApplications.filter { !$0.status.isArchiveBucket }
         let streakSummary = StreakEngine.build(
             now: .now,
             user: snapshot.user,
@@ -113,7 +113,7 @@ final class WidgetSyncService {
     ) {
         let now = Date()
         let projectedScans = projectedScans(afterMerging: result, into: scans, now: now)
-        let activeApplications = applications.filter { $0.status != .archived }
+        let activeApplications = applications.filter { !$0.status.isArchiveBucket }
         let currentScore = projectedScans.last?.matchAfter ?? projectedScans.last?.atsScore ?? (result.response.matchAfter ?? result.response.atsScore)
         let streakSummary = StreakEngine.build(
             now: now,
@@ -172,7 +172,7 @@ final class WidgetSyncService {
     }
 
     func mergeLocalApplications(_ applications: [ApplicationRecord]) {
-        let activeApplications = applications.filter { $0.status != .archived }
+        let activeApplications = applications.filter { !$0.status.isArchiveBucket }
         let streakSummary = StreakEngine.build(
             now: .now,
             user: nil,

@@ -7,7 +7,10 @@ struct PrimaryButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.tap()
+            action()
+        } label: {
             HStack(spacing: BoostaSpace.xs) {
                 if isLoading {
                     ProgressView()
@@ -61,7 +64,10 @@ struct SecondaryButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.tap()
+            action()
+        } label: {
             Text(title)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)

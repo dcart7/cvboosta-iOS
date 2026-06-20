@@ -27,7 +27,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     private let widgetSyncService = WidgetSyncService.shared
 
     private var activeApplications: [ApplicationRecord] {
-        applications.filter { $0.status != .archived }
+        applications.filter { !$0.status.isArchiveBucket }
     }
 
     private var foldersByID: [UUID: ApplicationFolder] {
@@ -47,7 +47,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         case .active:
             return activeApplications
         case .archive:
-            return applications.filter { $0.status == .archived }
+            return applications.filter { $0.status.isArchiveBucket }
         case .all:
             return applications
         }
@@ -82,6 +82,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
 
     private var availableResumeNames: [String] {
         profileWorkspaceService.mergedResumeNames(remoteNames: authViewModel.me?.savedResumes.map(\.fileName) ?? [])
+    }
+
+    private var folderSelectionCandidates: [FolderAssignableApplicationOption] {
+        activeApplications.map(FolderAssignableApplicationOption.init)
     }
 
     private var widgetSyncSignature: [String] {
@@ -191,6 +195,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     TrackerFolderManagerView(
                         folders: folderOptions,
                         applicationCountByFolder: folderUsageCounts,
+                        availableApplications: folderSelectionCandidates,
                         onCreate: createFolder,
                         onUpdate: updateFolder,
                         onDelete: deleteFolder
@@ -349,6 +354,34 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                                 applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
                             }
                             .buttonStyle(.plain)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button {
+                                    folderAssignmentTarget = app
+                                } label: {
+                                    Label("Folder", systemImage: "folder.badge.plus")
+                                }
+                                .tint(BoostaColor.accentSecondary)
+
+                                Button {
+                                    editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(BoostaColor.accent)
+
+                                Button {
+                                    updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+                                } label: {
+                                    Label(app.status.isArchiveBucket ? "Restore" : "Archive", systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox")
+                                }
+                                .tint(app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText)
+
+                                Button(role: .destructive) {
+                                    deleteApplication(id: app.id)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
@@ -450,7 +483,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 statusChangeTarget = app
             },
             onArchiveToggle: {
-                updateStatus(id: app.id, to: app.status == .archived ? .saved : .archived)
+                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
             },
             onMoveFolder: {
                 folderAssignmentTarget = app
@@ -484,7 +517,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
                 }
 
-                if app.status != .archived {
+                if !app.status.isArchiveBucket {
                     HStack(spacing: BoostaSpace.sm) {
                         WorkspaceActionButton(title: "Advance", systemImage: "arrow.right") {
                             updateStatus(id: app.id, to: nextStatus(after: app.status))
@@ -507,10 +540,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 }
 
                 WorkspaceActionButton(
-                    title: app.status == .archived ? "Restore to Active" : "Move to Archive",
-                    systemImage: app.status == .archived ? "arrow.uturn.backward" : "archivebox"
+                    title: app.status.isArchiveBucket ? "Restore to Active" : "Move to Archive",
+                    systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox"
                 ) {
-                    updateStatus(id: app.id, to: app.status == .archived ? .saved : .archived)
+                    updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
                 }
 
                 Divider()
@@ -619,7 +652,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         let today = calendar.startOfDay(for: Date())
 
         if app.status == .offer { return .urgent }
-        if app.status == .archived { return .archived }
+        if app.status.isArchiveBucket { return .archived }
         if app.status == .interview,
            let interviewAt = app.interviewAt,
            interviewAt <= (calendar.date(byAdding: .day, value: 3, to: today) ?? today) {
@@ -680,8 +713,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             syncWidgetSnapshot()
             celebrateStreak(with: record.status)
             presentPipelineLiveActivityIfNeeded(for: record)
+            HapticsService.success()
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
+            HapticsService.error()
         }
     }
 
@@ -706,8 +741,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             }
             presentPipelineLiveActivityIfNeeded(for: record)
             editingContext = nil
+            HapticsService.success()
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
+            HapticsService.error()
         }
     }
 
@@ -720,8 +757,14 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             statusChangeTarget = nil
             syncWidgetSnapshot()
             presentPipelineLiveActivityIfNeeded(for: record)
+            if status.isArchiveBucket {
+                HapticsService.warning()
+            } else {
+                HapticsService.success()
+            }
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
+            HapticsService.error()
         }
     }
 
@@ -736,8 +779,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             if selectedApplicationID == id {
                 selectedApplicationID = applications.first(where: { $0.id != id })?.id
             }
+            HapticsService.warning()
         } catch {
             // Local-only tracker: ignore save failure, user can retry.
+            HapticsService.error()
         }
     }
 
@@ -756,8 +801,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                     await LiveActivityManager.shared.clearPostInterviewReflection()
                 }
             }
+            HapticsService.success()
         } catch {
             // Best effort local reflection.
+            HapticsService.error()
         }
     }
 
@@ -840,7 +887,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         case .active:
             return "Active roles will show up here."
         case .archive:
-            return "Archived roles stay here until you restore them."
+            return "Rejected and archived roles stay here until you restore them."
         case .all:
             return "No applications match the current filters."
         }
@@ -853,21 +900,40 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         do {
             try modelContext.save()
             folderAssignmentTarget = nil
+            HapticsService.selection()
         } catch {
             // Best effort local folder update.
+            HapticsService.error()
         }
     }
 
-    private func createFolder(_ draft: FolderDraft) {
-        modelContext.insert(ApplicationFolder(name: draft.name, emoji: draft.emoji))
-        try? modelContext.save()
+    private func createFolder(_ draft: FolderCreationDraft) {
+        let folder = ApplicationFolder(name: draft.folder.name, emoji: draft.folder.emoji)
+        modelContext.insert(folder)
+
+        for application in applications where draft.applicationIDs.contains(application.id) {
+            application.folderID = folder.id
+        }
+
+        do {
+            try modelContext.save()
+            selectedFolderID = folder.id
+            HapticsService.success()
+        } catch {
+            HapticsService.error()
+        }
     }
 
     private func updateFolder(id: UUID, with draft: FolderDraft) {
         guard let folder = folders.first(where: { $0.id == id }) else { return }
         folder.name = draft.name
         folder.emoji = draft.emoji
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            HapticsService.selection()
+        } catch {
+            HapticsService.error()
+        }
     }
 
     private func deleteFolder(id: UUID) {
@@ -876,9 +942,14 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             application.folderID = nil
         }
         modelContext.delete(folder)
-        try? modelContext.save()
-        if selectedFolderID == id {
-            selectedFolderID = nil
+        do {
+            try modelContext.save()
+            if selectedFolderID == id {
+                selectedFolderID = nil
+            }
+            HapticsService.warning()
+        } catch {
+            HapticsService.error()
         }
     }
 
@@ -983,7 +1054,10 @@ private struct WorkspaceActionButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticsService.tap()
+            action()
+        } label: {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
