@@ -17,6 +17,7 @@
 		15CE5489A5B1E3C19241934F /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296DE09D85E22A290E90314B /* AppPreferences.swift */; };
 		20CCFAA2F6F9D1B8F82780C8 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C90AC1E9BA7AAA44DA936C /* LiveActivityManager.swift */; };
 		248A547FF22E32ECEE9BEA6B /* LatestScanReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CE450774353F59B8A313EC /* LatestScanReport.swift */; };
+		2D6BB5B3B36C4172B0F6638D /* TrackedApplicationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D52DBD214D37858610C815 /* TrackedApplicationWorkspaceView.swift */; };
 		2EEF4EDF7F4B1C816A820E97 /* WidgetSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9992BBEA9E48B91E8D1C3434 /* WidgetSyncService.swift */; };
 		30E83BA558E33656C4E983B3 /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF920A666F9E3794A987511 /* GlassCard.swift */; };
 		392677F2E714733C3696C1E6 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE45A63DC8DB19FB6BC25C94 /* StatisticsView.swift */; };
@@ -63,7 +64,6 @@
 		B60657164012C785BBCCA612 /* ATSResponseParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF76411B4D790EB18DB72BE /* ATSResponseParsingTests.swift */; };
 		B8081D06BF9D8CD22DF01C5E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA31832DAB32F2F0428FDA6 /* OnboardingView.swift */; };
 		B9095B6DA3D10E22D753047D /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2A9218B2C8FB4577724DE3 /* JSONValue.swift */; };
-		9A6C9A6F2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon */; };
 		C6724C80800F64DB795246DF /* TypographyTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F01EA905668C7DAA562A63 /* TypographyTokens.swift */; };
 		C8FC740FAFCBBFEEDDA0C3BC /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6FEAA043E841C4669C6C7E /* WelcomeView.swift */; };
 		C9D4D2E2018B77DE5807CCF2 /* CVBoostaLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1461E22841145EB23F015DCE /* CVBoostaLiveActivity.swift */; };
@@ -78,6 +78,7 @@
 		D39FC53469ED995361DE5BFD /* ApplicationTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EEAD106AFAA3B5F5F3B53CC /* ApplicationTrackerView.swift */; };
 		D411FE8E2BEB1DA0D4FFE9B4 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E7201C4EE4AEA49B0E2CD3 /* LoginView.swift */; };
 		DD7638D5E516B0A68419B367 /* SettingsWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1820FD891E24369ACC67E5A7 /* SettingsWorkspaceView_iPad.swift */; };
+		DD94DA0FF9CD000AB9E789F2 /* TrackerWorkspaceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8109D81CD0D902AB52F62BF3 /* TrackerWorkspaceService.swift */; };
 		DEE2144B0934F4C27DE6BB8F /* SavedTailoringSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C461E1368094D7C87A817584 /* SavedTailoringSuggestion.swift */; };
 		E66156CD9DFD4716286CFC8C /* CVBoostaActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3AEFB9DD06E89CFA436B864 /* CVBoostaActivityAttributes.swift */; };
 		EE59F786DABB29BB6A50C301 /* TailoringWorkspaceView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB3081B65BD244BECD75FA9 /* TailoringWorkspaceView_iPad.swift */; };
@@ -132,6 +133,7 @@
 		12360C6B9C4C8ACCA46372B1 /* ShareService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareService.swift; sourceTree = "<group>"; };
 		1461E22841145EB23F015DCE /* CVBoostaLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVBoostaLiveActivity.swift; sourceTree = "<group>"; };
 		14738B86F46E79C7FA758A2C /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		14D52DBD214D37858610C815 /* TrackedApplicationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackedApplicationWorkspaceView.swift; sourceTree = "<group>"; };
 		1542EAD33DCB06451ED938F1 /* CVBoostaApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CVBoostaApp.entitlements; sourceTree = "<group>"; };
 		1820FD891E24369ACC67E5A7 /* SettingsWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWorkspaceView_iPad.swift; sourceTree = "<group>"; };
 		18871EDEE83B3D1FBCF14E6C /* ATSScannerWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSScannerWorkspaceView_iPad.swift; sourceTree = "<group>"; };
@@ -159,11 +161,12 @@
 		7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
 		7C6FEAA043E841C4669C6C7E /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		7D96A48F58F41FE1D68D9D05 /* HapticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticsService.swift; sourceTree = "<group>"; };
-		80C953578667D3EAF2E686D5 /* CVBoostaApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CVBoostaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		80C953578667D3EAF2E686D5 /* CVBoostaApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CVBoostaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8109D81CD0D902AB52F62BF3 /* TrackerWorkspaceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerWorkspaceService.swift; sourceTree = "<group>"; };
 		81CE450774353F59B8A313EC /* LatestScanReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatestScanReport.swift; sourceTree = "<group>"; };
 		823A00EBF3019571C8987250 /* StringValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringValidation.swift; sourceTree = "<group>"; };
 		83162248824F6AA07FC508C4 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
-		84F84DECE7D45DDC893D1B98 /* CVBoostaAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CVBoostaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		84F84DECE7D45DDC893D1B98 /* CVBoostaAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CVBoostaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		856917246B5DA81EB8281D6B /* MetricPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricPill.swift; sourceTree = "<group>"; };
 		8996014C11088A9C86FE55ED /* SpotlightIndexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndexer.swift; sourceTree = "<group>"; };
 		89B2CD93E8844AAB384EB734 /* ATSService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSService.swift; sourceTree = "<group>"; };
@@ -178,8 +181,7 @@
 		A0071ECB8FC9DF9329EAF4E6 /* SharedStreakState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStreakState.swift; sourceTree = "<group>"; };
 		A23540F758E3EDCD837B0B25 /* ScanLimitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanLimitService.swift; sourceTree = "<group>"; };
 		AA66DB81C49009B7D8053EF9 /* StatisticsWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsWorkspaceView_iPad.swift; sourceTree = "<group>"; };
-		9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "CVBOOSTA IOS ICON.icon"; sourceTree = "<group>"; };
-		AAC93232D43362218F1D58CA /* CVBoostaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CVBoostaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAC93232D43362218F1D58CA /* CVBoostaWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CVBoostaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AEE5A1A839FD6DF6A38FCED8 /* HandoffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffService.swift; sourceTree = "<group>"; };
 		AF9335E5A9024CA3551C605D /* SiriSuggestionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriSuggestionService.swift; sourceTree = "<group>"; };
 		B05E24A22597CE21DD408948 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
@@ -383,6 +385,7 @@
 				8996014C11088A9C86FE55ED /* SpotlightIndexer.swift */,
 				823A00EBF3019571C8987250 /* StringValidation.swift */,
 				7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */,
+				8109D81CD0D902AB52F62BF3 /* TrackerWorkspaceService.swift */,
 				DEEE2C3751FEABF09BADBC00 /* UserService.swift */,
 				9992BBEA9E48B91E8D1C3434 /* WidgetSyncService.swift */,
 				07D635202B0B1BB875254A0C /* WorkspaceSessionService.swift */,
@@ -457,6 +460,7 @@
 			children = (
 				0EEAD106AFAA3B5F5F3B53CC /* ApplicationTrackerView.swift */,
 				8CD204FCF77D50300C7EF080 /* ApplicationTrackerWorkspaceView_iPad.swift */,
+				14D52DBD214D37858610C815 /* TrackedApplicationWorkspaceView.swift */,
 			);
 			path = Tracker;
 			sourceTree = "<group>";
@@ -474,7 +478,6 @@
 			isa = PBXGroup;
 			children = (
 				54BC9517B088B54807EB0DB3 /* Assets.xcassets */,
-				9A6C9A6E2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon */,
 				1542EAD33DCB06451ED938F1 /* CVBoostaApp.entitlements */,
 				E3F7E812A5E5E62EF7F0A245 /* Info.plist */,
 				555594A2C03812078F74A947 /* App */,
@@ -570,12 +573,15 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					0943C6844F25629726FD00F9 = {
+						DevelopmentTeam = G5CT2RF98B;
 						ProvisioningStyle = Automatic;
 					};
 					7B99514F0AD346F2B1029996 = {
+						DevelopmentTeam = G5CT2RF98B;
 						ProvisioningStyle = Automatic;
 					};
 					876849D1B625B7D4CE01AB06 = {
+						DevelopmentTeam = G5CT2RF98B;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -607,7 +613,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				D2290B91ACA3450054A644A7 /* Assets.xcassets in Resources */,
-				9A6C9A6F2FDF6F7F000E5DDD /* CVBOOSTA IOS ICON.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -683,6 +688,8 @@
 				0C9D1C9F70BD8C4E5315D318 /* SubscriptionService.swift in Sources */,
 				57AB37BAB32F57C14ECA5773 /* TailoringPreviewView.swift in Sources */,
 				EE59F786DABB29BB6A50C301 /* TailoringWorkspaceView_iPad.swift in Sources */,
+				2D6BB5B3B36C4172B0F6638D /* TrackedApplicationWorkspaceView.swift in Sources */,
+				DD94DA0FF9CD000AB9E789F2 /* TrackerWorkspaceService.swift in Sources */,
 				C6724C80800F64DB795246DF /* TypographyTokens.swift in Sources */,
 				9BB7DBFC762E3F2A1E51A2B2 /* UIComponents.swift in Sources */,
 				CFFC982EA13AC3FB9D41C88F /* UserService.swift in Sources */,
@@ -891,13 +898,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APS_ENVIRONMENT = production;
-				ASSETCATALOG_COMPILER_APPICON_NAME = "CVBOOSTA IOS ICON";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = CVBoostaApp/CVBoostaApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = G5CT2RF98B;
 				INFOPLIST_FILE = CVBoostaApp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CVboosta;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -913,13 +919,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APS_ENVIRONMENT = development;
-				ASSETCATALOG_COMPILER_APPICON_NAME = "CVBOOSTA IOS ICON";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = CVBoostaApp/CVBoostaApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = G5CT2RF98B;
 				INFOPLIST_FILE = CVBoostaApp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CVboosta;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

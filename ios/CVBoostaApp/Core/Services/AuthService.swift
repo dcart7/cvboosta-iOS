@@ -28,6 +28,36 @@ struct AuthUsageLimits: Hashable {
     let scansDailyLimit: Int?
     let scansUsedToday: Int
     let scansRemainingToday: Int?
+    let coverLetterDailyLimit: Int?
+    let coverLetterUsedToday: Int
+    let coverLetterRemainingToday: Int?
+    let interviewPrepDailyLimit: Int?
+    let interviewPrepUsedToday: Int
+    let interviewPrepRemainingToday: Int?
+
+    init(
+        plan: String,
+        scansDailyLimit: Int?,
+        scansUsedToday: Int,
+        scansRemainingToday: Int?,
+        coverLetterDailyLimit: Int? = nil,
+        coverLetterUsedToday: Int = 0,
+        coverLetterRemainingToday: Int? = nil,
+        interviewPrepDailyLimit: Int? = nil,
+        interviewPrepUsedToday: Int = 0,
+        interviewPrepRemainingToday: Int? = nil
+    ) {
+        self.plan = plan
+        self.scansDailyLimit = scansDailyLimit
+        self.scansUsedToday = scansUsedToday
+        self.scansRemainingToday = scansRemainingToday
+        self.coverLetterDailyLimit = coverLetterDailyLimit
+        self.coverLetterUsedToday = coverLetterUsedToday
+        self.coverLetterRemainingToday = coverLetterRemainingToday
+        self.interviewPrepDailyLimit = interviewPrepDailyLimit
+        self.interviewPrepUsedToday = interviewPrepUsedToday
+        self.interviewPrepRemainingToday = interviewPrepRemainingToday
+    }
 }
 
 struct SavedResumeSnapshot: Hashable, Identifiable {
@@ -452,12 +482,41 @@ private extension AuthService {
         let limit = payload.int("scans_daily_limit") ?? payload.int("daily_limit")
         let used = payload.int("scans_used_today") ?? payload.int("used_today") ?? 0
         let remaining = payload.int("scans_remaining_today") ?? payload.int("remaining_today")
+        let coverLetterLimit =
+            payload.int("cover_letter_daily_limit")
+            ?? payload.int("cover_letters_daily_limit")
+        let coverLetterUsed =
+            payload.int("cover_letter_used_today")
+            ?? payload.int("cover_letters_used_today")
+            ?? 0
+        let coverLetterRemaining =
+            payload.int("cover_letter_remaining_today")
+            ?? payload.int("cover_letters_remaining_today")
+        let interviewPrepLimit =
+            payload.int("interview_prep_daily_limit")
+            ?? payload.int("interview_preps_daily_limit")
+            ?? payload.int("interview_prep_regeneration_daily_limit")
+        let interviewPrepUsed =
+            payload.int("interview_prep_used_today")
+            ?? payload.int("interview_preps_used_today")
+            ?? payload.int("interview_prep_regenerations_used_today")
+            ?? 0
+        let interviewPrepRemaining =
+            payload.int("interview_prep_remaining_today")
+            ?? payload.int("interview_preps_remaining_today")
+            ?? payload.int("interview_prep_regenerations_remaining_today")
 
         return AuthUsageLimits(
             plan: plan,
             scansDailyLimit: limit,
             scansUsedToday: used,
-            scansRemainingToday: remaining
+            scansRemainingToday: remaining,
+            coverLetterDailyLimit: coverLetterLimit,
+            coverLetterUsedToday: coverLetterUsed,
+            coverLetterRemainingToday: coverLetterRemaining,
+            interviewPrepDailyLimit: interviewPrepLimit,
+            interviewPrepUsedToday: interviewPrepUsed,
+            interviewPrepRemainingToday: interviewPrepRemaining
         )
     }
 

@@ -225,6 +225,8 @@ struct SettingsWorkspaceView_iPad: View {
                 if let lastSyncedAt = subscriptionService.lastSyncedAt {
                     infoRow("Last synced", value: lastSyncedAt.formatted(date: .omitted, time: .shortened))
                 }
+                infoRow("Cover letters", value: workspaceLimitLabel(for: .coverLetter))
+                infoRow("Interview prep", value: workspaceLimitLabel(for: .interviewPrep))
 
                 PrimaryButton(title: subscriptionService.isPremium ? "Premium Active" : "Upgrade to Premium", isDisabled: subscriptionService.isPremium) {
                     showPaywall = true
@@ -316,6 +318,17 @@ struct SettingsWorkspaceView_iPad: View {
 
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+    }
+
+    private func workspaceLimitLabel(for feature: WorkspaceDailyFeature) -> String {
+        let status = subscriptionService.status(for: feature)
+        if let dailyLimit = status.dailyLimit, let remaining = status.remainingToday {
+            return "\(remaining) left of \(dailyLimit)/day"
+        }
+        if let remaining = status.remainingToday {
+            return "\(remaining) left today"
+        }
+        return "Unlimited"
     }
 
     private func infoRow(_ title: String, value: String) -> some View {

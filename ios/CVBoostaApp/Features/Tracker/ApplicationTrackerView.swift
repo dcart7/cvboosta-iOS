@@ -346,60 +346,85 @@ struct ApplicationTrackerView: View {
     private func applicationCard(_ app: ApplicationRecord) -> some View {
         let priority = priority(for: app)
 
-        return GlassCard {
-            VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(app.company)
-                            .font(BoostaType.bodyStrong)
-                        Text(app.role)
-                            .font(BoostaType.body)
-                            .foregroundStyle(BoostaColor.secondaryText)
-                        if let folderLabel = folderLabel(for: app) {
-                            ApplicationBadge(title: folderLabel, tint: BoostaColor.accentSecondary)
+        return NavigationLink {
+            TrackedApplicationWorkspaceView(
+                application: app,
+                folderLabel: folderLabel(for: app),
+                isEmbedded: false,
+                showsNavigationTitle: true,
+                onEdit: {
+                    editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                },
+                onChangeStatus: {
+                    statusChangeTarget = app
+                },
+                onArchiveToggle: {
+                    updateStatus(id: app.id, to: app.status == .archived ? .saved : .archived)
+                },
+                onMoveFolder: {
+                    folderAssignmentTarget = app
+                },
+                onAdvance: {
+                    updateStatus(id: app.id, to: nextStatus(after: app.status))
+                }
+            )
+        } label: {
+            GlassCard {
+                VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(app.company)
+                                .font(BoostaType.bodyStrong)
+                            Text(app.role)
+                                .font(BoostaType.body)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                            if let folderLabel = folderLabel(for: app) {
+                                ApplicationBadge(title: folderLabel, tint: BoostaColor.accentSecondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 8) {
+                            ApplicationBadge(title: app.status.rawValue.capitalized, tint: statusColor(for: app.status))
+                            ApplicationBadge(title: priority.title, tint: priority.color)
                         }
                     }
 
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 8) {
-                        ApplicationBadge(title: app.status.rawValue.capitalized, tint: statusColor(for: app.status))
-                        ApplicationBadge(title: priority.title, tint: priority.color)
+                    HStack {
+                        Text("Applied: \(app.appliedAt.formatted(date: .abbreviated, time: .omitted))")
+                        Spacer()
+                        if let score = app.atsScore {
+                            Text("ATS: \(score)")
+                        }
                     }
-                }
-
-                HStack {
-                    Text("Applied: \(app.appliedAt.formatted(date: .abbreviated, time: .omitted))")
-                    Spacer()
-                    if let score = app.atsScore {
-                        Text("ATS: \(score)")
-                    }
-                }
-                .font(BoostaType.caption)
-                .foregroundStyle(BoostaColor.secondaryText)
-
-                if let interviewAt = app.interviewAt, app.status == .interview {
-                    Text("Interview: \(interviewAt.formatted(date: .abbreviated, time: .shortened))")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.accentSecondary)
-                }
-
-                Text("Next step: \(nextStep(for: app))")
                     .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.primaryText)
+                    .foregroundStyle(BoostaColor.secondaryText)
 
-                if let notes = app.notes, !notes.isEmpty {
-                    Text(notes)
+                    if let interviewAt = app.interviewAt, app.status == .interview {
+                        Text("Interview: \(interviewAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.accentSecondary)
+                    }
+
+                    Text("Next step: \(nextStep(for: app))")
                         .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
-                        .lineLimit(2)
+                        .foregroundStyle(BoostaColor.primaryText)
+
+                    if let notes = app.notes, !notes.isEmpty {
+                        Text(notes)
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                            .lineLimit(2)
+                    }
+
+                    Label("Tap to open workspace", systemImage: "arrow.right.circle")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.accent)
                 }
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
-        }
+        .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if app.status == .archived {
                 Button {

@@ -4,24 +4,16 @@
 <dict>
 	<key>API_BASE_URL</key>
 	<string>https://cvboosta-backend-615826584976.europe-west3.run.app</string>
-	<key>APP_ENV</key>
-	<string>production</string>
-	<key>APP_BUNDLE_ID_PLACEHOLDER</key>
-	<string>com.cvboosta.app</string>
 	<key>APNS_DEACTIVATE_PATH</key>
 	<string>/devices/apns/deactivate</string>
 	<key>APNS_ENVIRONMENT</key>
 	<string>$(APS_ENVIRONMENT)</string>
 	<key>APNS_REGISTER_PATH</key>
 	<string>/devices/apns</string>
-	<key>LIVE_ACTIVITY_DEACTIVATE_PATH</key>
-	<string>/live-activities/apns/deactivate</string>
-	<key>LIVE_ACTIVITY_PUSH_TO_START_DEACTIVATE_PATH</key>
-	<string>/live-activities/apns/push-to-start/deactivate</string>
-	<key>LIVE_ACTIVITY_PUSH_TO_START_REGISTER_PATH</key>
-	<string>/live-activities/apns/push-to-start</string>
-	<key>LIVE_ACTIVITY_REGISTER_PATH</key>
-	<string>/live-activities/apns</string>
+	<key>APP_BUNDLE_ID_PLACEHOLDER</key>
+	<string>com.cvboosta.app</string>
+	<key>APP_ENV</key>
+	<string>production</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -40,6 +32,14 @@
 	<string>1.1.13</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LIVE_ACTIVITY_DEACTIVATE_PATH</key>
+	<string>/live-activities/apns/deactivate</string>
+	<key>LIVE_ACTIVITY_PUSH_TO_START_DEACTIVATE_PATH</key>
+	<string>/live-activities/apns/push-to-start/deactivate</string>
+	<key>LIVE_ACTIVITY_PUSH_TO_START_REGISTER_PATH</key>
+	<string>/live-activities/apns/push-to-start</string>
+	<key>LIVE_ACTIVITY_REGISTER_PATH</key>
+	<string>/live-activities/apns</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
@@ -66,6 +66,13 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -77,13 +84,6 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UIApplicationSceneManifest</key>
-	<dict>
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<false/>
-	</dict>
-	<key>UILaunchScreen</key>
-	<dict/>
 	<key>WEB_BASE_URL</key>
 	<string>https://cvboosta.com</string>
 </dict>

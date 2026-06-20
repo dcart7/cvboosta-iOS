@@ -5,6 +5,7 @@ enum PaywallPresentationContext: Identifiable, Equatable {
     case postLogin
     case postRegister
     case optimizationLimit(resetDate: Date?)
+    case workspaceFeatureLimit(feature: WorkspaceDailyFeature, resetDate: Date?)
 
     var id: String {
         switch self {
@@ -16,6 +17,8 @@ enum PaywallPresentationContext: Identifiable, Equatable {
             return "postRegister"
         case .optimizationLimit(let resetDate):
             return "optimizationLimit-\(resetDate?.timeIntervalSince1970 ?? 0)"
+        case .workspaceFeatureLimit(let feature, let resetDate):
+            return "workspaceFeatureLimit-\(feature.rawValue)-\(resetDate?.timeIntervalSince1970 ?? 0)"
         }
     }
 }
@@ -29,10 +32,10 @@ struct PaywallView: View {
     let context: PaywallPresentationContext
 
     private let plans: [AppStorePlan] = [
-        .init(title: "Single Scan", badge: "Pay as you go", productID: AppEnvironment.appStoreSingleScanProductID, fallbackPrice: 1.00, cadence: "one-time", ctaTitle: "Buy", features: ["1 ATS scan", "Quick recruiter visibility check"], accent: BoostaColor.warning),
-        .init(title: "Go", badge: "Most flexible", productID: AppEnvironment.appStoreGoMonthlyProductID, fallbackPrice: 10.00, cadence: "/ month", ctaTitle: "Subscribe", features: ["Unlimited ATS scans", "ATS score + keyword gaps", "Resume optimization preview"], accent: BoostaColor.accent),
-        .init(title: "Pro", badge: "Best value", productID: AppEnvironment.appStoreProMonthlyProductID, fallbackPrice: 25.00, cadence: "/ month", ctaTitle: "Subscribe", features: ["Everything in Go", "Tailoring workspace", "Deeper analytics + AI insights", "Priority web studio access"], accent: BoostaColor.success),
-        .init(title: "Lifetime", badge: "One payment", productID: AppEnvironment.appStoreLifetimeProductID, fallbackPrice: 150.00, cadence: "once", ctaTitle: "Unlock", features: ["Permanent CVBoosta access", "All premium ATS + tailoring tools", "No renewals"], accent: BoostaColor.accentSecondary)
+        .init(title: "Single Scan", badge: "Pay as you go", productID: AppEnvironment.appStoreSingleScanProductID, fallbackPrice: 1.00, cadence: "one-time", ctaTitle: "Buy", features: ["1 ATS scan", "Free plan still keeps 4 cover letters/day", "Free plan still keeps 4 interview prep regenerations/day"], accent: BoostaColor.warning),
+        .init(title: "Go", badge: "Most flexible", productID: AppEnvironment.appStoreGoMonthlyProductID, fallbackPrice: 10.00, cadence: "/ month", ctaTitle: "Subscribe", features: ["Unlimited ATS scans", "20 cover letters per day", "20 interview prep regenerations per day", "Resume optimization preview"], accent: BoostaColor.accent),
+        .init(title: "Pro", badge: "Best value", productID: AppEnvironment.appStoreProMonthlyProductID, fallbackPrice: 25.00, cadence: "/ month", ctaTitle: "Subscribe", features: ["Everything in Go", "Unlimited cover letters", "Unlimited interview prep regenerations", "Deeper analytics + AI insights"], accent: BoostaColor.success),
+        .init(title: "Lifetime", badge: "One payment", productID: AppEnvironment.appStoreLifetimeProductID, fallbackPrice: 150.00, cadence: "once", ctaTitle: "Unlock", features: ["Permanent CVBoosta access", "Unlimited cover letters", "Unlimited interview prep regenerations", "No renewals"], accent: BoostaColor.accentSecondary)
     ]
 
     init(context: PaywallPresentationContext = .standard) {
@@ -127,10 +130,24 @@ struct PaywallView: View {
                         .foregroundStyle(BoostaColor.secondaryText)
                 }
 
-                HStack(spacing: BoostaSpace.sm) {
-                    MetricPill(title: "Free", value: "1/day", color: BoostaColor.warning)
-                    MetricPill(title: "Premium", value: "Unlimited", color: BoostaColor.success)
-                    MetricPill(title: "Sync", value: "Shared account", color: BoostaColor.accent)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: BoostaSpace.sm) {
+                        MetricPill(title: "Free", value: "4/day", color: BoostaColor.warning)
+                        MetricPill(title: "Go", value: "20/day", color: BoostaColor.accent)
+                        MetricPill(title: "Pro", value: "Unlimited", color: BoostaColor.success)
+                        MetricPill(title: "Sync", value: "Shared account", color: BoostaColor.accent)
+                    }
+
+                    VStack(alignment: .leading, spacing: BoostaSpace.sm) {
+                        HStack(spacing: BoostaSpace.sm) {
+                            MetricPill(title: "Free", value: "4/day", color: BoostaColor.warning)
+                            MetricPill(title: "Go", value: "20/day", color: BoostaColor.accent)
+                        }
+                        HStack(spacing: BoostaSpace.sm) {
+                            MetricPill(title: "Pro", value: "Unlimited", color: BoostaColor.success)
+                            MetricPill(title: "Sync", value: "Shared account", color: BoostaColor.accent)
+                        }
+                    }
                 }
             }
         }
@@ -155,6 +172,10 @@ struct PaywallView: View {
                 ForEach(plans) { plan in
                     planRow(plan)
                 }
+
+                Text("Free includes 1 ATS optimization/day, 4 cover letters/day, and 4 interview prep regenerations/day. Go includes 20/day for cover letters and interview prep. Pro and Lifetime unlock both without a daily cap.")
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
 
                 Text("App Store pricing: Single Scan $1, Go $10/mo, Pro $25/mo, Lifetime $150.")
                     .font(BoostaType.caption)
@@ -242,6 +263,8 @@ struct PaywallView: View {
             return "Strong start. Keep free for now or unlock more depth."
         case .optimizationLimit:
             return "Today’s free optimization is used."
+        case .workspaceFeatureLimit(let feature, _):
+            return "Today’s free \(feature.shortTitle) limit is used."
         }
     }
 
@@ -258,6 +281,11 @@ struct PaywallView: View {
                 return "You can wait until \(resetDate.formatted(date: .omitted, time: .shortened)) or keep optimizing now with Premium."
             }
             return "You can come back tomorrow for another free run, or unlock unlimited optimizations now."
+        case .workspaceFeatureLimit(let feature, let resetDate):
+            if let resetDate {
+                return "Free includes 4 \(feature.shortTitle) per day. You can wait until \(resetDate.formatted(date: .omitted, time: .shortened)) or unlock more capacity now."
+            }
+            return "Free includes 4 \(feature.shortTitle) per day. Upgrade when you want more room without waiting for tomorrow."
         }
     }
 
@@ -271,6 +299,8 @@ struct PaywallView: View {
             return "No pressure: the free plan stays active immediately."
         case .optimizationLimit:
             return "Your account, history, and results stay the same either way."
+        case .workspaceFeatureLimit:
+            return "Your tracker workspace, history, and generated assets stay with the same shared account."
         }
     }
 
@@ -282,6 +312,13 @@ struct PaywallView: View {
             return "sparkles"
         case .optimizationLimit:
             return "timer"
+        case .workspaceFeatureLimit(let feature, _):
+            switch feature {
+            case .coverLetter:
+                return "text.badge.sparkles"
+            case .interviewPrep:
+                return "person.crop.rectangle.stack"
+            }
         }
     }
 
@@ -293,12 +330,21 @@ struct PaywallView: View {
             return BoostaColor.success
         case .optimizationLimit:
             return BoostaColor.warning
+        case .workspaceFeatureLimit(let feature, _):
+            switch feature {
+            case .coverLetter:
+                return BoostaColor.accentSecondary
+            case .interviewPrep:
+                return BoostaColor.warning
+            }
         }
     }
 
     private var primaryCTA: String {
         switch context {
         case .optimizationLimit:
+            return subscriptionService.isPremium ? "Manage App Store Plan" : "Open Website Dashboard"
+        case .workspaceFeatureLimit:
             return subscriptionService.isPremium ? "Manage App Store Plan" : "Open Website Dashboard"
         case .postLogin, .postRegister:
             return subscriptionService.isPremium ? "Manage App Store Plan" : "Open Website Dashboard"
@@ -312,6 +358,8 @@ struct PaywallView: View {
         case .postLogin, .postRegister:
             return "Stay on Free"
         case .optimizationLimit:
+            return "Maybe Later"
+        case .workspaceFeatureLimit:
             return "Maybe Later"
         case .standard:
             return "Maybe Later"
@@ -342,6 +390,13 @@ struct PaywallView: View {
                 "More keyword gaps and deeper AI recommendations",
                 "Full tailoring depth without waiting for tomorrow",
                 "Shared subscription status across web, iPhone, and iPad"
+            ]
+        case .workspaceFeatureLimit(let feature, _):
+            return [
+                "Free includes 4 \(feature.shortTitle) per day",
+                "Go raises \(feature.shortTitle) to 20 per day",
+                "Pro and Lifetime remove the daily cap",
+                "Your shared CVBoosta account stays in sync across web, iPhone, and iPad"
             ]
         }
     }

@@ -92,8 +92,10 @@ struct SettingsView: View {
                 if let lastSyncedAt = subscriptionService.lastSyncedAt {
                     row("Last synced", value: lastSyncedAt.formatted(date: .omitted, time: .shortened))
                 }
+                row("Cover letters", value: workspaceLimitLabel(for: .coverLetter))
+                row("Interview prep", value: workspaceLimitLabel(for: .interviewPrep))
 
-                Text("Unlock unlimited scans, deeper ATS intelligence, AI rewrite power, interview prediction signals, and stronger recruiter visibility.")
+                Text("Unlock unlimited scans, deeper ATS intelligence, AI rewrite power, more cover letters, more interview prep, and stronger recruiter visibility.")
                     .font(BoostaType.caption)
                     .foregroundStyle(BoostaColor.secondaryText)
 
@@ -192,6 +194,17 @@ struct SettingsView: View {
 
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+    }
+
+    private func workspaceLimitLabel(for feature: WorkspaceDailyFeature) -> String {
+        let status = subscriptionService.status(for: feature)
+        if let dailyLimit = status.dailyLimit, let remaining = status.remainingToday {
+            return "\(remaining) left of \(dailyLimit)/day"
+        }
+        if let remaining = status.remainingToday {
+            return "\(remaining) left today"
+        }
+        return "Unlimited"
     }
 
     private func row(_ title: String, value: String) -> some View {

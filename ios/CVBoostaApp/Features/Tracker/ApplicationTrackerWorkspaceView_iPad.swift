@@ -121,6 +121,10 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                             VStack(spacing: BoostaSpace.lg) {
                                 summaryCard
                                 listCard
+                                if let selectedApplication {
+                                    trackedApplicationWorkspace(selectedApplication, isEmbedded: true)
+                                        .id(selectedApplication.id)
+                                }
                             }
                             .padding(.horizontal, BoostaSpace.md)
                             .padding(.top, BoostaSpace.lg)
@@ -322,7 +326,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     private var listCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
             VStack(alignment: .leading, spacing: BoostaSpace.sm) {
-                SectionHeader(title: "Applications", subtitle: "Tap to focus details on the right")
+                SectionHeader(title: "Applications", subtitle: "Tap to open the premium workspace for that role")
 
                 LazyVStack(spacing: BoostaSpace.sm) {
                     if visibleApplications.isEmpty {
@@ -415,21 +419,41 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     }
 
     private var rightDetailColumn: some View {
-        ScrollView {
-            VStack(spacing: BoostaSpace.md) {
-                if let selectedApplication {
-                    detailCard(selectedApplication)
-                    nextStepCard(selectedApplication)
-                    notesCard(selectedApplication)
-                } else {
-                    GlassCard(padding: BoostaSpace.lg) {
-                        SectionHeader(title: "Select an application", subtitle: "Choose a row on the left to see details here.")
-                    }
+        Group {
+            if let selectedApplication {
+                trackedApplicationWorkspace(selectedApplication)
+                    .id(selectedApplication.id)
+            } else {
+                GlassCard(padding: BoostaSpace.lg) {
+                    SectionHeader(title: "Select an application", subtitle: "Choose a row on the left to open its workspace here.")
                 }
             }
-            .padding(.bottom, BoostaSpace.xxl)
         }
-        .scrollIndicators(.visible)
+    }
+
+    @ViewBuilder
+    private func trackedApplicationWorkspace(_ app: ApplicationRecord, isEmbedded: Bool = false) -> some View {
+        TrackedApplicationWorkspaceView(
+            application: app,
+            folderLabel: folderLabel(for: app),
+            isEmbedded: isEmbedded,
+            showsNavigationTitle: false,
+            onEdit: {
+                editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+            },
+            onChangeStatus: {
+                statusChangeTarget = app
+            },
+            onArchiveToggle: {
+                updateStatus(id: app.id, to: app.status == .archived ? .saved : .archived)
+            },
+            onMoveFolder: {
+                folderAssignmentTarget = app
+            },
+            onAdvance: {
+                updateStatus(id: app.id, to: nextStatus(after: app.status))
+            }
+        )
     }
 
     private func detailCard(_ app: ApplicationRecord) -> some View {

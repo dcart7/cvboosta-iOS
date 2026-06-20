@@ -51,6 +51,10 @@ final class SubscriptionService: ObservableObject {
     @Published private(set) var plan: String = "free"
     @Published private(set) var scansDailyLimit: Int?
     @Published private(set) var scansRemainingToday: Int?
+    @Published private(set) var coverLetterDailyLimit: Int?
+    @Published private(set) var coverLetterRemainingToday: Int?
+    @Published private(set) var interviewPrepDailyLimit: Int?
+    @Published private(set) var interviewPrepRemainingToday: Int?
     @Published private(set) var lastSyncedAt: Date?
 
     @Published private(set) var storeProducts: [String: Product] = [:]
@@ -244,12 +248,20 @@ final class SubscriptionService: ObservableObject {
             plan = snapshot.plan
             scansDailyLimit = snapshot.scansDailyLimit
             scansRemainingToday = snapshot.scansRemainingToday
+            coverLetterDailyLimit = snapshot.coverLetterDailyLimit
+            coverLetterRemainingToday = snapshot.coverLetterRemainingToday
+            interviewPrepDailyLimit = snapshot.interviewPrepDailyLimit
+            interviewPrepRemainingToday = snapshot.interviewPrepRemainingToday
             lastSyncedAt = Date()
         } else {
             DispatchQueue.main.async {
                 self.plan = snapshot.plan
                 self.scansDailyLimit = snapshot.scansDailyLimit
                 self.scansRemainingToday = snapshot.scansRemainingToday
+                self.coverLetterDailyLimit = snapshot.coverLetterDailyLimit
+                self.coverLetterRemainingToday = snapshot.coverLetterRemainingToday
+                self.interviewPrepDailyLimit = snapshot.interviewPrepDailyLimit
+                self.interviewPrepRemainingToday = snapshot.interviewPrepRemainingToday
                 self.lastSyncedAt = Date()
             }
         }
@@ -265,6 +277,58 @@ final class SubscriptionService: ObservableObject {
         }
     }
 
+    func status(for feature: WorkspaceDailyFeature) -> WorkspaceFeatureLimitStatus {
+        let localLimit = localPlanLimit(for: feature)
+        let localUsed = localUsageCount(for: feature)
+
+        let dailyLimit: Int?
+        let remainingToday: Int?
+
+        switch feature {
+        case .coverLetter:
+            dailyLimit = coverLetterDailyLimit ?? localLimit
+            remainingToday = coverLetterRemainingToday ?? dailyLimit.map { max($0 - localUsed, 0) }
+        case .interviewPrep:
+            dailyLimit = interviewPrepDailyLimit ?? localLimit
+            remainingToday = interviewPrepRemainingToday ?? dailyLimit.map { max($0 - localUsed, 0) }
+        }
+
+        let usedToday: Int
+        if let dailyLimit, let remainingToday {
+            usedToday = max(dailyLimit - remainingToday, 0)
+        } else {
+            usedToday = localUsed
+        }
+
+        return WorkspaceFeatureLimitStatus(
+            feature: feature,
+            dailyLimit: dailyLimit,
+            usedToday: usedToday,
+            remainingToday: remainingToday,
+            resetDate: Self.nextResetDate()
+        )
+    }
+
+    func recordUse(of feature: WorkspaceDailyFeature) {
+        let status = status(for: feature)
+        guard status.canUse else { return }
+
+        incrementLocalUsageCount(for: feature)
+
+        switch feature {
+        case .coverLetter:
+            if let coverLetterRemainingToday {
+                self.coverLetterRemainingToday = max(coverLetterRemainingToday - 1, 0)
+            }
+        case .interviewPrep:
+            if let interviewPrepRemainingToday {
+                self.interviewPrepRemainingToday = max(interviewPrepRemainingToday - 1, 0)
+            }
+        }
+
+        lastSyncedAt = Date()
+    }
+
     func reset() {
         if Thread.isMainThread {
             isPremium = false
@@ -274,6 +338,10 @@ final class SubscriptionService: ObservableObject {
             plan = "free"
             scansDailyLimit = nil
             scansRemainingToday = nil
+            coverLetterDailyLimit = nil
+            coverLetterRemainingToday = nil
+            interviewPrepDailyLimit = nil
+            interviewPrepRemainingToday = nil
             lastSyncedAt = nil
         } else {
             DispatchQueue.main.async {
@@ -284,6 +352,10 @@ final class SubscriptionService: ObservableObject {
                 self.plan = "free"
                 self.scansDailyLimit = nil
                 self.scansRemainingToday = nil
+                self.coverLetterDailyLimit = nil
+                self.coverLetterRemainingToday = nil
+                self.interviewPrepDailyLimit = nil
+                self.interviewPrepRemainingToday = nil
                 self.lastSyncedAt = nil
             }
         }
@@ -329,6 +401,20 @@ final class SubscriptionService: ObservableObject {
                 ?? (active ? "premium" : "free")
             scansDailyLimit = payload.int("scans_daily_limit") ?? payload.int("daily_limit")
             scansRemainingToday = payload.int("scans_remaining_today") ?? payload.int("remaining_today")
+            coverLetterDailyLimit =
+                payload.int("cover_letter_daily_limit")
+                ?? payload.int("cover_letters_daily_limit")
+            coverLetterRemainingToday =
+                payload.int("cover_letter_remaining_today")
+                ?? payload.int("cover_letters_remaining_today")
+            interviewPrepDailyLimit =
+                payload.int("interview_prep_daily_limit")
+                ?? payload.int("interview_preps_daily_limit")
+                ?? payload.int("interview_prep_regeneration_daily_limit")
+            interviewPrepRemainingToday =
+                payload.int("interview_prep_remaining_today")
+                ?? payload.int("interview_preps_remaining_today")
+                ?? payload.int("interview_prep_regenerations_remaining_today")
 
             if let credits =
                 payload.int("scan_credit_balance")
@@ -536,6 +622,44 @@ final class SubscriptionService: ObservableObject {
         }
         defaults.set(ids, forKey: processedConsumableTransactionIDsKey)
     }
+
+    private func localPlanLimit(for feature: WorkspaceDailyFeature) -> Int? {
+        let normalizedPlan = [
+            entitlement?.lowercased(),
+            plan.lowercased()
+        ]
+        .compactMap { $0 }
+        .joined(separator: " ")
+
+        if normalizedPlan.contains("go") {
+            return 20
+        }
+
+        if normalizedPlan.contains("pro") || normalizedPlan.contains("lifetime") {
+            return nil
+        }
+
+        if isPremium && !normalizedPlan.contains("go") {
+            return nil
+        }
+
+        switch feature {
+        case .coverLetter, .interviewPrep:
+            return 4
+        }
+    }
+
+    private func localUsageCount(for feature: WorkspaceDailyFeature) -> Int {
+        defaults.integer(forKey: dailyUsageKey(for: feature))
+    }
+
+    private func incrementLocalUsageCount(for feature: WorkspaceDailyFeature) {
+        defaults.set(localUsageCount(for: feature) + 1, forKey: dailyUsageKey(for: feature))
+    }
+
+    private func dailyUsageKey(for feature: WorkspaceDailyFeature, date: Date = .now) -> String {
+        "cvboosta.workspace.\(feature.rawValue).\(Self.dayStampFormatter.string(from: date))"
+    }
 }
 
 private extension SubscriptionService {
@@ -564,8 +688,22 @@ private extension SubscriptionService {
         return formatter
     }()
 
+    static let dayStampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     static func parseDate(_ value: String) -> Date? {
         iso8601WithFractional.date(from: value) ?? iso8601.date(from: value)
+    }
+
+    static func nextResetDate(from date: Date = .now) -> Date {
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        return Calendar.current.date(byAdding: .day, value: 1, to: startOfDay) ?? date.addingTimeInterval(60 * 60 * 24)
     }
 
     static func inferredSubscriptionActive(from payload: [String: JSONValue], entitlement: String?) -> Bool {
