@@ -10,7 +10,19 @@ struct CVBoostaApp: App {
     @StateObject private var appRouter = AppRouter()
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
+        let trackerSchema = Schema([
+            ApplicationFolder.self,
+            ApplicationRecord.self
+        ])
+
+        let localSchema = Schema([
+            ResumeProfile.self,
+            ATSInsight.self,
+            LatestScanReport.self,
+            SavedTailoringSuggestion.self
+        ])
+
+        let fullSchema = Schema([
             ResumeProfile.self,
             ApplicationFolder.self,
             ApplicationRecord.self,
@@ -24,26 +36,48 @@ struct CVBoostaApp: App {
         do {
             if isPreview {
                 let previewConfig = ModelConfiguration(
-                    schema: schema,
+                    schema: fullSchema,
                     isStoredInMemoryOnly: true,
                     cloudKitDatabase: .none
                 )
-                return try ModelContainer(for: schema, configurations: previewConfig)
+                return try ModelContainer(for: fullSchema, configurations: previewConfig)
             }
 
-            let configuration = ModelConfiguration(
-                schema: schema,
+            let trackerConfiguration = ModelConfiguration(
+                "TrackerCloud",
+                schema: trackerSchema,
                 isStoredInMemoryOnly: false,
                 cloudKitDatabase: .automatic
             )
-            return try ModelContainer(for: schema, configurations: configuration)
-        } catch {
-            let fallbackConfig = ModelConfiguration(
-                schema: schema,
+            let localConfiguration = ModelConfiguration(
+                "WorkspaceLocal",
+                schema: localSchema,
                 isStoredInMemoryOnly: false,
                 cloudKitDatabase: .none
             )
-            if let fallback = try? ModelContainer(for: schema, configurations: fallbackConfig) {
+            return try ModelContainer(
+                for: fullSchema,
+                configurations: trackerConfiguration,
+                localConfiguration
+            )
+        } catch {
+            let trackerFallbackConfiguration = ModelConfiguration(
+                "TrackerFallback",
+                schema: trackerSchema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .none
+            )
+            let localConfiguration = ModelConfiguration(
+                "WorkspaceLocalFallback",
+                schema: localSchema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .none
+            )
+            if let fallback = try? ModelContainer(
+                for: fullSchema,
+                configurations: trackerFallbackConfiguration,
+                localConfiguration
+            ) {
                 return fallback
             }
             fatalError("Failed to create fallback ModelContainer: \(error)")
@@ -74,11 +108,20 @@ struct AppRootView: View {
     @State private var isAccountSyncInFlight = false
     @State private var hasPendingAccountSyncRequest = false
 
-    private var accountApplicationsSignature: String {
-        authViewModel.me?.applications
-            .sorted(by: { $0.appliedAt < $1.appliedAt })
-            .map { "\($0.id.uuidString)-\($0.status)-\($0.appliedAt.timeIntervalSince1970)" }
+    private var accountTrackerSignature: String {
+        let folderSignature = authViewModel.me?.applicationFolders
+            .sorted(by: { $0.createdAt < $1.createdAt })
+            .map { "\($0.id.uuidString)-\($0.name)-\($0.emoji)-\($0.createdAt.timeIntervalSince1970)" }
             .joined(separator: "|") ?? ""
+
+        let applicationSignature = authViewModel.me?.applications
+            .sorted(by: { $0.appliedAt < $1.appliedAt })
+            .map {
+                "\($0.id.uuidString)-\($0.status)-\($0.appliedAt.timeIntervalSince1970)-\($0.folderID?.uuidString ?? "none")-\($0.interviewReflectionSubmittedAt?.timeIntervalSince1970 ?? 0)"
+            }
+            .joined(separator: "|") ?? ""
+
+        return [folderSignature, applicationSignature].joined(separator: "||")
     }
 
     var body: some View {
@@ -98,8 +141,8 @@ struct AppRootView: View {
             }
         }
         .preferredColorScheme(AppAppearancePreference(rawValue: appearanceMode)?.colorScheme)
-        .task(id: accountApplicationsSignature) {
-            syncAccountApplications()
+        .task(id: accountTrackerSignature) {
+            syncAccountTrackerState()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active, authViewModel.state == .loggedIn else { return }
@@ -130,8 +173,36 @@ struct AppRootView: View {
     }
 
     @MainActor
-    private func syncAccountApplications() {
+    private func syncAccountTrackerState() {
+        let accountFolders = authViewModel.me?.applicationFolders ?? []
         let accountApplications = authViewModel.me?.applications ?? []
+
+        let existingFolders = (try? modelContext.fetch(FetchDescriptor<ApplicationFolder>())) ?? []
+        let existingFoldersByID = Dictionary(uniqueKeysWithValues: existingFolders.map { ($0.id, $0) })
+        let folderSnapshotIDs = Set(accountFolders.map(\.id))
+
+        for snapshot in accountFolders {
+            if let existing = existingFoldersByID[snapshot.id] {
+                existing.name = snapshot.name
+                existing.emoji = snapshot.emoji
+                existing.createdAt = snapshot.createdAt
+                existing.isAccountBacked = true
+            } else {
+                modelContext.insert(
+                    ApplicationFolder(
+                        id: snapshot.id,
+                        name: snapshot.name,
+                        emoji: snapshot.emoji,
+                        isAccountBacked: true,
+                        createdAt: snapshot.createdAt
+                    )
+                )
+            }
+        }
+
+        for folder in existingFolders where folder.isAccountBacked && !folderSnapshotIDs.contains(folder.id) {
+            modelContext.delete(folder)
+        }
 
         let existingRecords = (try? modelContext.fetch(FetchDescriptor<ApplicationRecord>())) ?? []
         let existingByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.id, $0) })
@@ -145,7 +216,18 @@ struct AppRootView: View {
                 existing.role = snapshot.role
                 existing.status = status
                 existing.appliedAt = snapshot.appliedAt
-                existing.source = snapshot.source ?? "Account"
+                existing.source = snapshot.source ?? existing.source
+                existing.interviewAt = snapshot.interviewAt
+                existing.notes = snapshot.notes
+                existing.resumeUsed = snapshot.resumeUsed
+                existing.jobLink = snapshot.jobLink
+                existing.folderID = snapshot.folderID
+                existing.atsScore = snapshot.atsScore
+                existing.interviewReflectionRating = snapshot.interviewReflectionRating
+                existing.interviewReflectionOutcome = snapshot.interviewReflectionOutcome
+                existing.interviewReflectionNotes = snapshot.interviewReflectionNotes
+                existing.interviewReflectionSubmittedAt = snapshot.interviewReflectionSubmittedAt
+                existing.isAccountBacked = true
             } else {
                 modelContext.insert(
                     ApplicationRecord(
@@ -154,13 +236,24 @@ struct AppRootView: View {
                         role: snapshot.role,
                         status: status,
                         appliedAt: snapshot.appliedAt,
-                        source: snapshot.source ?? "Account"
+                        source: snapshot.source ?? "Account",
+                        interviewAt: snapshot.interviewAt,
+                        notes: snapshot.notes,
+                        resumeUsed: snapshot.resumeUsed,
+                        jobLink: snapshot.jobLink,
+                        folderID: snapshot.folderID,
+                        atsScore: snapshot.atsScore,
+                        interviewReflectionRating: snapshot.interviewReflectionRating,
+                        interviewReflectionOutcome: snapshot.interviewReflectionOutcome,
+                        interviewReflectionNotes: snapshot.interviewReflectionNotes,
+                        interviewReflectionSubmittedAt: snapshot.interviewReflectionSubmittedAt,
+                        isAccountBacked: true
                     )
                 )
             }
         }
 
-        for record in existingRecords where record.source == "Account" && !snapshotIDs.contains(record.id) {
+        for record in existingRecords where record.isAccountBacked && !snapshotIDs.contains(record.id) {
             modelContext.delete(record)
         }
 
@@ -204,7 +297,7 @@ struct AppRootView: View {
 
         await authViewModel.refreshSharedState()
         _ = await subscriptionService.syncFromBackend()
-        syncAccountApplications()
+        syncAccountTrackerState()
     }
 }
 

@@ -85,6 +85,22 @@ struct AccountApplicationSnapshot: Hashable, Identifiable {
     let source: String?
     let appliedAt: Date
     let interviewAt: Date?
+    let notes: String?
+    let resumeUsed: String?
+    let jobLink: String?
+    let folderID: UUID?
+    let atsScore: Int?
+    let interviewReflectionRating: Int?
+    let interviewReflectionOutcome: String?
+    let interviewReflectionNotes: String?
+    let interviewReflectionSubmittedAt: Date?
+}
+
+struct AccountApplicationFolderSnapshot: Hashable, Identifiable {
+    let id: UUID
+    let name: String
+    let emoji: String
+    let createdAt: Date
 }
 
 struct AuthMePayload: Hashable {
@@ -94,6 +110,7 @@ struct AuthMePayload: Hashable {
     let savedResumes: [SavedResumeSnapshot]
     let scanHistory: [ScanHistorySnapshot]
     let applications: [AccountApplicationSnapshot]
+    let applicationFolders: [AccountApplicationFolderSnapshot]
 }
 
 struct StoredAuthSession: Codable {
@@ -305,6 +322,7 @@ actor AuthService {
         let mePayload = try await userPayload
         let user = try Self.mapUser(from: mePayload)
         let applications = Self.mapApplications(from: mePayload)
+        let applicationFolders = Self.mapApplicationFolders(from: mePayload)
 
         let historyItems = try await history
         let snapshots: [ScanHistorySnapshot] = historyItems.items.sorted(by: { $0.createdAt > $1.createdAt }).map {
@@ -326,7 +344,8 @@ actor AuthService {
             usageLimits: usageLimits,
             savedResumes: [],
             scanHistory: snapshots,
-            applications: applications
+            applications: applications,
+            applicationFolders: applicationFolders
         )
     }
 
@@ -458,6 +477,12 @@ private extension AuthService {
                 ?? parseDate(object.string("scheduled_at"))
                 ?? parseDate(object.string("interview_date"))
                 ?? parseDate(object.string("starts_at"))
+            let folderID =
+                object.string("folder_id")
+                .flatMap(UUID.init(uuidString:))
+            let reflectionSubmittedAt =
+                parseDate(object.string("interview_reflection_submitted_at"))
+                ?? parseDate(object.string("reflection_submitted_at"))
 
             return AccountApplicationSnapshot(
                 id: id,
@@ -466,7 +491,39 @@ private extension AuthService {
                 status: status,
                 source: object.string("source"),
                 appliedAt: appliedAt,
-                interviewAt: interviewAt
+                interviewAt: interviewAt,
+                notes: object.string("notes"),
+                resumeUsed: object.string("resume_used") ?? object.string("resume"),
+                jobLink: object.string("job_link") ?? object.string("url"),
+                folderID: folderID,
+                atsScore: object.int("ats_score"),
+                interviewReflectionRating: object.int("interview_reflection_rating"),
+                interviewReflectionOutcome: object.string("interview_reflection_outcome"),
+                interviewReflectionNotes: object.string("interview_reflection_notes"),
+                interviewReflectionSubmittedAt: reflectionSubmittedAt
+            )
+        }
+    }
+
+    static func mapApplicationFolders(from payload: [String: JSONValue]) -> [AccountApplicationFolderSnapshot] {
+        let keys = ["tracker_folders", "application_folders", "folders"]
+        guard let values = keys.compactMap({ payload[$0] }).first else { return [] }
+        guard case .array(let rawItems) = values else { return [] }
+
+        return rawItems.compactMap { item in
+            guard case .object(let object) = item else { return nil }
+            guard
+                let id = object.string("id").flatMap(UUID.init(uuidString:)),
+                let name = object.string("name")
+            else {
+                return nil
+            }
+
+            return AccountApplicationFolderSnapshot(
+                id: id,
+                name: name,
+                emoji: object.string("emoji") ?? "🗂",
+                createdAt: parseDate(object.string("created_at")) ?? Date()
             )
         }
     }

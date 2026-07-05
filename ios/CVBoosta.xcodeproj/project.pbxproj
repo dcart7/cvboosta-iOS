@@ -15,6 +15,7 @@
 		0C9D1C9F70BD8C4E5315D318 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */; };
 		13D40C37D6F48C671FF2723C /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3225480D808117E869EEF922 /* AppEnvironment.swift */; };
 		15CE5489A5B1E3C19241934F /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296DE09D85E22A290E90314B /* AppPreferences.swift */; };
+		1B44DA37931D7136FB732F0B /* TrackerSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A9ECA85ABE13B7EAF83F8E /* TrackerSyncService.swift */; };
 		20CCFAA2F6F9D1B8F82780C8 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C90AC1E9BA7AAA44DA936C /* LiveActivityManager.swift */; };
 		248A547FF22E32ECEE9BEA6B /* LatestScanReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CE450774353F59B8A313EC /* LatestScanReport.swift */; };
 		2C2AAF09398ED87CCA91F141 /* ProfileWorkspaceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6576CA21F4F9E0734EFF1F /* ProfileWorkspaceService.swift */; };
@@ -204,6 +205,7 @@
 		CCD474CCF739DCCFBE6AB208 /* ATSInsight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSInsight.swift; sourceTree = "<group>"; };
 		CEF920A666F9E3794A987511 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
 		CF43F0E3501A34C986F0A26A /* HomeWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWorkspaceView_iPad.swift; sourceTree = "<group>"; };
+		D2A9ECA85ABE13B7EAF83F8E /* TrackerSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackerSyncService.swift; sourceTree = "<group>"; };
 		D331903CBC87E0E4C13F5CB4 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
 		D9E9F8B93F8812D5DC150A93 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DEEE2C3751FEABF09BADBC00 /* UserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserService.swift; sourceTree = "<group>"; };
@@ -394,6 +396,7 @@
 				8996014C11088A9C86FE55ED /* SpotlightIndexer.swift */,
 				823A00EBF3019571C8987250 /* StringValidation.swift */,
 				7B7F2CABEB6CEEC7B4C54AD8 /* SubscriptionService.swift */,
+				D2A9ECA85ABE13B7EAF83F8E /* TrackerSyncService.swift */,
 				8109D81CD0D902AB52F62BF3 /* TrackerWorkspaceService.swift */,
 				DEEE2C3751FEABF09BADBC00 /* UserService.swift */,
 				9992BBEA9E48B91E8D1C3434 /* WidgetSyncService.swift */,
@@ -713,6 +716,7 @@
 				57AB37BAB32F57C14ECA5773 /* TailoringPreviewView.swift in Sources */,
 				EE59F786DABB29BB6A50C301 /* TailoringWorkspaceView_iPad.swift in Sources */,
 				2D6BB5B3B36C4172B0F6638D /* TrackedApplicationWorkspaceView.swift in Sources */,
+				1B44DA37931D7136FB732F0B /* TrackerSyncService.swift in Sources */,
 				DD94DA0FF9CD000AB9E789F2 /* TrackerWorkspaceService.swift in Sources */,
 				C6724C80800F64DB795246DF /* TypographyTokens.swift in Sources */,
 				9BB7DBFC762E3F2A1E51A2B2 /* UIComponents.swift in Sources */,

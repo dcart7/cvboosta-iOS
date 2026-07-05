@@ -21,7 +21,7 @@ targets:
         CFBundleDisplayName: CVBoosta
         CFBundleIdentifier: com.cvboosta.app
         CFBundleVersion: "1"
-        CFBundleShortVersionString: "1.1.14"
+        CFBundleShortVersionString: "1.1.16"
         API_BASE_URL: https://cvboosta-backend-615826584976.europe-west3.run.app
         WEB_BASE_URL: https://cvboosta.com
         APP_ENV: production
@@ -83,7 +83,7 @@ targets:
         CFBundleDisplayName: CVBoosta Widgets
         CFBundleIdentifier: com.cvboosta.app.widgets
         CFBundleVersion: "1"
-        CFBundleShortVersionString: "1.1.14"
+        CFBundleShortVersionString: "1.1.16"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

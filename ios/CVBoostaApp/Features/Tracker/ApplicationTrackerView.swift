@@ -24,6 +24,7 @@ struct ApplicationTrackerView: View {
     @State private var revealedApplicationID: UUID?
 
     private let widgetSyncService = WidgetSyncService.shared
+    private let trackerSyncService = TrackerSyncService.shared
 
     private var foldersByID: [UUID: ApplicationFolder] {
         Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
@@ -581,32 +582,50 @@ struct ApplicationTrackerView: View {
 
     private func createApplication(_ draft: NewApplicationDraft) {
         errorMessage = nil
+        let recordID = UUID()
 
-        let record = ApplicationRecord(
-            company: draft.company,
-            role: draft.role,
-            status: draft.status,
-            appliedAt: draft.appliedAt,
-            source: "iOS",
-            interviewAt: draft.interviewAt,
-            notes: draft.notes,
-            resumeUsed: draft.resumeUsed,
-            jobLink: draft.jobLink,
-            folderID: draft.folderID,
-            atsScore: nil
-        )
-        modelContext.insert(record)
+        Task {
+            do {
+                try await trackerSyncService.createApplication(id: recordID, draft: draft)
 
-        do {
-            try modelContext.save()
-            syncWidgetSnapshot()
-            celebrateStreak(with: record.status)
-            presentPipelineLiveActivityIfNeeded(for: record)
-            showAddSheet = false
-            HapticsService.success()
-        } catch {
-            errorMessage = "Could not save application."
-            HapticsService.error()
+                await MainActor.run {
+                    let record = ApplicationRecord(
+                        id: recordID,
+                        company: draft.company,
+                        role: draft.role,
+                        status: draft.status,
+                        appliedAt: draft.appliedAt,
+                        source: "iOS",
+                        interviewAt: draft.interviewAt,
+                        notes: draft.notes,
+                        resumeUsed: draft.resumeUsed,
+                        jobLink: draft.jobLink,
+                        folderID: draft.folderID,
+                        atsScore: nil,
+                        isAccountBacked: true
+                    )
+                    modelContext.insert(record)
+
+                    do {
+                        try modelContext.save()
+                        syncWidgetSnapshot()
+                        celebrateStreak(with: record.status)
+                        presentPipelineLiveActivityIfNeeded(for: record)
+                        showAddSheet = false
+                        HapticsService.success()
+                    } catch {
+                        errorMessage = "Saved to account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
+            }
         }
     }
 
@@ -614,88 +633,154 @@ struct ApplicationTrackerView: View {
         guard let record = applications.first(where: { $0.id == id }) else { return }
         errorMessage = nil
 
-        record.company = draft.company
-        record.role = draft.role
-        record.status = draft.status
-        record.appliedAt = draft.appliedAt
-        record.interviewAt = draft.interviewAt
-        record.notes = draft.notes
-        record.resumeUsed = draft.resumeUsed
-        record.jobLink = draft.jobLink
-        record.folderID = draft.folderID
+        Task {
+            do {
+                try await trackerSyncService.updateApplication(id: id, draft: draft)
 
-        do {
-            try modelContext.save()
-            syncWidgetSnapshot()
-            if record.status != .archived {
-                celebrateStreak(with: record.status)
+                await MainActor.run {
+                    record.company = draft.company
+                    record.role = draft.role
+                    record.status = draft.status
+                    record.appliedAt = draft.appliedAt
+                    record.interviewAt = draft.interviewAt
+                    record.notes = draft.notes
+                    record.resumeUsed = draft.resumeUsed
+                    record.jobLink = draft.jobLink
+                    record.folderID = draft.folderID
+                    record.isAccountBacked = true
+
+                    do {
+                        try modelContext.save()
+                        syncWidgetSnapshot()
+                        if record.status != .archived {
+                            celebrateStreak(with: record.status)
+                        }
+                        presentPipelineLiveActivityIfNeeded(for: record)
+                        editingContext = nil
+                        HapticsService.success()
+                    } catch {
+                        errorMessage = "Saved to account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
             }
-            presentPipelineLiveActivityIfNeeded(for: record)
-            editingContext = nil
-            HapticsService.success()
-        } catch {
-            errorMessage = "Could not update application."
-            HapticsService.error()
         }
     }
 
     private func updateStatus(id: UUID, to status: ApplicationStatus) {
         guard let record = applications.first(where: { $0.id == id }) else { return }
         errorMessage = nil
-        record.status = status
 
-        do {
-            try modelContext.save()
-            statusChangeTarget = nil
-            syncWidgetSnapshot()
-            presentPipelineLiveActivityIfNeeded(for: record)
-            if status.isArchiveBucket {
-                HapticsService.warning()
-            } else {
-                HapticsService.success()
+        Task {
+            do {
+                try await trackerSyncService.updateStatus(id: id, status: status)
+
+                await MainActor.run {
+                    record.status = status
+                    record.isAccountBacked = true
+
+                    do {
+                        try modelContext.save()
+                        statusChangeTarget = nil
+                        syncWidgetSnapshot()
+                        presentPipelineLiveActivityIfNeeded(for: record)
+                        if status.isArchiveBucket {
+                            HapticsService.warning()
+                        } else {
+                            HapticsService.success()
+                        }
+                    } catch {
+                        errorMessage = "Saved to account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
             }
-        } catch {
-            errorMessage = "Could not update application status."
-            HapticsService.error()
         }
     }
 
     private func deleteApplication(id: UUID) {
         guard let record = applications.first(where: { $0.id == id }) else { return }
         errorMessage = nil
-        modelContext.delete(record)
 
-        do {
-            try modelContext.save()
-            syncWidgetSnapshot(applications.filter { $0.id != id })
-            editingContext = nil
-            HapticsService.warning()
-        } catch {
-            errorMessage = "Could not delete application."
-            HapticsService.error()
+        Task {
+            do {
+                try await trackerSyncService.deleteApplication(id: id)
+
+                await MainActor.run {
+                    modelContext.delete(record)
+
+                    do {
+                        try modelContext.save()
+                        syncWidgetSnapshot(applications.filter { $0.id != id })
+                        editingContext = nil
+                        HapticsService.warning()
+                    } catch {
+                        errorMessage = "Deleted from account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
+            }
         }
     }
 
     private func saveInterviewReflection(for id: UUID, reflection: InterviewReflectionDraft) {
         guard let record = applications.first(where: { $0.id == id }) else { return }
         errorMessage = nil
-        record.interviewReflectionRating = reflection.rating
-        record.interviewReflectionOutcome = reflection.outcome
-        record.interviewReflectionNotes = reflection.notes
-        record.interviewReflectionSubmittedAt = .now
 
-        do {
-            try modelContext.save()
-            interviewReflectionTarget = nil
-            if #available(iOS 16.1, *) {
-                Task {
-                    await LiveActivityManager.shared.clearPostInterviewReflection()
+        Task {
+            do {
+                try await trackerSyncService.saveInterviewReflection(id: id, reflection: reflection)
+
+                await MainActor.run {
+                    record.interviewReflectionRating = reflection.rating
+                    record.interviewReflectionOutcome = reflection.outcome
+                    record.interviewReflectionNotes = reflection.notes
+                    record.interviewReflectionSubmittedAt = .now
+                    record.isAccountBacked = true
+
+                    do {
+                        try modelContext.save()
+                        interviewReflectionTarget = nil
+                        if #available(iOS 16.1, *) {
+                            Task {
+                                await LiveActivityManager.shared.clearPostInterviewReflection()
+                            }
+                        }
+                        HapticsService.success()
+                    } catch {
+                        errorMessage = "Saved to account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
                 }
             }
-            HapticsService.success()
-        } catch {
-            errorMessage = "Could not save interview reflection."
-            HapticsService.error()
         }
     }
 
@@ -720,67 +805,144 @@ struct ApplicationTrackerView: View {
 
     private func assignFolder(_ folderID: UUID?, to applicationID: UUID) {
         guard let record = applications.first(where: { $0.id == applicationID }) else { return }
-        record.folderID = folderID
+        errorMessage = nil
 
-        do {
-            try modelContext.save()
-            folderAssignmentTarget = nil
-            HapticsService.selection()
-        } catch {
-            errorMessage = "Could not update folder."
-            HapticsService.error()
+        Task {
+            do {
+                try await trackerSyncService.assignFolder(folderID, to: applicationID)
+
+                await MainActor.run {
+                    record.folderID = folderID
+                    record.isAccountBacked = true
+
+                    do {
+                        try modelContext.save()
+                        folderAssignmentTarget = nil
+                        HapticsService.selection()
+                    } catch {
+                        errorMessage = "Saved to account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
+            }
         }
     }
 
     private func createFolder(_ draft: FolderCreationDraft) {
-        let folder = ApplicationFolder(name: draft.folder.name, emoji: draft.folder.emoji)
-        modelContext.insert(folder)
+        errorMessage = nil
+        let folderID = UUID()
 
-        for application in applications where draft.applicationIDs.contains(application.id) {
-            application.folderID = folder.id
-        }
+        Task {
+            do {
+                try await trackerSyncService.createFolder(id: folderID, draft: draft)
 
-        do {
-            try modelContext.save()
-            selectedFolderID = folder.id
-            HapticsService.success()
-        } catch {
-            errorMessage = "Could not create folder."
-            HapticsService.error()
+                await MainActor.run {
+                    let folder = ApplicationFolder(
+                        id: folderID,
+                        name: draft.folder.name,
+                        emoji: draft.folder.emoji,
+                        isAccountBacked: true
+                    )
+                    modelContext.insert(folder)
+
+                    for application in applications where draft.applicationIDs.contains(application.id) {
+                        application.folderID = folder.id
+                        application.isAccountBacked = true
+                    }
+
+                    do {
+                        try modelContext.save()
+                        selectedFolderID = folder.id
+                        HapticsService.success()
+                    } catch {
+                        errorMessage = "Saved to account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
+            }
         }
     }
 
     private func updateFolder(id: UUID, with draft: FolderDraft) {
         guard let folder = folders.first(where: { $0.id == id }) else { return }
-        folder.name = draft.name
-        folder.emoji = draft.emoji
+        errorMessage = nil
 
-        do {
-            try modelContext.save()
-            HapticsService.selection()
-        } catch {
-            errorMessage = "Could not update folder."
-            HapticsService.error()
+        Task {
+            do {
+                try await trackerSyncService.updateFolder(id: id, draft: draft)
+
+                await MainActor.run {
+                    folder.name = draft.name
+                    folder.emoji = draft.emoji
+                    folder.isAccountBacked = true
+
+                    do {
+                        try modelContext.save()
+                        HapticsService.selection()
+                    } catch {
+                        errorMessage = "Saved to account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
+            }
         }
     }
 
     private func deleteFolder(id: UUID) {
         guard let folder = folders.first(where: { $0.id == id }) else { return }
+        errorMessage = nil
 
-        for application in applications where application.folderID == id {
-            application.folderID = nil
-        }
-        modelContext.delete(folder)
+        Task {
+            do {
+                try await trackerSyncService.deleteFolder(id: id)
 
-        do {
-            try modelContext.save()
-            if selectedFolderID == id {
-                selectedFolderID = nil
+                await MainActor.run {
+                    for application in applications where application.folderID == id {
+                        application.folderID = nil
+                        application.isAccountBacked = true
+                    }
+                    modelContext.delete(folder)
+
+                    do {
+                        try modelContext.save()
+                        if selectedFolderID == id {
+                            selectedFolderID = nil
+                        }
+                        HapticsService.warning()
+                    } catch {
+                        errorMessage = "Deleted from account, but local refresh needs one more sync."
+                        HapticsService.error()
+                    }
+                }
+
+                await authViewModel.refreshSharedState()
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    HapticsService.error()
+                }
             }
-            HapticsService.warning()
-        } catch {
-            errorMessage = "Could not delete folder."
-            HapticsService.error()
         }
     }
 

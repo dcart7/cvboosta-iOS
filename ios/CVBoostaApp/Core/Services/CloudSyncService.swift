@@ -6,6 +6,7 @@ final class CloudSyncService {
     private init() {}
 
     func syncResumeSnapshot() async throws {
-        // Placeholder: persist sync state and schedule CloudKit push.
+        // Tracker data now syncs across devices through the SwiftData CloudKit container.
+        // Keep this hook for future non-tracker mirrors such as exported resume snapshots.
     }
 }

@@ -20,32 +20,35 @@ enum ApplicationStatus: String, Codable, CaseIterable {
 
 @Model
 final class ApplicationFolder {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var emoji: String
-    var createdAt: Date
+    var id: UUID = UUID()
+    var name: String = ""
+    var emoji: String = "\u{1F5C2}"
+    var isAccountBacked: Bool = false
+    var createdAt: Date = Date()
 
     init(
         id: UUID = UUID(),
         name: String,
         emoji: String = "🗂",
+        isAccountBacked: Bool = false,
         createdAt: Date = .now
     ) {
         self.id = id
         self.name = name
         self.emoji = emoji
+        self.isAccountBacked = isAccountBacked
         self.createdAt = createdAt
     }
 }
 
 @Model
 final class ApplicationRecord {
-    @Attribute(.unique) var id: UUID
-    var company: String
-    var role: String
-    var status: ApplicationStatus
-    var appliedAt: Date
-    var source: String
+    var id: UUID = UUID()
+    var company: String = ""
+    var role: String = ""
+    var statusRawValue: String = ApplicationStatus.applied.rawValue
+    var appliedAt: Date = Date()
+    var source: String = "LinkedIn"
     var interviewAt: Date?
     var notes: String?
     var resumeUsed: String?
@@ -56,6 +59,12 @@ final class ApplicationRecord {
     var interviewReflectionOutcome: String?
     var interviewReflectionNotes: String?
     var interviewReflectionSubmittedAt: Date?
+    var isAccountBacked: Bool = false
+
+    var status: ApplicationStatus {
+        get { ApplicationStatus(rawValue: statusRawValue) ?? .applied }
+        set { statusRawValue = newValue.rawValue }
+    }
 
     init(
         id: UUID = UUID(),
@@ -73,12 +82,13 @@ final class ApplicationRecord {
         interviewReflectionRating: Int? = nil,
         interviewReflectionOutcome: String? = nil,
         interviewReflectionNotes: String? = nil,
-        interviewReflectionSubmittedAt: Date? = nil
+        interviewReflectionSubmittedAt: Date? = nil,
+        isAccountBacked: Bool = false
     ) {
         self.id = id
         self.company = company
         self.role = role
-        self.status = status
+        self.statusRawValue = status.rawValue
         self.appliedAt = appliedAt
         self.source = source
         self.interviewAt = interviewAt
@@ -91,5 +101,6 @@ final class ApplicationRecord {
         self.interviewReflectionOutcome = interviewReflectionOutcome
         self.interviewReflectionNotes = interviewReflectionNotes
         self.interviewReflectionSubmittedAt = interviewReflectionSubmittedAt
+        self.isAccountBacked = isAccountBacked
     }
 }
