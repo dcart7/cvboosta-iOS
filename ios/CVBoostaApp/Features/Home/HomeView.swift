@@ -603,6 +603,7 @@ struct HomeStatCard: View {
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
                 .lineLimit(2)
+                .minimumScaleFactor(0.9)
 
             Spacer(minLength: 0)
 
@@ -616,10 +617,11 @@ struct HomeStatCard: View {
                 Text(value)
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundStyle(color)
+                    .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.cardTileMinHeight, alignment: .leading)
         .padding(BoostaSpace.sm)
         .background(BoostaColor.surfaceInteractive)
         .overlay(

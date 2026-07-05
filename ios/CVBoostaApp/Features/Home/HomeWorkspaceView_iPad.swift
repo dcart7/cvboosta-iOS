@@ -284,11 +284,11 @@ struct HomeWorkspaceView_iPad: View {
             horizontalPadding: horizontalPadding
         )
         let columns = Array(
-            repeating: GridItem(.flexible(minimum: 320), spacing: BoostaSpace.lg, alignment: .top),
+            repeating: GridItem(.flexible(minimum: 320), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
             count: columnCount
         )
 
-        LazyVGrid(columns: columns, alignment: .leading, spacing: BoostaSpace.lg) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
             heroCard
                 .gridCellColumns(columnCount)
 
@@ -575,9 +575,9 @@ private struct WorkspaceCTAButton: View {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
+                .workspaceButtonLabelLayout()
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
                 .background(BoostaColor.surfaceInteractive)
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
@@ -585,7 +585,7 @@ private struct WorkspaceCTAButton: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .hoverEffect(.lift)
     }
 }

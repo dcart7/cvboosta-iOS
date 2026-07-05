@@ -10,13 +10,18 @@ struct MetricPill: View {
             Text(title)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
 
             Text(value)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
+        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.metricPillMinHeight, alignment: .leading)
         .padding(.horizontal, BoostaSpace.sm)
-        .padding(.vertical, BoostaSpace.xs)
+        .padding(.vertical, BoostaSpace.sm)
         .background(BoostaColor.surfaceInteractive)
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.sm, style: .continuous))
     }

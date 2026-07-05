@@ -156,11 +156,11 @@ struct StatisticsWorkspaceView_iPad: View {
     private func content(width: CGFloat, horizontalPadding: CGFloat) -> some View {
         let columnCount = workspaceColumnCount(for: width, horizontalPadding: horizontalPadding)
         let columns = Array(
-            repeating: GridItem(.flexible(minimum: 300), spacing: BoostaSpace.lg, alignment: .top),
+            repeating: GridItem(.flexible(minimum: 300), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
             count: columnCount
         )
 
-        LazyVGrid(columns: columns, alignment: .leading, spacing: BoostaSpace.lg) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
             headerCard
                 .gridCellColumns(columnCount)
 
@@ -812,6 +812,7 @@ private struct WorkspaceActionButton: View {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
+                .workspaceButtonLabelLayout()
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
                 .background(BoostaColor.surfaceInteractive)
@@ -821,7 +822,7 @@ private struct WorkspaceActionButton: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .hoverEffect(.lift)
         .accessibilityLabel(title)
     }
@@ -894,14 +895,18 @@ private struct StatisticsMetricRing_iPad: View {
                 Text(value)
                     .font(BoostaType.bodyStrong)
                     .foregroundStyle(BoostaColor.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(width: 78, height: 78)
 
             Text(title)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.ringCardMinHeight)
         .padding(.vertical, 6)
         .background(BoostaColor.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))

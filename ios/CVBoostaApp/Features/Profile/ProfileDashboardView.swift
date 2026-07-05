@@ -560,13 +560,15 @@ private struct ProfileMetricCard: View {
             Text(title)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
             Text(value)
                 .font(BoostaType.section)
                 .foregroundStyle(tint)
-                .lineLimit(2)
+                .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.cardTileMinHeight, alignment: .leading)
         .padding(BoostaSpace.sm)
         .background(BoostaColor.surfaceInteractive)
         .overlay(
@@ -595,7 +597,7 @@ private struct ProfileMiniActionButton: View {
                 .background(tint.opacity(0.10))
                 .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
     }
 }
 

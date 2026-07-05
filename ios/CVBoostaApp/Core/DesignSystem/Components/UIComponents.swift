@@ -1,5 +1,37 @@
 import SwiftUI
 
+private struct WorkspaceButtonLabelModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .allowsTightening(true)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.controlMinHeight)
+    }
+}
+
+extension View {
+    func workspaceButtonLabelLayout() -> some View {
+        modifier(WorkspaceButtonLabelModifier())
+    }
+}
+
+struct BoostaDepthButtonStyle: ButtonStyle {
+    var pressedScale: CGFloat = 0.982
+    var pressedOpacity: Double = 0.97
+    var verticalOffset: CGFloat = 1.5
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? pressedScale : 1)
+            .opacity(configuration.isPressed ? pressedOpacity : 1)
+            .offset(y: configuration.isPressed ? verticalOffset : 0)
+            .brightness(configuration.isPressed ? -0.01 : 0)
+            .animation(BoostaMotion.snap, value: configuration.isPressed)
+    }
+}
+
 struct PrimaryButton: View {
     let title: String
     var isLoading: Bool = false
@@ -19,11 +51,16 @@ struct PrimaryButton: View {
                 }
                 Text(title)
                     .font(BoostaType.bodyStrong)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .allowsTightening(true)
+                    .layoutPriority(1)
                 Image(systemName: "arrow.right")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .opacity(isLoading ? 0 : 0.9)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.controlMinHeight)
+            .padding(.horizontal, BoostaSpace.md)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
@@ -45,7 +82,7 @@ struct PrimaryButton: View {
                     .blendMode(.screen)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .foregroundStyle(.white)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
@@ -71,7 +108,8 @@ struct SecondaryButton: View {
             Text(title)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
-                .frame(maxWidth: .infinity)
+                .workspaceButtonLabelLayout()
+                .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 14)
                 .background(BoostaColor.surfaceElevated)
                 .overlay(alignment: .topLeading) {
@@ -91,7 +129,7 @@ struct SecondaryButton: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.6 : 1)
         .accessibilityLabel(title)
@@ -386,7 +424,11 @@ struct EmptyStateView: View {
 }
 
 enum WorkspaceLayoutMetrics {
-    static let gridSpacing = BoostaSpace.lg
+    static let gridSpacing = BoostaSpace.md
+    static let controlMinHeight: CGFloat = 52
+    static let metricPillMinHeight: CGFloat = 60
+    static let cardTileMinHeight: CGFloat = 96
+    static let ringCardMinHeight: CGFloat = 118
 
     static func horizontalPadding(for width: CGFloat) -> CGFloat {
         if width >= 1360 {

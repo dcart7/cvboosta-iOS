@@ -100,11 +100,11 @@ struct SettingsWorkspaceView_iPad: View {
     private func settingsGrid(width: CGFloat, horizontalPadding: CGFloat) -> some View {
         let columnCount = settingsColumnCount(for: width, horizontalPadding: horizontalPadding)
         let columns = Array(
-            repeating: GridItem(.flexible(minimum: 300), spacing: BoostaSpace.lg, alignment: .top),
+            repeating: GridItem(.flexible(minimum: 300), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
             count: columnCount
         )
 
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: BoostaSpace.lg) {
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
             headerCard
                 .gridCellColumns(columnCount)
 
@@ -350,14 +350,15 @@ struct SettingsWorkspaceView_iPad: View {
             Text(title)
                 .font(BoostaType.body)
                 .foregroundStyle(BoostaColor.secondaryText)
-                .lineLimit(2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
             Spacer(minLength: 0)
             Text(value)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
                 .multilineTextAlignment(.trailing)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
         }
     }
 
@@ -404,6 +405,7 @@ struct SettingsWorkspaceView_iPad: View {
         Label(title, systemImage: systemImage)
             .font(BoostaType.bodyStrong)
             .foregroundStyle(BoostaColor.primaryText)
+            .workspaceButtonLabelLayout()
             .padding(.horizontal, BoostaSpace.md)
             .padding(.vertical, 10)
             .background(BoostaColor.surfaceInteractive)
@@ -475,6 +477,7 @@ private struct WorkspaceActionButton: View {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
+                .workspaceButtonLabelLayout()
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
                 .background(isDisabled ? BoostaColor.surfaceDisabled : BoostaColor.surfaceInteractive)
@@ -484,7 +487,7 @@ private struct WorkspaceActionButton: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.65 : 1)
         .hoverEffect(.lift)

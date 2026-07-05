@@ -39,7 +39,7 @@ struct TailoringWorkspaceView_iPad: View {
 
                 GeometryReader { proxy in
                     ScrollView {
-                        VStack(spacing: BoostaSpace.lg) {
+                        VStack(spacing: WorkspaceLayoutMetrics.gridSpacing) {
                             headerCard
                             sessionCard
 
@@ -153,7 +153,7 @@ struct TailoringWorkspaceView_iPad: View {
 
     private var headerCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            HStack(alignment: .top, spacing: BoostaSpace.lg) {
+            HStack(alignment: .top, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Tailoring Workspace")
                         .font(BoostaType.title)
@@ -190,7 +190,7 @@ struct TailoringWorkspaceView_iPad: View {
 
     private var sessionCard: some View {
         GlassCard(padding: BoostaSpace.lg) {
-            HStack(alignment: .top, spacing: BoostaSpace.lg) {
+            HStack(alignment: .top, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Tailoring Session")
                         .font(BoostaType.section)
@@ -219,8 +219,8 @@ struct TailoringWorkspaceView_iPad: View {
         let layout = TailoringWorkspaceLayout(width: width)
 
         if layout.isWide {
-            HStack(alignment: .top, spacing: BoostaSpace.lg) {
-                VStack(alignment: .leading, spacing: BoostaSpace.lg) {
+            HStack(alignment: .top, spacing: WorkspaceLayoutMetrics.gridSpacing) {
+                VStack(alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                     originalCard(payload)
                     diffHighlightsCard(payload)
                     jobContextCard(payload)
@@ -234,7 +234,7 @@ struct TailoringWorkspaceView_iPad: View {
                     .frame(width: 360)
             }
         } else {
-            VStack(alignment: .leading, spacing: BoostaSpace.lg) {
+            VStack(alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                 originalCard(payload)
                 optimizedCard(payload)
                 insightsSidebar(payload: payload)
@@ -573,6 +573,7 @@ private struct WorkspaceActionButton: View {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
+                .workspaceButtonLabelLayout()
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
                 .background(isDisabled ? BoostaColor.surfaceDisabled : BoostaColor.surfaceInteractive)
@@ -582,7 +583,7 @@ private struct WorkspaceActionButton: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.65 : 1)
         .hoverEffect(.lift)

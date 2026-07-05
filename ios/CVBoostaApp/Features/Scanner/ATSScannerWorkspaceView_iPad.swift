@@ -44,7 +44,7 @@ struct ATSScannerWorkspaceView_iPad: View {
                     let horizontalPadding = WorkspaceLayoutMetrics.horizontalPadding(for: proxy.size.width)
 
                     if layout.isWide {
-                        HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                        HStack(alignment: .top, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                             leftColumn
                                 .frame(width: layout.leftColumnWidth)
 
@@ -58,7 +58,7 @@ struct ATSScannerWorkspaceView_iPad: View {
                         .frame(maxWidth: .infinity, alignment: .top)
                     } else {
                         ScrollView {
-                            VStack(spacing: BoostaSpace.lg) {
+                            VStack(spacing: WorkspaceLayoutMetrics.gridSpacing) {
                                 leftColumnContent
                                 rightColumnContent
                             }
@@ -618,6 +618,7 @@ private struct WorkspaceActionButton: View {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
+                .workspaceButtonLabelLayout()
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
                 .background(isDisabled ? BoostaColor.surfaceDisabled : BoostaColor.surfaceInteractive)
@@ -627,7 +628,7 @@ private struct WorkspaceActionButton: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.65 : 1)
         .hoverEffect(.lift)
@@ -645,14 +646,20 @@ private struct ScannerPreviewCard: View {
             Text(title)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
             Text(value)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
             Text(subtitle)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.tertiaryText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.9)
         }
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.cardTileMinHeight, alignment: .leading)
         .padding(BoostaSpace.sm)
         .background(BoostaColor.surfaceInteractive)
         .overlay(
@@ -677,11 +684,11 @@ private struct ATSResultsPanel_iPad: View {
         GeometryReader { proxy in
             let columnCount = resultsColumnCount(for: proxy.size.width)
             let columns = Array(
-                repeating: GridItem(.flexible(minimum: 320), spacing: BoostaSpace.lg, alignment: .top),
+                repeating: GridItem(.flexible(minimum: 320), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
                 count: columnCount
             )
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: BoostaSpace.lg) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                 overviewCard
                     .gridCellColumns(columnCount)
 
