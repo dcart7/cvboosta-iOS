@@ -290,6 +290,7 @@ struct ApplicationTrackerView: View {
                         Text(scope.title).tag(scope)
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .pickerStyle(.segmented)
 
                 folderFilterStrip

@@ -12,6 +12,7 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content
             .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(BoostaGlass.background)
             .background(
                 LinearGradient(

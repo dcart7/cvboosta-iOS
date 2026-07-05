@@ -293,6 +293,7 @@ struct SettingsWorkspaceView_iPad: View {
                         Text(appearance.title).tag(appearance.rawValue)
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .pickerStyle(.segmented)
 
                 settingsToggle("Notifications", subtitle: "Career reminders and follow-up nudges", isOn: $notificationsEnabled)

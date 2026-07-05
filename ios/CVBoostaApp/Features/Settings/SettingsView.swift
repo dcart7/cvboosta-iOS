@@ -168,6 +168,7 @@ struct SettingsView: View {
                             Text(appearance.title).tag(appearance.rawValue)
                         }
                     }
+                    .frame(maxWidth: .infinity)
                     .pickerStyle(.segmented)
                 }
 

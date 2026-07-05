@@ -124,9 +124,58 @@ struct InterviewCountdownWidget: Widget {
     }
 }
 
+private struct WidgetPalette {
+    let family: WidgetFamily
+    let renderingMode: WidgetRenderingMode
+
+    private var usesAdaptiveForeground: Bool {
+        family.isAccessoryFamily || renderingMode != .fullColor
+    }
+
+    var primaryText: Color {
+        usesAdaptiveForeground ? .primary : Color.white.opacity(0.96)
+    }
+
+    var secondaryText: Color {
+        usesAdaptiveForeground ? .secondary : Color.white.opacity(0.74)
+    }
+
+    var eyebrowText: Color {
+        usesAdaptiveForeground ? Color.primary.opacity(0.82) : Color.white.opacity(0.64)
+    }
+
+    var pillText: Color {
+        usesAdaptiveForeground ? .primary : Color.white.opacity(0.94)
+    }
+
+    var pillFillOpacity: Double {
+        usesAdaptiveForeground ? 0.24 : 0.18
+    }
+
+    var pillBorderOpacity: Double {
+        usesAdaptiveForeground ? 0.28 : 0.22
+    }
+}
+
+private extension WidgetFamily {
+    var isAccessoryFamily: Bool {
+        switch self {
+        case .accessoryCircular, .accessoryRectangular:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 private struct ATSScoreWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: CVBoostaWidgetEntry
+
+    private var palette: WidgetPalette {
+        WidgetPalette(family: family, renderingMode: renderingMode)
+    }
 
     var body: some View {
         switch family {
@@ -138,6 +187,7 @@ private struct ATSScoreWidgetView: View {
                 } currentValueLabel: {
                     Text("\(entry.snapshot.currentATSScore)")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(palette.primaryText)
                 }
                 .gaugeStyle(.accessoryCircularCapacity)
                 .tint(scoreColor)
@@ -146,39 +196,41 @@ private struct ATSScoreWidgetView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("ATS \(entry.snapshot.currentATSScore)")
                     .font(.headline)
+                    .foregroundStyle(palette.primaryText)
                 Text(entry.snapshot.weeklyATSDelta == 0 ? "Stable this week" : "\(entry.snapshot.weeklyATSDelta > 0 ? "+" : "")\(entry.snapshot.weeklyATSDelta) this week")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryText)
             }
         case .systemMedium:
             VStack(alignment: .leading, spacing: 10) {
-                widgetTitle("ATS Score", subtitle: recencyText)
+                widgetTitle("ATS Score", subtitle: recencyText, palette: palette)
                 HStack(spacing: 14) {
                     scoreGauge
                         .frame(width: 72, height: 72)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Missing keywords")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondaryText)
                         Text(keywordLine)
                             .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(palette.primaryText)
                             .lineLimit(2)
                         if let recentRole = entry.snapshot.recentRole {
                             Text(recentRole)
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(palette.secondaryText)
                         }
                     }
                 }
             }
         default:
             VStack(alignment: .leading, spacing: 10) {
-                widgetTitle("ATS Score", subtitle: entry.snapshot.weeklyATSDelta == 0 ? "No change this week" : "\(entry.snapshot.weeklyATSDelta > 0 ? "+" : "")\(entry.snapshot.weeklyATSDelta) this week")
+                widgetTitle("ATS Score", subtitle: entry.snapshot.weeklyATSDelta == 0 ? "No change this week" : "\(entry.snapshot.weeklyATSDelta > 0 ? "+" : "")\(entry.snapshot.weeklyATSDelta) this week", palette: palette)
                 scoreGauge
                     .frame(maxWidth: .infinity)
                 Text(keywordLine)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryText)
                     .lineLimit(2)
             }
         }
@@ -191,9 +243,10 @@ private struct ATSScoreWidgetView: View {
             VStack(spacing: 2) {
                 Text("\(entry.snapshot.currentATSScore)")
                     .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(palette.primaryText)
                 Text("ATS")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryText)
             }
         }
         .gaugeStyle(.accessoryCircularCapacity)
@@ -223,23 +276,29 @@ private struct ATSScoreWidgetView: View {
 
 private struct DailyFocusWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: CVBoostaWidgetEntry
+
+    private var palette: WidgetPalette {
+        WidgetPalette(family: family, renderingMode: renderingMode)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            widgetTitle(entry.snapshot.dailyFocusTitle, subtitle: family == .accessoryRectangular ? "Open Scanner" : "One smart next step")
+            widgetTitle(entry.snapshot.dailyFocusTitle, subtitle: family == .accessoryRectangular ? "Open Scanner" : "One smart next step", palette: palette)
             Text(entry.snapshot.dailyFocusDetail)
                 .font(family == .systemLarge ? .title3.weight(.semibold) : .subheadline.weight(.semibold))
+                .foregroundStyle(palette.primaryText)
                 .lineLimit(family == .systemLarge ? 4 : 3)
             if family != .accessoryRectangular {
                 HStack(spacing: 8) {
-                    WidgetPill(title: entry.snapshot.recentRole ?? "ATS", tint: .blue)
-                    WidgetPill(title: entry.snapshot.streakDays == 0 ? "Start streak" : "\(entry.snapshot.streakDays)d streak", tint: .orange)
+                    WidgetPill(title: entry.snapshot.recentRole ?? "ATS", tint: .blue, palette: palette)
+                    WidgetPill(title: entry.snapshot.streakDays == 0 ? "Start streak" : "\(entry.snapshot.streakDays)d streak", tint: .orange, palette: palette)
                 }
                 Spacer(minLength: 0)
                 Label("Open Scanner", systemImage: "arrow.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryText)
             }
         }
     }
@@ -247,7 +306,12 @@ private struct DailyFocusWidgetView: View {
 
 private struct StreakWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: CVBoostaWidgetEntry
+
+    private var palette: WidgetPalette {
+        WidgetPalette(family: family, renderingMode: renderingMode)
+    }
 
     var body: some View {
         switch family {
@@ -255,13 +319,14 @@ private struct StreakWidgetView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.snapshot.streakDays == 0 ? "Start streak" : "\(entry.snapshot.streakDays)d streak")
                     .font(.headline)
+                    .foregroundStyle(palette.primaryText)
                 Text(entry.snapshot.streakStatusTitle)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryText)
             }
         case .systemMedium:
             VStack(alignment: .leading, spacing: 10) {
-                widgetTitle("Career Streak", subtitle: entry.snapshot.careerLevel)
+                widgetTitle("Career Streak", subtitle: entry.snapshot.careerLevel, palette: palette)
                 HStack(spacing: 14) {
                     ZStack {
                         Circle()
@@ -275,6 +340,7 @@ private struct StreakWidgetView: View {
                                 .foregroundStyle(.orange)
                             Text(entry.snapshot.streakDays == 0 ? "0" : "\(entry.snapshot.streakDays)")
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundStyle(palette.primaryText)
                         }
                     }
                     .frame(width: 74, height: 74)
@@ -282,17 +348,18 @@ private struct StreakWidgetView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(entry.snapshot.streakStatusTitle)
                             .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(palette.primaryText)
                         Text(entry.snapshot.streakStatusDetail)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondaryText)
                             .lineLimit(3)
-                        WidgetPill(title: entry.snapshot.nextMilestoneTitle, tint: .orange)
+                        WidgetPill(title: entry.snapshot.nextMilestoneTitle, tint: .orange, palette: palette)
                     }
                 }
             }
         default:
             VStack(alignment: .leading, spacing: 10) {
-                widgetTitle("Career Streak", subtitle: entry.snapshot.weeklyActiveDays == 0 ? "1 action today" : "\(entry.snapshot.weeklyActiveDays)/7 this week")
+                widgetTitle("Career Streak", subtitle: entry.snapshot.weeklyActiveDays == 0 ? "1 action today" : "\(entry.snapshot.weeklyActiveDays)/7 this week", palette: palette)
                 HStack(spacing: 12) {
                     Image(systemName: "flame.fill")
                         .font(.system(size: 28, weight: .bold))
@@ -300,14 +367,15 @@ private struct StreakWidgetView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.snapshot.streakDays == 0 ? "Start today" : "\(entry.snapshot.streakDays) day streak")
                             .font(.title3.bold())
+                            .foregroundStyle(palette.primaryText)
                         Text(entry.snapshot.streakStatusTitle)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondaryText)
                     }
                 }
                 Text(entry.snapshot.streakStatusDetail)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryText)
                     .lineLimit(3)
             }
         }
@@ -316,7 +384,12 @@ private struct StreakWidgetView: View {
 
 private struct InterviewCountdownWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: CVBoostaWidgetEntry
+
+    private var palette: WidgetPalette {
+        WidgetPalette(family: family, renderingMode: renderingMode)
+    }
 
     var body: some View {
         Group {
@@ -326,50 +399,53 @@ private struct InterviewCountdownWidgetView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Interview")
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.eyebrowText)
                         Text(timerInterval: entry.date...interviewDate, countsDown: true)
                             .font(.headline)
+                            .foregroundStyle(palette.primaryText)
                             .monospacedDigit()
                         Text(interviewCompanyLine)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondaryText)
                             .lineLimit(1)
                     }
                 case .systemSmall:
                     VStack(alignment: .leading, spacing: 10) {
-                        widgetTitle("Interview", subtitle: interviewCompanyLine)
+                        widgetTitle("Interview", subtitle: interviewCompanyLine, palette: palette)
                         Spacer(minLength: 0)
                         Text(timerInterval: entry.date...interviewDate, countsDown: true)
                             .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(palette.primaryText)
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                         Text(interviewDate.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondaryText)
                     }
                 default:
                     VStack(alignment: .leading, spacing: 10) {
-                        widgetTitle("Interview Countdown", subtitle: interviewTitle)
+                        widgetTitle("Interview Countdown", subtitle: interviewTitle, palette: palette)
                         Text(timerInterval: entry.date...interviewDate, countsDown: true)
                             .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(palette.primaryText)
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                         Text(interviewDate.formatted(date: .complete, time: .shortened))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondaryText)
                         Label("Open Tracker", systemImage: "arrow.right")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondaryText)
                     }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    widgetTitle("Interview Countdown", subtitle: "No interview scheduled")
+                    widgetTitle("Interview Countdown", subtitle: "No interview scheduled", palette: palette)
                     Text("Add an interview date in Tracker to see a live countdown here.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondaryText)
                 }
             }
         }
@@ -394,11 +470,16 @@ private struct InterviewCountdownWidgetView: View {
 
 private struct PipelineWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: CVBoostaWidgetEntry
+
+    private var palette: WidgetPalette {
+        WidgetPalette(family: family, renderingMode: renderingMode)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            widgetTitle("Job Pipeline", subtitle: pipelineSubtitle)
+            widgetTitle("Job Pipeline", subtitle: pipelineSubtitle, palette: palette)
 
             HStack(spacing: 10) {
                 pipelineMetric("Applied", value: entry.snapshot.applicationsCount, tint: .blue)
@@ -419,14 +500,15 @@ private struct PipelineWidgetView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(entry.snapshot.nextInterviewTitle ?? "No interview scheduled")
                         .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(palette.primaryText)
                     Text(nextInterviewDetail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondaryText)
                 }
             } else {
                 Text("Response rate \(entry.snapshot.responseRate)%")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryText)
             }
         }
     }
@@ -443,7 +525,7 @@ private struct PipelineWidgetView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.secondaryText)
             Text("\(value)")
                 .font(.title3.bold())
                 .foregroundStyle(tint)
@@ -472,19 +554,25 @@ private struct PipelineWidgetView: View {
 
 private struct CareerMomentumWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: CVBoostaWidgetEntry
+
+    private var palette: WidgetPalette {
+        WidgetPalette(family: family, renderingMode: renderingMode)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            widgetTitle(entry.snapshot.momentumTitle, subtitle: momentumBadge)
+            widgetTitle(entry.snapshot.momentumTitle, subtitle: momentumBadge, palette: palette)
             Text(entry.snapshot.momentumDetail)
                 .font(family == .systemSmall ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                .foregroundStyle(palette.primaryText)
                 .lineLimit(family == .systemSmall ? 3 : 4)
 
             if family != .systemSmall {
                 HStack(spacing: 8) {
-                    WidgetPill(title: "Best: \(entry.snapshot.strongestArea)", tint: .green)
-                    WidgetPill(title: "Blocker: \(entry.snapshot.weakestArea)", tint: .orange)
+                    WidgetPill(title: "Best: \(entry.snapshot.strongestArea)", tint: .green, palette: palette)
+                    WidgetPill(title: "Blocker: \(entry.snapshot.weakestArea)", tint: .orange, palette: palette)
                 }
             }
 
@@ -509,9 +597,10 @@ private struct CareerMomentumWidgetView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.secondaryText)
             Text(value)
                 .font(.title3.bold())
+                .foregroundStyle(palette.primaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -530,27 +619,33 @@ private struct WidgetBackground: View {
 private struct WidgetPill: View {
     let title: String
     let tint: Color
+    let palette: WidgetPalette
 
     var body: some View {
         Text(title)
             .font(.caption2.weight(.semibold))
+            .foregroundStyle(palette.pillText)
             .lineLimit(1)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(tint.opacity(0.16))
+            .background(tint.opacity(palette.pillFillOpacity))
+            .overlay(
+                Capsule()
+                    .strokeBorder(tint.opacity(palette.pillBorderOpacity), lineWidth: 1)
+            )
             .clipShape(Capsule())
     }
 }
 
 @ViewBuilder
-private func widgetTitle(_ title: String, subtitle: String) -> some View {
+private func widgetTitle(_ title: String, subtitle: String, palette: WidgetPalette) -> some View {
     VStack(alignment: .leading, spacing: 2) {
         Text(title)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(palette.eyebrowText)
         Text(subtitle)
             .font(.caption2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(palette.secondaryText)
     }
 }
 

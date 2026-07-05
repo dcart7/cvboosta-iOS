@@ -329,6 +329,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                         Text(scope.title).tag(scope)
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .pickerStyle(.segmented)
 
                 folderFilterStrip

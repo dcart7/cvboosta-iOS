@@ -214,6 +214,7 @@ struct StatisticsView: View {
                 Text(section.title).tag(section)
             }
         }
+        .frame(maxWidth: .infinity)
         .pickerStyle(.segmented)
     }
 
@@ -315,6 +316,7 @@ struct StatisticsView: View {
                         Text(range.title).tag(range)
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .pickerStyle(.segmented)
 
                 if snapshot.trendPoints.count < 2 {

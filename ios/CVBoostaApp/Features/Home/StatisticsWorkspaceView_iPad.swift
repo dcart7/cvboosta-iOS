@@ -246,6 +246,7 @@ struct StatisticsWorkspaceView_iPad: View {
                 Text(section.title).tag(section)
             }
         }
+        .frame(maxWidth: .infinity)
         .pickerStyle(.segmented)
     }
 
@@ -380,6 +381,7 @@ struct StatisticsWorkspaceView_iPad: View {
                         Text(range.title).tag(range)
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .pickerStyle(.segmented)
 
                 if snapshot.trendPoints.count < 2 {
