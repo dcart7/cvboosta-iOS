@@ -283,22 +283,13 @@ struct HomeWorkspaceView_iPad: View {
             maxColumns: 2,
             horizontalPadding: horizontalPadding
         )
-        let columns = Array(
-            repeating: GridItem(.flexible(minimum: 320), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
-            count: columnCount
-        )
 
-        LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
+        WorkspaceMasonryLayout(columns: columnCount, spacing: WorkspaceLayoutMetrics.gridSpacing) {
             heroCard
-                .gridCellColumns(columnCount)
-
             quickStatsCard
             todayCard
             recentActivityCard
-                .gridCellColumns(columnCount)
-
             actionsCard
-                .gridCellColumns(columnCount)
         }
         .animation(BoostaMotion.smooth, value: columnCount)
     }

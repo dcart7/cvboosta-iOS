@@ -45,21 +45,17 @@ struct StreakCenterView: View {
                     maxColumns: 3,
                     horizontalPadding: horizontalPadding
                 )
-                let columns = Array(
-                    repeating: GridItem(.flexible(minimum: 310), spacing: BoostaSpace.lg, alignment: .top),
-                    count: columnCount
-                )
 
                 ScrollView {
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: BoostaSpace.lg) {
+                    WorkspaceMasonryLayout(columns: columnCount, spacing: BoostaSpace.lg) {
                         heroCard
-                            .gridCellColumns(columnCount)
+                            .workspaceColumnSpan(columnCount)
 
                         todayCard
                         heatmapCard
 
                         milestonesCard
-                            .gridCellColumns(min(2, columnCount))
+                            .workspaceColumnSpan(min(2, columnCount))
 
                         missionsCard
                         achievementsCard

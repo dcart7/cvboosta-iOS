@@ -99,17 +99,13 @@ struct SettingsWorkspaceView_iPad: View {
 
     private func settingsGrid(width: CGFloat, horizontalPadding: CGFloat) -> some View {
         let columnCount = settingsColumnCount(for: width, horizontalPadding: horizontalPadding)
-        let columns = Array(
-            repeating: GridItem(.flexible(minimum: 300), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
-            count: columnCount
-        )
 
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
+        return WorkspaceMasonryLayout(columns: columnCount, spacing: WorkspaceLayoutMetrics.gridSpacing) {
             headerCard
-                .gridCellColumns(columnCount)
+                .workspaceColumnSpan(columnCount)
 
             accountCard
-                .gridCellColumns(min(2, columnCount))
+                .workspaceColumnSpan(min(2, columnCount))
 
             subscriptionCard
             dataCard

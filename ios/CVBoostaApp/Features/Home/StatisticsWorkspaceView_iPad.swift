@@ -155,17 +155,13 @@ struct StatisticsWorkspaceView_iPad: View {
     @ViewBuilder
     private func content(width: CGFloat, horizontalPadding: CGFloat) -> some View {
         let columnCount = workspaceColumnCount(for: width, horizontalPadding: horizontalPadding)
-        let columns = Array(
-            repeating: GridItem(.flexible(minimum: 300), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
-            count: columnCount
-        )
 
-        LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
+        WorkspaceMasonryLayout(columns: columnCount, spacing: WorkspaceLayoutMetrics.gridSpacing) {
             headerCard
-                .gridCellColumns(columnCount)
+                .workspaceColumnSpan(columnCount)
 
             sectionPicker
-                .gridCellColumns(columnCount)
+                .workspaceColumnSpan(columnCount)
 
             visibleCards(for: columnCount)
         }
@@ -255,43 +251,40 @@ struct StatisticsWorkspaceView_iPad: View {
         switch selectedSection {
         case .overview:
             overviewCard
-                .gridCellColumns(min(2, columnCount))
+                .workspaceColumnSpan(min(2, columnCount))
             streakCard
             weeklySummaryCard
             sharedHistoryCard
-                .gridCellColumns(columnCount)
         case .ats:
             overviewCard
-                .gridCellColumns(min(2, columnCount))
+                .workspaceColumnSpan(min(2, columnCount))
             atsTrendCard
-                .gridCellColumns(min(2, columnCount))
+                .workspaceColumnSpan(min(2, columnCount))
             activityHeatmapCard
             recentScanCard
             if latestPayload != nil || latestHistoryDetail != nil {
                 insightsCard
-                    .gridCellColumns(max(min(2, columnCount), 1))
+                    .workspaceColumnSpan(max(min(2, columnCount), 1))
             } else {
                 emptyStateCard
-                    .gridCellColumns(max(min(2, columnCount), 1))
+                    .workspaceColumnSpan(max(min(2, columnCount), 1))
             }
         case .funnel:
             interviewPipelineCard
-                .gridCellColumns(min(2, columnCount))
+                .workspaceColumnSpan(min(2, columnCount))
             streakCard
             weeklySummaryCard
             sharedHistoryCard
-                .gridCellColumns(columnCount)
         case .insights:
             if latestPayload != nil || latestHistoryDetail != nil {
                 insightsCard
-                    .gridCellColumns(max(min(2, columnCount), 1))
+                    .workspaceColumnSpan(max(min(2, columnCount), 1))
             } else {
                 emptyStateCard
-                    .gridCellColumns(max(min(2, columnCount), 1))
+                    .workspaceColumnSpan(max(min(2, columnCount), 1))
             }
             recentScanCard
             sharedHistoryCard
-                .gridCellColumns(columnCount)
         }
     }
 

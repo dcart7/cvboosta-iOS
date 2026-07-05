@@ -463,6 +463,112 @@ enum WorkspaceLayoutMetrics {
     }
 }
 
+private struct WorkspaceColumnSpanKey: LayoutValueKey {
+    static let defaultValue = 1
+}
+
+extension View {
+    func workspaceColumnSpan(_ span: Int) -> some View {
+        layoutValue(key: WorkspaceColumnSpanKey.self, value: max(1, span))
+    }
+}
+
+struct WorkspaceMasonryLayout: Layout {
+    let columns: Int
+    let spacing: CGFloat
+
+    init(columns: Int, spacing: CGFloat = WorkspaceLayoutMetrics.gridSpacing) {
+        self.columns = max(1, columns)
+        self.spacing = spacing
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+        let layout = computeLayout(
+            width: resolvedWidth(from: proposal, subviews: subviews),
+            subviews: subviews
+        )
+        return layout.containerSize
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        let layout = computeLayout(width: bounds.width, subviews: subviews)
+
+        for (index, subview) in subviews.enumerated() {
+            guard index < layout.frames.count else { continue }
+            let frame = layout.frames[index]
+            subview.place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: frame.width, height: frame.height)
+            )
+        }
+    }
+
+    private func resolvedWidth(from proposal: ProposedViewSize, subviews: Subviews) -> CGFloat {
+        if let width = proposal.width, width > 0 {
+            return width
+        }
+
+        let fallbackWidth = subviews
+            .map { $0.sizeThatFits(.unspecified).width }
+            .max() ?? 320
+
+        let totalSpacing = spacing * CGFloat(columns - 1)
+        return max(fallbackWidth * CGFloat(columns) + totalSpacing, fallbackWidth)
+    }
+
+    private func computeLayout(width: CGFloat, subviews: Subviews) -> (frames: [CGRect], containerSize: CGSize) {
+        let totalSpacing = spacing * CGFloat(columns - 1)
+        let columnWidth = max((width - totalSpacing) / CGFloat(columns), 0)
+        var columnHeights = Array(repeating: CGFloat.zero, count: columns)
+        var frames: [CGRect] = []
+        frames.reserveCapacity(subviews.count)
+
+        for subview in subviews {
+            let requestedSpan = subview[WorkspaceColumnSpanKey.self]
+            let span = min(max(1, requestedSpan), columns)
+            let itemWidth = columnWidth * CGFloat(span) + spacing * CGFloat(span - 1)
+
+            let placement: (column: Int, y: CGFloat)
+            if span == columns {
+                placement = (0, columnHeights.max() ?? 0)
+            } else {
+                var bestColumn = 0
+                var bestY = CGFloat.greatestFiniteMagnitude
+
+                for startColumn in 0...(columns - span) {
+                    let candidateY = columnHeights[startColumn..<(startColumn + span)].max() ?? 0
+                    if candidateY < bestY - 0.5 || (abs(candidateY - bestY) <= 0.5 && startColumn < bestColumn) {
+                        bestColumn = startColumn
+                        bestY = candidateY
+                    }
+                }
+
+                placement = (bestColumn, bestY)
+            }
+
+            let proposedSize = ProposedViewSize(width: itemWidth, height: nil)
+            let measuredSize = subview.sizeThatFits(proposedSize)
+            let originX = CGFloat(placement.column) * (columnWidth + spacing)
+            let frame = CGRect(
+                x: originX,
+                y: placement.y,
+                width: itemWidth,
+                height: measuredSize.height
+            )
+            frames.append(frame)
+
+            let nextHeight = frame.maxY + spacing
+            for column in placement.column..<(placement.column + span) {
+                columnHeights[column] = nextHeight
+            }
+        }
+
+        let contentHeight = max((columnHeights.max() ?? 0) - (subviews.isEmpty ? 0 : spacing), 0)
+        return (frames, CGSize(width: width, height: contentHeight))
+    }
+}
+
 #if DEBUG
 struct UIComponents_Previews: PreviewProvider {
     static var previews: some View {

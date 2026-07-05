@@ -683,23 +683,19 @@ private struct ATSResultsPanel_iPad: View {
     var body: some View {
         GeometryReader { proxy in
             let columnCount = resultsColumnCount(for: proxy.size.width)
-            let columns = Array(
-                repeating: GridItem(.flexible(minimum: 320), spacing: WorkspaceLayoutMetrics.gridSpacing, alignment: .top),
-                count: columnCount
-            )
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: WorkspaceLayoutMetrics.gridSpacing) {
+            WorkspaceMasonryLayout(columns: columnCount, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                 overviewCard
-                    .gridCellColumns(columnCount)
+                    .workspaceColumnSpan(columnCount)
 
                 recommendationsCard
-                    .gridCellColumns(min(2, columnCount))
+                    .workspaceColumnSpan(min(2, columnCount))
 
                 missingSkillsCard
                 actionsCard
 
                 optimizedCVCard
-                    .gridCellColumns(columnCount)
+                    .workspaceColumnSpan(columnCount)
             }
             .onAppear {
                 persistLatestScanIfNeeded()
