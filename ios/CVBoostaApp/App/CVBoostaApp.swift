@@ -40,7 +40,7 @@ struct CVBoostaApp: App {
         } catch {
             let fallbackConfig = ModelConfiguration(
                 schema: schema,
-                isStoredInMemoryOnly: true,
+                isStoredInMemoryOnly: false,
                 cloudKitDatabase: .none
             )
             if let fallback = try? ModelContainer(for: schema, configurations: fallbackConfig) {

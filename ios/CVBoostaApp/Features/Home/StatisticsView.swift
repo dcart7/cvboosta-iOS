@@ -1013,53 +1013,24 @@ struct StatisticsTrendChartView: View, Equatable {
     }
 
     var body: some View {
-        let renderedPoints = stabilizedPoints
-
         Chart {
-            ForEach(renderedPoints) { point in
-                AreaMark(
-                    x: .value("Date", point.date),
-                    y: .value("ATS", point.score)
-                )
-                .interpolationMethod(.monotone)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [BoostaColor.accent.opacity(0.34), BoostaColor.accent.opacity(0.03)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
-
-            ForEach(renderedPoints) { point in
-                LineMark(
-                    x: .value("Date", point.date),
-                    y: .value("ATS", point.score)
-                )
-                .interpolationMethod(.monotone)
-                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [BoostaColor.accentSecondary.opacity(0.95), BoostaColor.accent],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-            }
-
-            ForEach(points) { point in
-                LineMark(
-                    x: .value("Date", point.date),
-                    y: .value("Benchmark", benchmarkScore)
-                )
-                .interpolationMethod(.linear)
+            RuleMark(y: .value("Benchmark", benchmarkScore))
                 .lineStyle(StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [5, 6]))
                 .foregroundStyle(Color.white.opacity(0.24))
+
+            ForEach(points) { point in
+                BarMark(
+                    x: .value("Scan", point.id + 1),
+                    y: .value("ATS", point.score),
+                    width: .fixed(barWidth)
+                )
+                .foregroundStyle(barGradient(for: point))
+                .opacity(latestPoint?.id == point.id ? 1 : 0.88)
             }
 
-            if let latest = points.last {
+            if let latest = latestPoint {
                 PointMark(
-                    x: .value("Date", latest.date),
+                    x: .value("Scan", latest.id + 1),
                     y: .value("ATS", latest.score)
                 )
                 .symbolSize(54)
@@ -1068,7 +1039,7 @@ struct StatisticsTrendChartView: View, Equatable {
         }
         .chartYScale(domain: 0...100)
         .chartYAxis {
-            AxisMarks(position: .leading, values: [50, 100]) { value in
+            AxisMarks(position: .leading, values: [0, 50, 100]) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.7))
                     .foregroundStyle(Color.white.opacity(0.045))
                 AxisValueLabel {
@@ -1081,12 +1052,13 @@ struct StatisticsTrendChartView: View, Equatable {
             }
         }
         .chartXAxis {
-            AxisMarks(values: axisDates) { value in
+            AxisMarks(values: axisPointIDs) { value in
                 AxisGridLine().foregroundStyle(.clear)
                 AxisTick().foregroundStyle(Color.white.opacity(0.10))
                 AxisValueLabel {
-                    if let dateValue = value.as(Date.self) {
-                        Text(StatisticsSnapshotBuilder.chartLabel(for: dateValue))
+                    if let idValue = value.as(Int.self),
+                       let point = points.first(where: { $0.id + 1 == idValue }) {
+                        Text(StatisticsSnapshotBuilder.chartLabel(for: point.date))
                             .font(BoostaType.caption)
                             .foregroundStyle(BoostaColor.secondaryText)
                     }
@@ -1107,37 +1079,40 @@ struct StatisticsTrendChartView: View, Equatable {
         }
     }
 
-    private var stabilizedPoints: [StatisticsTrendPoint] {
-        guard points.count > 2 else { return points }
+    private var latestPoint: StatisticsTrendPoint? {
+        points.last
+    }
 
-        return points.indices.map { index in
-            if index == points.startIndex || index == points.index(before: points.endIndex) {
-                return points[index]
-            }
+    private var axisPointIDs: [Int] {
+        let axisSet = Set(axisDates.map(\.timeIntervalSinceReferenceDate))
+        let matchedIDs = points
+            .filter { axisSet.contains($0.date.timeIntervalSinceReferenceDate) }
+            .map { $0.id + 1 }
 
-            let lowerBound = max(0, index - 2)
-            let upperBound = min(points.count - 1, index + 2)
-            let window = points[lowerBound...upperBound]
-            let weights = window.indices.map { innerIndex -> Double in
-                let distance = abs(window.distance(from: window.startIndex, to: innerIndex) - (index - lowerBound))
-                switch distance {
-                case 0: return 0.4
-                case 1: return 0.24
-                default: return 0.06
-                }
-            }
-            let weightedTotal = zip(window, weights).reduce(0.0) { partial, pair in
-                partial + (Double(pair.0.score) * pair.1)
-            }
-            let normalizedWeight = weights.reduce(0, +)
-            let smoothedScore = Int((weightedTotal / max(normalizedWeight, 0.0001)).rounded())
+        return matchedIDs.isEmpty ? points.map { $0.id + 1 } : matchedIDs
+    }
 
-            return StatisticsTrendPoint(
-                id: points[index].id,
-                date: points[index].date,
-                score: smoothedScore
-            )
+    private var barWidth: CGFloat {
+        switch points.count {
+        case ...6:
+            return 28
+        case ...10:
+            return 20
+        default:
+            return 14
         }
+    }
+
+    private func barGradient(for point: StatisticsTrendPoint) -> LinearGradient {
+        let isLatest = latestPoint?.id == point.id
+        let topColor = isLatest ? BoostaColor.accent : BoostaColor.accentSecondary
+        let bottomColor = isLatest ? BoostaColor.accentSecondary.opacity(0.88) : BoostaColor.accent.opacity(0.74)
+
+        return LinearGradient(
+            colors: [bottomColor, topColor],
+            startPoint: .bottom,
+            endPoint: .top
+        )
     }
 }
 
