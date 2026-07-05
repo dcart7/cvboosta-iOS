@@ -2,9 +2,9 @@
 
 CVBoosta is a premium career operating system focused on ATS optimization, role-specific resume tailoring, interview conversion, and job search analytics.
 
-This repository contains the native SwiftUI iOS app (iPhone + iPad) and supporting docs.
+This repository contains the native SwiftUI iOS app (iPhone + iPad), a local FastAPI backend harness for tracker/account flows, and supporting docs.
 
-The app integrates directly with the production CVBoosta backend (one backend, one database). No iOS-only backend is included in this repo.
+The app integrates directly with the production CVBoosta backend (one backend, one database). The `backend/` folder in this repo is a local development/reference implementation for auth, tracker sync, and smoke testing of the shared API contract.
 
 ## Folder Structure
 
@@ -28,6 +28,10 @@ The app integrates directly with the production CVBoosta backend (one backend, o
 │   │       ├── Tailoring
 │   │       └── Tracker
 │   └── CVBoostaWidgetExtension
+├── backend
+│   ├── app
+│   ├── sql
+│   └── tests
 ├── docs
 ```
 
@@ -56,3 +60,9 @@ xcodegen generate
 ```
 
 The backend base URL is configured via `API_BASE_URL` (Info.plist) and can be overridden at runtime via the `API_BASE_URL` environment variable for development/testing.
+
+Run the local backend harness:
+
+```bash
+uvicorn backend.app.main:create_app --factory --reload
+```

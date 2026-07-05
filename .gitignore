@@ -16,3 +16,5 @@ xcuserdata/
 # Environment
 .env
 backend/.env
+backend/*.db
+backend/*.sqlite3

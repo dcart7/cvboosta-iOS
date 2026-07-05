@@ -33,6 +33,13 @@ Authenticated (Bearer token):
 - `POST /optimize/cover-letter`
 - `GET /history`
 - `GET /history/{item_id}`
+- `GET /tracker`
+- `POST /tracker/applications`
+- `PATCH /tracker/applications/{application_id}`
+- `DELETE /tracker/applications/{application_id}`
+- `POST /tracker/folders`
+- `PATCH /tracker/folders/{folder_id}`
+- `DELETE /tracker/folders/{folder_id}`
 
 ## Production Readiness Next
 

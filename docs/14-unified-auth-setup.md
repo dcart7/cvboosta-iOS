@@ -10,7 +10,9 @@ No iOS-only users table is created.
 
 ## Production Backend
 
-The production backend is hosted separately (Google Cloud Run) and is not part of this repo.
+The production backend is hosted separately (Google Cloud Run).
+
+This repo now also includes a local `backend/` FastAPI harness that mirrors the account + tracker contract for development and smoke testing. It is not the production deployment target.
 
 ## Auth Endpoints
 
