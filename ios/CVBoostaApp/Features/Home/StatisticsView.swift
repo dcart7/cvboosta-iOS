@@ -1011,7 +1011,7 @@ struct StatisticsTrendChartView: View, Equatable {
     }
 
     var body: some View {
-        let renderedPoints = smoothedPoints
+        let renderedPoints = stabilizedPoints
 
         Chart {
             ForEach(renderedPoints) { point in
@@ -1105,16 +1105,30 @@ struct StatisticsTrendChartView: View, Equatable {
         }
     }
 
-    private var smoothedPoints: [StatisticsTrendPoint] {
+    private var stabilizedPoints: [StatisticsTrendPoint] {
         guard points.count > 2 else { return points }
 
         return points.indices.map { index in
-            let lowerBound = max(0, index - 1)
-            let upperBound = min(points.count - 1, index + 1)
+            if index == points.startIndex || index == points.index(before: points.endIndex) {
+                return points[index]
+            }
+
+            let lowerBound = max(0, index - 2)
+            let upperBound = min(points.count - 1, index + 2)
             let window = points[lowerBound...upperBound]
-            let smoothedScore = Int(
-                (Double(window.map(\.score).reduce(0, +)) / Double(window.count)).rounded()
-            )
+            let weights = window.indices.map { innerIndex -> Double in
+                let distance = abs(window.distance(from: window.startIndex, to: innerIndex) - (index - lowerBound))
+                switch distance {
+                case 0: return 0.4
+                case 1: return 0.24
+                default: return 0.06
+                }
+            }
+            let weightedTotal = zip(window, weights).reduce(0.0) { partial, pair in
+                partial + (Double(pair.0.score) * pair.1)
+            }
+            let normalizedWeight = weights.reduce(0, +)
+            let smoothedScore = Int((weightedTotal / max(normalizedWeight, 0.0001)).rounded())
 
             return StatisticsTrendPoint(
                 id: points[index].id,

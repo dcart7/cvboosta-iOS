@@ -1132,7 +1132,7 @@ private struct WorkspaceHeaderButton: View {
         } label: {
             WorkspaceHeaderButtonLabel(title: title, systemImage: systemImage, tint: tint)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
     }
 }
 
@@ -1219,7 +1219,7 @@ private struct ProgressStageNode: View {
             }
             .padding(.horizontal, 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
     }
 }
 
@@ -1389,7 +1389,7 @@ private struct TrackerQuickActionButton: View {
             .background(tint)
             .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
     }
 }
 

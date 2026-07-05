@@ -21,6 +21,7 @@ struct ApplicationTrackerView: View {
     @State private var statusChangeTarget: ApplicationRecord?
     @State private var selectedScope: TrackerListScope = .active
     @State private var selectedFolderID: UUID?
+    @State private var revealedApplicationID: UUID?
 
     private let widgetSyncService = WidgetSyncService.shared
 
@@ -251,10 +252,14 @@ struct ApplicationTrackerView: View {
                 presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: selectedScope) { _, _ in
+                revealedApplicationID = nil
                 guard let selectedFolderID else { return }
                 if !folders.contains(where: { $0.id == selectedFolderID }) {
                     self.selectedFolderID = nil
                 }
+            }
+            .onChange(of: selectedFolderID) { _, _ in
+                revealedApplicationID = nil
             }
         }
     }
@@ -356,106 +361,141 @@ struct ApplicationTrackerView: View {
     private func applicationCard(_ app: ApplicationRecord) -> some View {
         let priority = priority(for: app)
 
-        return NavigationLink {
-            TrackedApplicationWorkspaceView(
-                application: app,
-                folderLabel: folderLabel(for: app),
-                isEmbedded: false,
-                showsNavigationTitle: true,
-                onEdit: {
-                    editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
-                },
-                onChangeStatus: {
-                    statusChangeTarget = app
-                },
-                onArchiveToggle: {
-                    updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
-                },
-                onMoveFolder: {
-                    folderAssignmentTarget = app
-                },
-                onAdvance: {
-                    updateStatus(id: app.id, to: nextStatus(after: app.status))
+        return TrackerTelegramSwipeRow(
+            isOpen: revealedApplicationID == app.id,
+            onOpenChange: { isOpen in
+                withAnimation(BoostaMotion.smooth) {
+                    revealedApplicationID = isOpen ? app.id : nil
                 }
-            )
-        } label: {
-            GlassCard {
-                VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(app.company)
-                                .font(BoostaType.bodyStrong)
-                            Text(app.role)
-                                .font(BoostaType.body)
-                                .foregroundStyle(BoostaColor.secondaryText)
-                            if let folderLabel = folderLabel(for: app) {
-                                ApplicationBadge(title: folderLabel, tint: BoostaColor.accentSecondary)
+            },
+            actions: trackerDrawerActions(for: app)
+        ) {
+            NavigationLink {
+                TrackedApplicationWorkspaceView(
+                    application: app,
+                    folderLabel: folderLabel(for: app),
+                    isEmbedded: false,
+                    showsNavigationTitle: true,
+                    onEdit: {
+                        editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                    },
+                    onChangeStatus: {
+                        statusChangeTarget = app
+                    },
+                    onArchiveToggle: {
+                        updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+                    },
+                    onMoveFolder: {
+                        folderAssignmentTarget = app
+                    },
+                    onAdvance: {
+                        updateStatus(id: app.id, to: nextStatus(after: app.status))
+                    }
+                )
+            } label: {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(app.company)
+                                    .font(BoostaType.bodyStrong)
+                                Text(app.role)
+                                    .font(BoostaType.body)
+                                    .foregroundStyle(BoostaColor.secondaryText)
+                                if let folderLabel = folderLabel(for: app) {
+                                    ApplicationBadge(title: folderLabel, tint: BoostaColor.accentSecondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 8) {
+                                ApplicationBadge(title: app.status.rawValue.capitalized, tint: statusColor(for: app.status))
+                                ApplicationBadge(title: priority.title, tint: priority.color)
                             }
                         }
 
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 8) {
-                            ApplicationBadge(title: app.status.rawValue.capitalized, tint: statusColor(for: app.status))
-                            ApplicationBadge(title: priority.title, tint: priority.color)
+                        HStack {
+                            Text("Applied: \(app.appliedAt.formatted(date: .abbreviated, time: .omitted))")
+                            Spacer()
+                            if let score = app.atsScore {
+                                Text("ATS: \(score)")
+                            }
                         }
-                    }
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.secondaryText)
 
-                    HStack {
-                        Text("Applied: \(app.appliedAt.formatted(date: .abbreviated, time: .omitted))")
-                        Spacer()
-                        if let score = app.atsScore {
-                            Text("ATS: \(score)")
+                        if let interviewAt = app.interviewAt, app.status == .interview {
+                            Text("Interview: \(interviewAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.accentSecondary)
                         }
-                    }
-                    .font(BoostaType.caption)
-                    .foregroundStyle(BoostaColor.secondaryText)
 
-                    if let interviewAt = app.interviewAt, app.status == .interview {
-                        Text("Interview: \(interviewAt.formatted(date: .abbreviated, time: .shortened))")
+                        Text("Next step: \(nextStep(for: app))")
                             .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.accentSecondary)
-                    }
+                            .foregroundStyle(BoostaColor.primaryText)
 
-                    Text("Next step: \(nextStep(for: app))")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.primaryText)
+                        if let notes = app.notes, !notes.isEmpty {
+                            Text(notes)
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                                .lineLimit(2)
+                        }
 
-                    if let notes = app.notes, !notes.isEmpty {
-                        Text(notes)
+                        Label("Tap to open workspace", systemImage: "arrow.right.circle")
                             .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.secondaryText)
-                            .lineLimit(2)
+                            .foregroundStyle(BoostaColor.accent)
                     }
-
-                    Label("Tap to open workspace", systemImage: "arrow.right.circle")
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.accent)
                 }
             }
+            .buttonStyle(BoostaDepthButtonStyle())
+            .contextMenu {
+                trackerQuickActionsMenu(for: app)
+            }
         }
-        .buttonStyle(.plain)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+    }
+
+    private func trackerDrawerActions(for app: ApplicationRecord) -> [TrackerSwipeDrawerAction] {
+        [
+            TrackerSwipeDrawerAction(title: "Folder", systemImage: "folder.badge.plus", tint: BoostaColor.accentSecondary) {
+                folderAssignmentTarget = app
+            },
+            TrackerSwipeDrawerAction(title: "Edit", systemImage: "pencil", tint: BoostaColor.accent) {
+                editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+            },
+            TrackerSwipeDrawerAction(
+                title: app.status.isArchiveBucket ? "Restore" : "Archive",
+                systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox",
+                tint: app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText
+            ) {
+                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+            },
+            TrackerSwipeDrawerAction(title: "Delete", systemImage: "trash", tint: BoostaColor.danger, role: .destructive) {
+                deleteApplication(id: app.id)
+            }
+        ]
+    }
+
+    @ViewBuilder
+    private func trackerQuickActionsMenu(for app: ApplicationRecord) -> some View {
+        Group {
             Button {
                 folderAssignmentTarget = app
             } label: {
                 Label("Folder", systemImage: "folder.badge.plus")
             }
-            .tint(BoostaColor.accentSecondary)
 
             Button {
                 editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .tint(BoostaColor.accent)
 
             Button {
                 updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
             } label: {
                 Label(app.status.isArchiveBucket ? "Restore" : "Archive", systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox")
             }
-            .tint(app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText)
 
             Button(role: .destructive) {
                 deleteApplication(id: app.id)
@@ -1173,7 +1213,156 @@ struct TrackerFolderChip: View {
             )
             .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
+    }
+}
+
+struct TrackerSwipeDrawerAction: Identifiable {
+    let id = UUID()
+    let title: String
+    let systemImage: String
+    let tint: Color
+    var role: ButtonRole? = nil
+    let action: () -> Void
+}
+
+struct TrackerTelegramSwipeRow<Content: View>: View {
+    let isOpen: Bool
+    let onOpenChange: (Bool) -> Void
+    let actions: [TrackerSwipeDrawerAction]
+    let cornerRadius: CGFloat
+    let content: () -> Content
+
+    @GestureState private var dragTranslation: CGFloat = 0
+
+    init(
+        isOpen: Bool,
+        onOpenChange: @escaping (Bool) -> Void,
+        actions: [TrackerSwipeDrawerAction],
+        cornerRadius: CGFloat = BoostaRadius.md,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.isOpen = isOpen
+        self.onOpenChange = onOpenChange
+        self.actions = actions
+        self.cornerRadius = cornerRadius
+        self.content = content
+    }
+
+    private var drawerWidth: CGFloat {
+        CGFloat(actions.count) * 78
+    }
+
+    private var contentOffset: CGFloat {
+        let base = isOpen ? -drawerWidth : 0
+        return max(-drawerWidth, min(0, base + dragTranslation))
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+
+                HStack(spacing: 0) {
+                    ForEach(actions) { action in
+                        TrackerSwipeDrawerButton(action: action) {
+                            closeDrawer()
+                            Task { @MainActor in
+                                action.action()
+                            }
+                        }
+                    }
+                }
+                .frame(width: drawerWidth)
+                .frame(maxHeight: .infinity)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.06),
+                            Color.white.opacity(0.03)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+            }
+
+            content()
+                .offset(x: contentOffset)
+                .overlay {
+                    if isOpen {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                closeDrawer()
+                            }
+                    }
+                }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .simultaneousGesture(dragGesture)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+            .updating($dragTranslation) { value, state, _ in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                state = value.translation.width
+            }
+            .onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+
+                let base = isOpen ? -drawerWidth : 0
+                let projected = max(-drawerWidth, min(0, base + value.predictedEndTranslation.width))
+                let shouldOpen = projected < -(drawerWidth * 0.34)
+
+                if shouldOpen != isOpen {
+                    HapticsService.selection()
+                }
+
+                withAnimation(BoostaMotion.smooth) {
+                    onOpenChange(shouldOpen)
+                }
+            }
+    }
+
+    private func closeDrawer() {
+        withAnimation(BoostaMotion.smooth) {
+            onOpenChange(false)
+        }
+    }
+}
+
+private struct TrackerSwipeDrawerButton: View {
+    let action: TrackerSwipeDrawerAction
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(role: action.role) {
+            onTap()
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: action.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                Text(action.title)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 6)
+            .background(action.tint)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 1)
+            }
+        }
+        .buttonStyle(BoostaDepthButtonStyle(pressedScale: 0.97, pressedOpacity: 0.94, verticalOffset: 0))
+        .accessibilityLabel(action.title)
     }
 }
 
@@ -1228,13 +1417,13 @@ struct TrackerFolderManagerView: View {
                                     Button("Edit") {
                                         editorContext = FolderEditorContext(id: folder.id, name: folder.name, emoji: folder.emoji, selectedApplicationIDs: [])
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(BoostaDepthButtonStyle())
                                     .foregroundStyle(BoostaColor.accent)
 
                                     Button("Delete", role: .destructive) {
                                         onDelete(folder.id)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(BoostaDepthButtonStyle())
                                 }
                                 .padding(.vertical, 4)
                             }
@@ -1359,7 +1548,7 @@ private struct TrackerFolderEditorView: View {
                                             }
                                             .padding(.vertical, 6)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(BoostaDepthButtonStyle())
                                     }
                                 }
                             }
@@ -1426,7 +1615,7 @@ struct TrackerFolderAssignmentView: View {
                         } label: {
                             folderRow(title: "No folder", emoji: "🗂", isSelected: selectedFolderID == nil)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(BoostaDepthButtonStyle())
 
                         ForEach(folderOptions) { folder in
                             Button {
@@ -1435,7 +1624,7 @@ struct TrackerFolderAssignmentView: View {
                             } label: {
                                 folderRow(title: folder.name, emoji: folder.emoji, isSelected: selectedFolderID == folder.id)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(BoostaDepthButtonStyle())
                         }
                     }
                 }
@@ -1537,7 +1726,7 @@ struct InterviewReflectionView: View {
                                             .font(.system(size: 22, weight: .semibold))
                                             .foregroundStyle(value <= rating ? BoostaColor.warning : BoostaColor.secondaryText)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(BoostaDepthButtonStyle(pressedScale: 0.93, pressedOpacity: 0.92, verticalOffset: 0))
                                 }
                             }
                         }

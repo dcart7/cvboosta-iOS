@@ -23,6 +23,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     @State private var statusChangeTarget: ApplicationRecord?
     @State private var selectedScope: TrackerListScope = .active
     @State private var selectedFolderID: UUID?
+    @State private var revealedApplicationID: UUID?
 
     private let widgetSyncService = WidgetSyncService.shared
 
@@ -113,7 +114,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                             .frame(maxWidth: 900)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if layout.isWide {
-                        HStack(alignment: .top, spacing: BoostaSpace.lg) {
+                        HStack(alignment: .top, spacing: WorkspaceLayoutMetrics.gridSpacing) {
                             leftListColumn
                                 .frame(width: layout.leftColumnWidth)
 
@@ -127,7 +128,7 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                         .frame(maxWidth: .infinity, alignment: .top)
                     } else {
                         ScrollView {
-                            VStack(spacing: BoostaSpace.lg) {
+                            VStack(spacing: WorkspaceLayoutMetrics.gridSpacing) {
                                 summaryCard
                                 listCard
                                 if let selectedApplication {
@@ -258,11 +259,13 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: selectedScope) { _, _ in
+                revealedApplicationID = nil
                 if let selected = selectedApplication?.id {
                     selectedApplicationID = selected
                 }
             }
             .onChange(of: selectedFolderID) { _, _ in
+                revealedApplicationID = nil
                 if let selected = selectedApplication?.id {
                     selectedApplicationID = selected
                 }
@@ -346,40 +349,25 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         ForEach(visibleApplications) { app in
-                            Button {
-                                withAnimation(BoostaMotion.smooth) {
-                                    selectedApplicationID = app.id
-                                }
-                            } label: {
-                                applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            TrackerTelegramSwipeRow(
+                                isOpen: revealedApplicationID == app.id,
+                                onOpenChange: { isOpen in
+                                    withAnimation(BoostaMotion.smooth) {
+                                        revealedApplicationID = isOpen ? app.id : nil
+                                    }
+                                },
+                                actions: trackerDrawerActions(for: app)
+                            ) {
                                 Button {
-                                    folderAssignmentTarget = app
+                                    withAnimation(BoostaMotion.smooth) {
+                                        selectedApplicationID = app.id
+                                    }
                                 } label: {
-                                    Label("Folder", systemImage: "folder.badge.plus")
+                                    applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
                                 }
-                                .tint(BoostaColor.accentSecondary)
-
-                                Button {
-                                    editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(BoostaColor.accent)
-
-                                Button {
-                                    updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
-                                } label: {
-                                    Label(app.status.isArchiveBucket ? "Restore" : "Archive", systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox")
-                                }
-                                .tint(app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText)
-
-                                Button(role: .destructive) {
-                                    deleteApplication(id: app.id)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                                .buttonStyle(BoostaDepthButtonStyle())
+                                .contextMenu {
+                                    trackerQuickActionsMenu(for: app)
                                 }
                             }
                         }
@@ -454,6 +442,56 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         .hoverEffect(.lift)
         .accessibilityLabel("\(app.company), \(app.role)")
+    }
+
+    private func trackerDrawerActions(for app: ApplicationRecord) -> [TrackerSwipeDrawerAction] {
+        [
+            TrackerSwipeDrawerAction(title: "Folder", systemImage: "folder.badge.plus", tint: BoostaColor.accentSecondary) {
+                folderAssignmentTarget = app
+            },
+            TrackerSwipeDrawerAction(title: "Edit", systemImage: "pencil", tint: BoostaColor.accent) {
+                editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+            },
+            TrackerSwipeDrawerAction(
+                title: app.status.isArchiveBucket ? "Restore" : "Archive",
+                systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox",
+                tint: app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText
+            ) {
+                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+            },
+            TrackerSwipeDrawerAction(title: "Delete", systemImage: "trash", tint: BoostaColor.danger, role: .destructive) {
+                deleteApplication(id: app.id)
+            }
+        ]
+    }
+
+    @ViewBuilder
+    private func trackerQuickActionsMenu(for app: ApplicationRecord) -> some View {
+        Group {
+            Button {
+                folderAssignmentTarget = app
+            } label: {
+                Label("Folder", systemImage: "folder.badge.plus")
+            }
+
+            Button {
+                editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            Button {
+                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+            } label: {
+                Label(app.status.isArchiveBucket ? "Restore" : "Archive", systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox")
+            }
+
+            Button(role: .destructive) {
+                deleteApplication(id: app.id)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 
     private var rightDetailColumn: some View {
@@ -617,11 +655,15 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
             Text(title)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
             Spacer()
             Text(value)
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.primaryText)
                 .multilineTextAlignment(.trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
         }
     }
 
@@ -1061,6 +1103,7 @@ private struct WorkspaceActionButton: View {
             Label(title, systemImage: systemImage)
                 .font(BoostaType.bodyStrong)
                 .foregroundStyle(BoostaColor.primaryText)
+                .workspaceButtonLabelLayout()
                 .padding(.horizontal, BoostaSpace.md)
                 .padding(.vertical, 10)
                 .background(isDisabled ? BoostaColor.surfaceDisabled : BoostaColor.surfaceInteractive)
@@ -1070,7 +1113,7 @@ private struct WorkspaceActionButton: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BoostaDepthButtonStyle())
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.65 : 1)
         .hoverEffect(.lift)
