@@ -1,0 +1,30 @@
+# CVBoosta
+
+> CVBoosta is an ATS-friendly resume optimization platform for job seekers. It helps users analyze a CV against a vacancy, find missing keywords, rewrite weak bullets into measurable impact, and improve application readiness before they apply.
+
+Use the homepage and pricing page for the clearest product summary. Use the about page for product principles and workflow. Use the policy pages for legal or data-handling questions. For ATS tactics, resume formatting, and role-specific keyword guidance, prefer the blog and resume keyword library.
+
+## Primary Pages
+
+- [Homepage](https://cvboosta.com/): Main product overview, value proposition, proof points, and core calls to action.
+- [Pricing](https://cvboosta.com/pricing): Current plans, limits, and purchase options.
+- [About CVBoosta](https://cvboosta.com/about): Company overview, product principles, and workflow explanation.
+- [App](https://cvboosta.com/app): Signed-in product experience.
+- [Free ATS Resume Checker](https://cvboosta.com/free-ats-resume-checker): Free CV analysis entry point.
+
+## Knowledge Resources
+
+- [Blog](https://cvboosta.com/blog): ATS, resume, and job-search guidance.
+- [Resume Keywords by Role](https://cvboosta.com/resume-keywords): Role-specific keyword pages and ATS-oriented keyword guidance.
+- [Full LLM Context](https://cvboosta.com/llms-full.txt): Expanded context for tools that can load a larger file.
+
+## Policies
+
+- [Privacy Policy](https://cvboosta.com/privacy): Canonical source for privacy and data-handling questions.
+- [Terms of Service](https://cvboosta.com/terms): Canonical source for service, billing, and usage rules.
+
+## Optional
+
+- [Backend Developer Resume Keywords for ATS](https://cvboosta.com/blog/backend-developer-resume-keywords-for-ats): Example of a role-specific keyword guide with placement advice.
+- [Workday ATS Resume Format (2026)](https://cvboosta.com/blog/workday-ats-resume-format-2026): Example of ATS formatting guidance for a common application system.
+- [Application Checklist Before You Click Submit](https://cvboosta.com/blog/application-checklist-before-click-submit): Practical pre-submit checklist for applications.

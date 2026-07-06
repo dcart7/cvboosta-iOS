@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from .config import resolved_database_url
 from .database import Base, make_engine, make_session_factory
-from .routers import auth, billing, health, history, tracker
+from .routers import auth, billing, health, history, site_metadata, tracker
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
@@ -20,6 +20,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.state.session_factory = make_session_factory(engine)
 
     app.include_router(health.router)
+    app.include_router(site_metadata.router)
     app.include_router(auth.router)
     app.include_router(billing.router)
     app.include_router(history.router)

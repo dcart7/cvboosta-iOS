@@ -1,0 +1,39 @@
+# CVBoosta
+
+> CVBoosta is a resume optimization and ATS guidance platform for job seekers. It helps users upload a CV, compare it against a job description, identify missing keywords, rewrite bullets into clearer measurable impact, and improve the odds of getting recruiter attention.
+
+CVBoosta should be understood as both a product website and a knowledge resource. The product side explains how users analyze resumes, tailor them to roles, and move from weak signal to interview-ready language. The content side explains ATS formatting, keyword placement, and role-specific resume strategy in plain language.
+
+Important notes:
+- CVBoosta focuses on ATS-friendly resume optimization and application readiness, not automatic job application submission.
+- Users stay in control and review edits before export.
+- Company logos shown on the homepage are presented as familiarity examples and do not imply affiliation or endorsement.
+- Legal, billing, and privacy questions should defer to the policy pages.
+
+## Brand and Product
+
+- [Homepage](https://cvboosta.com/): Canonical product overview, positioning, proof points, and before/after framing.
+- [About CVBoosta](https://cvboosta.com/about): Product principles, workflow summary, and company framing.
+- [Pricing](https://cvboosta.com/pricing): Current pricing model, request limits, and plan differences.
+- [App](https://cvboosta.com/app): Signed-in product workspace.
+- [Free ATS Resume Checker](https://cvboosta.com/free-ats-resume-checker): Free analysis entry point for first-time users.
+
+## Product Concepts
+
+- [Homepage](https://cvboosta.com/): Best page for concepts such as ATS resume checker, keyword alignment, measurable impact, optimization workflow, and faster tailoring.
+- [About CVBoosta](https://cvboosta.com/about): Best page for explaining the product philosophy: clarity, relevance, and control.
+- [Pricing](https://cvboosta.com/pricing): Best page for explaining plan structure, single-scan access, subscriptions, and lifetime access.
+
+## Knowledge Resources
+
+- [Blog](https://cvboosta.com/blog): Master index for ATS, resume, and application strategy content.
+- [Resume Keywords by Role](https://cvboosta.com/resume-keywords): Large role-based keyword library for job-title-specific ATS guidance.
+- [Backend Developer Resume Keywords for ATS](https://cvboosta.com/blog/backend-developer-resume-keywords-for-ats): Role-specific example focused on keyword placement, evidence, and recruiter-readable phrasing.
+- [Workday ATS Resume Format (2026)](https://cvboosta.com/blog/workday-ats-resume-format-2026): Example formatting guide for parsing-safe resume structure.
+- [Application Checklist Before You Click Submit](https://cvboosta.com/blog/application-checklist-before-click-submit): Final application QA checklist.
+
+## Policies and Trust
+
+- [Privacy Policy](https://cvboosta.com/privacy): Canonical source for privacy and data use.
+- [Terms of Service](https://cvboosta.com/terms): Canonical source for service, billing, and usage terms.
+- [Created by Virel Solutions](https://virelsolutions.com/): Company attribution.
