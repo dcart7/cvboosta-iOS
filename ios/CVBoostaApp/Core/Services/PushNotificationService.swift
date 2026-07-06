@@ -44,7 +44,7 @@ final class PushNotificationService: NSObject {
 
     func requestAuthorizationIfNeeded(forcePrompt: Bool = true) async {
         guard notificationsEnabled else {
-            UIApplication.shared.unregisterForRemoteNotifications()
+            await disableRemoteNotificationsIfNeeded()
             return
         }
 
@@ -63,7 +63,7 @@ final class PushNotificationService: NSObject {
                 // Ignore: user can enable later.
             }
         case .denied:
-            break
+            await disableRemoteNotificationsIfNeeded()
         case .authorized, .provisional, .ephemeral:
             UIApplication.shared.registerForRemoteNotifications()
         @unknown default:
@@ -86,7 +86,7 @@ final class PushNotificationService: NSObject {
 
     func refreshRegistrationState() async {
         guard notificationsEnabled else {
-            UIApplication.shared.unregisterForRemoteNotifications()
+            await disableRemoteNotificationsIfNeeded()
             return
         }
 
@@ -94,8 +94,10 @@ final class PushNotificationService: NSObject {
         switch status {
         case .authorized, .provisional, .ephemeral:
             UIApplication.shared.registerForRemoteNotifications()
-        case .notDetermined, .denied:
+        case .notDetermined:
             break
+        case .denied:
+            await disableRemoteNotificationsIfNeeded()
         @unknown default:
             break
         }
@@ -177,6 +179,19 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
     ) {
         completionHandler([.banner, .list, .sound, .badge])
     }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        _ = response
+        Task { @MainActor in
+            UIApplication.shared.applicationIconBadgeNumber = 0
+            await PushNotificationService.shared.syncIfPossible()
+        }
+        completionHandler()
+    }
 }
 
 private extension PushNotificationService {
@@ -203,6 +218,13 @@ private extension PushNotificationService {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    var hasActiveBackendRegistration: Bool {
+        guard let lastSentToken = defaults.string(forKey: lastSentTokenKey) else {
+            return false
+        }
+        return !lastSentToken.isEmpty
+    }
+
     func currentRequestBody() -> APNSDeviceTokenRequest? {
         guard let token = defaults.string(forKey: tokenStorageKey),
               !token.isEmpty
@@ -215,5 +237,12 @@ private extension PushNotificationService {
             bundleId: Bundle.main.bundleIdentifier ?? AppEnvironment.appBundleIdentifierPlaceholder,
             apnsEnvironment: AppEnvironment.apnsEnvironment.rawValue
         )
+    }
+
+    func disableRemoteNotificationsIfNeeded() async {
+        if hasActiveBackendRegistration {
+            await deactivateCurrentTokenIfPossible()
+        }
+        UIApplication.shared.unregisterForRemoteNotifications()
     }
 }

@@ -59,28 +59,12 @@ struct PrimaryButton: View {
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .opacity(isLoading ? 0 : 0.9)
             }
-            .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.controlMinHeight)
             .padding(.horizontal, BoostaSpace.md)
-            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.controlMinHeight)
             .background(
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                    .fill(
-                        isDisabled
-                        ? AnyShapeStyle(BoostaColor.accent.opacity(0.35))
-                        : AnyShapeStyle(BoostaColor.auroraGradient)
-                    )
+                    .fill(isDisabled ? BoostaColor.accent.opacity(0.3) : BoostaColor.accent)
             )
-            .overlay(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [BoostaColor.glassHighlightStrong, .clear],
-                            startPoint: .topLeading,
-                            endPoint: .center
-                        )
-                    )
-                    .blendMode(.screen)
-            }
         }
         .buttonStyle(BoostaDepthButtonStyle())
         .foregroundStyle(.white)
@@ -89,7 +73,7 @@ struct PrimaryButton: View {
                 .stroke(isDisabled ? BoostaColor.glassHighlight : BoostaColor.outlineSoft, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
-        .shadow(color: BoostaColor.accent.opacity(isDisabled ? 0 : 0.22), radius: 18, x: 0, y: 12)
+        .shadow(color: BoostaColor.accent.opacity(isDisabled ? 0 : 0.18), radius: 12, x: 0, y: 8)
         .disabled(isLoading || isDisabled)
         .accessibilityLabel(title)
     }
@@ -110,19 +94,7 @@ struct SecondaryButton: View {
                 .foregroundStyle(BoostaColor.primaryText)
                 .workspaceButtonLabelLayout()
                 .padding(.horizontal, BoostaSpace.md)
-                .padding(.vertical, 14)
                 .background(BoostaColor.surfaceElevated)
-                .overlay(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [BoostaColor.glassHighlight, .clear],
-                                startPoint: .topLeading,
-                                endPoint: .center
-                            )
-                        )
-                        .blendMode(.screen)
-                }
                 .overlay(
                     RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                         .stroke(BoostaColor.glassStrongStroke, lineWidth: 1)
@@ -425,8 +397,8 @@ struct EmptyStateView: View {
 
 enum WorkspaceLayoutMetrics {
     static let gridSpacing = BoostaSpace.md
-    static let controlMinHeight: CGFloat = 52
-    static let metricPillMinHeight: CGFloat = 60
+    static let controlMinHeight: CGFloat = 48
+    static let metricPillMinHeight: CGFloat = 68
     static let cardTileMinHeight: CGFloat = 96
     static let ringCardMinHeight: CGFloat = 118
 

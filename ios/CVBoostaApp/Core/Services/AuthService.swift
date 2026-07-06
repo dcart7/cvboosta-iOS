@@ -111,6 +111,7 @@ struct AuthMePayload: Hashable {
     let scanHistory: [ScanHistorySnapshot]
     let applications: [AccountApplicationSnapshot]
     let applicationFolders: [AccountApplicationFolderSnapshot]
+    let hasTrackerSnapshot: Bool
 }
 
 struct StoredAuthSession: Codable {
@@ -321,8 +322,10 @@ actor AuthService {
         let usageLimits = Self.mapUsageLimits(from: billingRaw, subscription: subscription)
         let mePayload = try await userPayload
         let user = try Self.mapUser(from: mePayload)
+        let savedResumes = Self.mapSavedResumes(from: mePayload)
         let applications = Self.mapApplications(from: mePayload)
         let applicationFolders = Self.mapApplicationFolders(from: mePayload)
+        let hasTrackerSnapshot = Self.hasTrackerSnapshot(in: mePayload)
 
         let historyItems = try await history
         let snapshots: [ScanHistorySnapshot] = historyItems.items.sorted(by: { $0.createdAt > $1.createdAt }).map {
@@ -342,10 +345,11 @@ actor AuthService {
             user: user,
             subscription: subscription,
             usageLimits: usageLimits,
-            savedResumes: [],
+            savedResumes: savedResumes,
             scanHistory: snapshots,
             applications: applications,
-            applicationFolders: applicationFolders
+            applicationFolders: applicationFolders,
+            hasTrackerSnapshot: hasTrackerSnapshot
         )
     }
 
@@ -505,6 +509,25 @@ private extension AuthService {
         }
     }
 
+    static func mapSavedResumes(from payload: [String: JSONValue]) -> [SavedResumeSnapshot] {
+        let keys = ["saved_resumes", "resumes", "resume_files"]
+        guard let values = keys.compactMap({ payload[$0] }).first else { return [] }
+        guard case .array(let rawItems) = values else { return [] }
+
+        return rawItems.enumerated().compactMap { index, item in
+            guard case .object(let object) = item else { return nil }
+            guard let fileName = object.string("file_name") ?? object.string("filename") ?? object.string("name") else {
+                return nil
+            }
+
+            return SavedResumeSnapshot(
+                id: object.int("id") ?? (index + 1),
+                fileName: fileName,
+                createdAt: parseDate(object.string("created_at")) ?? Date.distantPast
+            )
+        }
+    }
+
     static func mapApplicationFolders(from payload: [String: JSONValue]) -> [AccountApplicationFolderSnapshot] {
         let keys = ["tracker_folders", "application_folders", "folders"]
         guard let values = keys.compactMap({ payload[$0] }).first else { return [] }
@@ -526,6 +549,14 @@ private extension AuthService {
                 createdAt: parseDate(object.string("created_at")) ?? Date()
             )
         }
+    }
+
+    static func hasTrackerSnapshot(in payload: [String: JSONValue]) -> Bool {
+        payload["applications"] != nil
+            || payload["tracker"] != nil
+            || payload["application_history"] != nil
+            || payload["tracker_folders"] != nil
+            || payload["application_folders"] != nil
     }
 
     static func mapUsageLimits(from payload: [String: JSONValue], subscription: AuthSubscription) -> AuthUsageLimits {

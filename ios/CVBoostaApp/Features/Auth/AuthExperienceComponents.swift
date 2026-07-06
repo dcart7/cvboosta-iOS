@@ -252,17 +252,17 @@ struct AuthPrimaryNavigationButton<Destination: View>: View {
                     .font(.system(size: 13, weight: .bold, design: .rounded))
             }
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .padding(.horizontal, BoostaSpace.md)
+            .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.controlMinHeight)
             .background(
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
-                    .fill(BoostaColor.auroraGradient)
+                    .fill(BoostaColor.accent)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                     .stroke(BoostaColor.outlineSoft, lineWidth: 1)
             )
-            .shadow(color: BoostaColor.accent.opacity(0.24), radius: 18, x: 0, y: 12)
+            .shadow(color: BoostaColor.accent.opacity(0.18), radius: 12, x: 0, y: 8)
         }
         .buttonStyle(.plain)
     }
@@ -290,9 +290,8 @@ struct AuthSecondaryNavigationButton<Destination: View>: View {
                 Image(systemName: systemImage)
             }
             .foregroundStyle(BoostaColor.primaryText)
-            .frame(maxWidth: .infinity)
             .padding(.horizontal, BoostaSpace.md)
-            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.controlMinHeight)
             .background(BoostaColor.surfaceElevated)
             .overlay(
                 RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)

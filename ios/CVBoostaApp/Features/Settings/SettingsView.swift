@@ -4,6 +4,7 @@ import UserNotifications
 
 struct SettingsView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var authViewModel: AuthViewModel
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @ObservedObject private var profileWorkspaceService = ProfileWorkspaceService.shared
@@ -62,6 +63,12 @@ struct SettingsView: View {
             .onChange(of: notificationsEnabled) { _, isEnabled in
                 Task {
                     await PushNotificationService.shared.applyUserPreference(isEnabled: isEnabled)
+                    await refreshNotificationAuthorizationStatus()
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active else { return }
+                Task {
                     await refreshNotificationAuthorizationStatus()
                 }
             }

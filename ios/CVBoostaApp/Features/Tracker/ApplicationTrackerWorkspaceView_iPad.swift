@@ -23,7 +23,6 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
     @State private var statusChangeTarget: ApplicationRecord?
     @State private var selectedScope: TrackerListScope = .active
     @State private var selectedFolderID: UUID?
-    @State private var revealedApplicationID: UUID?
 
     private let widgetSyncService = WidgetSyncService.shared
     private let trackerSyncService = TrackerSyncService.shared
@@ -260,13 +259,11 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                 presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: selectedScope) { _, _ in
-                revealedApplicationID = nil
                 if let selected = selectedApplication?.id {
                     selectedApplicationID = selected
                 }
             }
             .onChange(of: selectedFolderID) { _, _ in
-                revealedApplicationID = nil
                 if let selected = selectedApplication?.id {
                     selectedApplicationID = selected
                 }
@@ -351,25 +348,44 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         ForEach(visibleApplications) { app in
-                            TrackerTelegramSwipeRow(
-                                isOpen: revealedApplicationID == app.id,
-                                onOpenChange: { isOpen in
-                                    withAnimation(BoostaMotion.smooth) {
-                                        revealedApplicationID = isOpen ? app.id : nil
-                                    }
-                                },
-                                actions: trackerDrawerActions(for: app)
-                            ) {
-                                Button {
-                                    withAnimation(BoostaMotion.smooth) {
-                                        selectedApplicationID = app.id
-                                    }
-                                } label: {
-                                    applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
+                            Button {
+                                withAnimation(BoostaMotion.smooth) {
+                                    selectedApplicationID = app.id
                                 }
-                                .buttonStyle(BoostaDepthButtonStyle())
-                                .contextMenu {
-                                    trackerQuickActionsMenu(for: app)
+                            } label: {
+                                applicationRow(app, isSelected: app.id == (selectedApplication?.id ?? app.id))
+                            }
+                            .buttonStyle(BoostaDepthButtonStyle())
+                            .contextMenu {
+                                trackerQuickActionsMenu(for: app)
+                            }
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button {
+                                    folderAssignmentTarget = app
+                                } label: {
+                                    Label("Folder", systemImage: "folder.badge.plus")
+                                }
+                                .tint(BoostaColor.accentSecondary)
+
+                                Button {
+                                    editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(BoostaColor.accent)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button {
+                                    updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+                                } label: {
+                                    Label(app.status.isArchiveBucket ? "Restore" : "Archive", systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox")
+                                }
+                                .tint(app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText)
+
+                                Button(role: .destructive) {
+                                    deleteApplication(id: app.id)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
                         }
@@ -444,27 +460,6 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
         .hoverEffect(.lift)
         .accessibilityLabel("\(app.company), \(app.role)")
-    }
-
-    private func trackerDrawerActions(for app: ApplicationRecord) -> [TrackerSwipeDrawerAction] {
-        [
-            TrackerSwipeDrawerAction(title: "Folder", systemImage: "folder.badge.plus", tint: BoostaColor.accentSecondary) {
-                folderAssignmentTarget = app
-            },
-            TrackerSwipeDrawerAction(title: "Edit", systemImage: "pencil", tint: BoostaColor.accent) {
-                editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
-            },
-            TrackerSwipeDrawerAction(
-                title: app.status.isArchiveBucket ? "Restore" : "Archive",
-                systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox",
-                tint: app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText
-            ) {
-                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
-            },
-            TrackerSwipeDrawerAction(title: "Delete", systemImage: "trash", tint: BoostaColor.danger, role: .destructive) {
-                deleteApplication(id: app.id)
-            }
-        ]
     }
 
     @ViewBuilder
@@ -736,47 +731,43 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         let recordID = UUID()
 
         Task {
-            do {
-                try await trackerSyncService.createApplication(id: recordID, draft: draft)
+            let isAccountBacked = await trackerSyncService.createApplication(id: recordID, draft: draft)
 
-                await MainActor.run {
-                    let record = ApplicationRecord(
-                        id: recordID,
-                        company: draft.company,
-                        role: draft.role,
-                        status: draft.status,
-                        appliedAt: draft.appliedAt,
-                        source: "iOS",
-                        interviewAt: draft.interviewAt,
-                        notes: draft.notes,
-                        resumeUsed: draft.resumeUsed,
-                        jobLink: draft.jobLink,
-                        folderID: draft.folderID,
-                        atsScore: nil,
-                        isAccountBacked: true
-                    )
-                    modelContext.insert(record)
+            await MainActor.run {
+                let record = ApplicationRecord(
+                    id: recordID,
+                    company: draft.company,
+                    role: draft.role,
+                    status: draft.status,
+                    appliedAt: draft.appliedAt,
+                    source: "iOS",
+                    interviewAt: draft.interviewAt,
+                    notes: draft.notes,
+                    resumeUsed: draft.resumeUsed,
+                    jobLink: draft.jobLink,
+                    folderID: draft.folderID,
+                    atsScore: nil,
+                    isAccountBacked: isAccountBacked
+                )
+                modelContext.insert(record)
 
-                    do {
-                        try modelContext.save()
-                        showAddSheet = false
-                        if selectedApplicationID == nil {
-                            selectedApplicationID = record.id
-                        }
-                        syncWidgetSnapshot()
-                        celebrateStreak(with: record.status)
-                        presentPipelineLiveActivityIfNeeded(for: record)
-                        HapticsService.success()
-                    } catch {
-                        HapticsService.error()
+                do {
+                    try modelContext.save()
+                    showAddSheet = false
+                    if selectedApplicationID == nil {
+                        selectedApplicationID = record.id
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                    syncWidgetSnapshot()
+                    celebrateStreak(with: record.status)
+                    presentPipelineLiveActivityIfNeeded(for: record)
+                    HapticsService.success()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -785,40 +776,36 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         guard let record = applications.first(where: { $0.id == id }) else { return }
 
         Task {
-            do {
-                try await trackerSyncService.updateApplication(id: id, draft: draft)
+            let isAccountBacked = await trackerSyncService.updateApplication(id: id, draft: draft)
 
-                await MainActor.run {
-                    record.company = draft.company
-                    record.role = draft.role
-                    record.status = draft.status
-                    record.appliedAt = draft.appliedAt
-                    record.interviewAt = draft.interviewAt
-                    record.notes = draft.notes
-                    record.resumeUsed = draft.resumeUsed
-                    record.jobLink = draft.jobLink
-                    record.folderID = draft.folderID
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.company = draft.company
+                record.role = draft.role
+                record.status = draft.status
+                record.appliedAt = draft.appliedAt
+                record.interviewAt = draft.interviewAt
+                record.notes = draft.notes
+                record.resumeUsed = draft.resumeUsed
+                record.jobLink = draft.jobLink
+                record.folderID = draft.folderID
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        syncWidgetSnapshot()
-                        if record.status != .archived {
-                            celebrateStreak(with: record.status)
-                        }
-                        presentPipelineLiveActivityIfNeeded(for: record)
-                        editingContext = nil
-                        HapticsService.success()
-                    } catch {
-                        HapticsService.error()
+                do {
+                    try modelContext.save()
+                    syncWidgetSnapshot()
+                    if record.status != .archived {
+                        celebrateStreak(with: record.status)
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                    presentPipelineLiveActivityIfNeeded(for: record)
+                    editingContext = nil
+                    HapticsService.success()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -827,33 +814,29 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         guard let record = applications.first(where: { $0.id == id }) else { return }
 
         Task {
-            do {
-                try await trackerSyncService.updateStatus(id: id, status: status)
+            let isAccountBacked = await trackerSyncService.updateStatus(id: id, status: status)
 
-                await MainActor.run {
-                    record.status = status
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.status = status
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        statusChangeTarget = nil
-                        syncWidgetSnapshot()
-                        presentPipelineLiveActivityIfNeeded(for: record)
-                        if status.isArchiveBucket {
-                            HapticsService.warning()
-                        } else {
-                            HapticsService.success()
-                        }
-                    } catch {
-                        HapticsService.error()
+                do {
+                    try modelContext.save()
+                    statusChangeTarget = nil
+                    syncWidgetSnapshot()
+                    presentPipelineLiveActivityIfNeeded(for: record)
+                    if status.isArchiveBucket {
+                        HapticsService.warning()
+                    } else {
+                        HapticsService.success()
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -862,30 +845,26 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         guard let record = applications.first(where: { $0.id == id }) else { return }
 
         Task {
-            do {
-                try await trackerSyncService.deleteApplication(id: id)
+            let isAccountBacked = await trackerSyncService.deleteApplication(id: id)
 
-                await MainActor.run {
-                    modelContext.delete(record)
+            await MainActor.run {
+                modelContext.delete(record)
 
-                    do {
-                        try modelContext.save()
-                        syncWidgetSnapshot(applications.filter { $0.id != id })
-                        editingContext = nil
-                        if selectedApplicationID == id {
-                            selectedApplicationID = applications.first(where: { $0.id != id })?.id
-                        }
-                        HapticsService.warning()
-                    } catch {
-                        HapticsService.error()
+                do {
+                    try modelContext.save()
+                    syncWidgetSnapshot(applications.filter { $0.id != id })
+                    editingContext = nil
+                    if selectedApplicationID == id {
+                        selectedApplicationID = applications.first(where: { $0.id != id })?.id
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                    HapticsService.warning()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -894,35 +873,31 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         guard let record = applications.first(where: { $0.id == id }) else { return }
 
         Task {
-            do {
-                try await trackerSyncService.saveInterviewReflection(id: id, reflection: reflection)
+            let isAccountBacked = await trackerSyncService.saveInterviewReflection(id: id, reflection: reflection)
 
-                await MainActor.run {
-                    record.interviewReflectionRating = reflection.rating
-                    record.interviewReflectionOutcome = reflection.outcome
-                    record.interviewReflectionNotes = reflection.notes
-                    record.interviewReflectionSubmittedAt = .now
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.interviewReflectionRating = reflection.rating
+                record.interviewReflectionOutcome = reflection.outcome
+                record.interviewReflectionNotes = reflection.notes
+                record.interviewReflectionSubmittedAt = .now
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        interviewReflectionTarget = nil
-                        if #available(iOS 16.1, *) {
-                            Task {
-                                await LiveActivityManager.shared.clearPostInterviewReflection()
-                            }
+                do {
+                    try modelContext.save()
+                    interviewReflectionTarget = nil
+                    if #available(iOS 16.1, *) {
+                        Task {
+                            await LiveActivityManager.shared.clearPostInterviewReflection()
                         }
-                        HapticsService.success()
-                    } catch {
-                        HapticsService.error()
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                    HapticsService.success()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -1016,27 +991,23 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         guard let record = applications.first(where: { $0.id == applicationID }) else { return }
 
         Task {
-            do {
-                try await trackerSyncService.assignFolder(folderID, to: applicationID)
+            let isAccountBacked = await trackerSyncService.assignFolder(folderID, to: applicationID)
 
-                await MainActor.run {
-                    record.folderID = folderID
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.folderID = folderID
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        folderAssignmentTarget = nil
-                        HapticsService.selection()
-                    } catch {
-                        HapticsService.error()
-                    }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                do {
+                    try modelContext.save()
+                    folderAssignmentTarget = nil
+                    HapticsService.selection()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -1045,37 +1016,33 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         let folderID = UUID()
 
         Task {
-            do {
-                try await trackerSyncService.createFolder(id: folderID, draft: draft)
+            let isAccountBacked = await trackerSyncService.createFolder(id: folderID, draft: draft)
 
-                await MainActor.run {
-                    let folder = ApplicationFolder(
-                        id: folderID,
-                        name: draft.folder.name,
-                        emoji: draft.folder.emoji,
-                        isAccountBacked: true
-                    )
-                    modelContext.insert(folder)
+            await MainActor.run {
+                let folder = ApplicationFolder(
+                    id: folderID,
+                    name: draft.folder.name,
+                    emoji: draft.folder.emoji,
+                    isAccountBacked: isAccountBacked
+                )
+                modelContext.insert(folder)
 
-                    for application in applications where draft.applicationIDs.contains(application.id) {
-                        application.folderID = folder.id
-                        application.isAccountBacked = true
-                    }
-
-                    do {
-                        try modelContext.save()
-                        selectedFolderID = folder.id
-                        HapticsService.success()
-                    } catch {
-                        HapticsService.error()
-                    }
+                for application in applications where draft.applicationIDs.contains(application.id) {
+                    application.folderID = folder.id
+                    application.isAccountBacked = isAccountBacked
                 }
 
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                do {
+                    try modelContext.save()
+                    selectedFolderID = folder.id
+                    HapticsService.success()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -1084,26 +1051,22 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         guard let folder = folders.first(where: { $0.id == id }) else { return }
 
         Task {
-            do {
-                try await trackerSyncService.updateFolder(id: id, draft: draft)
+            let isAccountBacked = await trackerSyncService.updateFolder(id: id, draft: draft)
 
-                await MainActor.run {
-                    folder.name = draft.name
-                    folder.emoji = draft.emoji
-                    folder.isAccountBacked = true
-                    do {
-                        try modelContext.save()
-                        HapticsService.selection()
-                    } catch {
-                        HapticsService.error()
-                    }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+            await MainActor.run {
+                folder.name = draft.name
+                folder.emoji = draft.emoji
+                folder.isAccountBacked = isAccountBacked
+                do {
+                    try modelContext.save()
+                    HapticsService.selection()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -1112,31 +1075,27 @@ struct ApplicationTrackerWorkspaceView_iPad: View {
         guard let folder = folders.first(where: { $0.id == id }) else { return }
 
         Task {
-            do {
-                try await trackerSyncService.deleteFolder(id: id)
+            let isAccountBacked = await trackerSyncService.deleteFolder(id: id)
 
-                await MainActor.run {
-                    for application in applications where application.folderID == id {
-                        application.folderID = nil
-                        application.isAccountBacked = true
-                    }
-                    modelContext.delete(folder)
-                    do {
-                        try modelContext.save()
-                        if selectedFolderID == id {
-                            selectedFolderID = nil
-                        }
-                        HapticsService.warning()
-                    } catch {
-                        HapticsService.error()
-                    }
+            await MainActor.run {
+                for application in applications where application.folderID == id {
+                    application.folderID = nil
+                    application.isAccountBacked = isAccountBacked
                 }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
+                modelContext.delete(folder)
+                do {
+                    try modelContext.save()
+                    if selectedFolderID == id {
+                        selectedFolderID = nil
+                    }
+                    HapticsService.warning()
+                } catch {
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }

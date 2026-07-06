@@ -371,16 +371,16 @@ struct HomeView: View {
                         Image(systemName: "chart.line.uptrend.xyaxis")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(BoostaColor.auroraGradient)
+                    .padding(.horizontal, BoostaSpace.md)
+                    .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.controlMinHeight)
+                    .background(BoostaColor.accent)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
                             .stroke(BoostaColor.outlineSoft, lineWidth: 1)
                     )
-                    .shadow(color: BoostaColor.accent.opacity(0.18), radius: 18, x: 0, y: 12)
+                    .shadow(color: BoostaColor.accent.opacity(0.18), radius: 12, x: 0, y: 8)
                 }
                 .buttonStyle(.plain)
             }
@@ -621,8 +621,8 @@ struct HomeStatCard: View {
                     .minimumScaleFactor(0.8)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.cardTileMinHeight, alignment: .leading)
         .padding(BoostaSpace.sm)
+        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.cardTileMinHeight, alignment: .leading)
         .background(BoostaColor.surfaceInteractive)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)

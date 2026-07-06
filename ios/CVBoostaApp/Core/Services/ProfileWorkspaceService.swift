@@ -122,6 +122,7 @@ final class ProfileWorkspaceService: ObservableObject {
     private enum DefaultsKey {
         static let settings = "cvboosta.profile_workspace.settings"
         static let resumes = "cvboosta.profile_workspace.resumes"
+        static let resumesRevisionAt = "cvboosta.profile_workspace.resumes.revision_at"
         static let uploadTracking = "cvboosta.profile_workspace.upload_tracking"
         static let exportHistory = "cvboosta.profile_workspace.export_history"
         static let primaryTipDismissed = "cvboosta.profile_workspace.primary_tip_dismissed"
@@ -164,6 +165,7 @@ final class ProfileWorkspaceService: ObservableObject {
         self.avatarData = nil
 
         normalizeStoredState()
+        ensureResumeRevisionExists()
         avatarData = loadAvatarData()
     }
 
@@ -173,6 +175,17 @@ final class ProfileWorkspaceService: ObservableObject {
 
     var shouldShowPrimarySetupTip: Bool {
         primaryResume == nil && !defaults.bool(forKey: DefaultsKey.primaryTipDismissed)
+    }
+
+    var resumeSyncRevisionDate: Date {
+        if let stored = defaults.object(forKey: DefaultsKey.resumesRevisionAt) as? Date {
+            return stored
+        }
+
+        let derived = savedResumes
+            .map { max($0.lastUsedAt, $0.createdAt) }
+            .max() ?? .distantPast
+        return derived
     }
 
     func dismissPrimarySetupTip() {
@@ -434,6 +447,105 @@ final class ProfileWorkspaceService: ObservableObject {
         mergedResumeNames(remoteNames: remoteNames).count
     }
 
+    func exportCloudResumePayloads() async -> [CloudResumePayload] {
+        await withTaskGroup(of: CloudResumePayload?.self) { group in
+            for resume in savedResumes {
+                group.addTask { [fileManager] in
+                    let root = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                        ?? fileManager.temporaryDirectory
+                    let baseDirectory = root.appendingPathComponent("CVBoostaProfileWorkspace", isDirectory: true)
+                    let fileURL = baseDirectory
+                        .appendingPathComponent("Resumes", isDirectory: true)
+                        .appendingPathComponent(resume.storageFileName)
+
+                    guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe) else {
+                        return nil
+                    }
+
+                    return CloudResumePayload(
+                        fileHash: resume.fileHash,
+                        resumeID: resume.id,
+                        displayName: resume.displayName,
+                        originalFileName: resume.originalFileName,
+                        createdAt: resume.createdAt,
+                        lastUsedAt: resume.lastUsedAt,
+                        uploadCount: resume.uploadCount,
+                        isPrimary: resume.isPrimary,
+                        updatedAt: max(resume.lastUsedAt, resume.createdAt),
+                        pdfData: data
+                    )
+                }
+            }
+
+            var payloads: [CloudResumePayload] = []
+            for await payload in group {
+                if let payload {
+                    payloads.append(payload)
+                }
+            }
+            return payloads.sorted { lhs, rhs in
+                if lhs.isPrimary != rhs.isPrimary {
+                    return lhs.isPrimary && !rhs.isPrimary
+                }
+                return lhs.lastUsedAt > rhs.lastUsedAt
+            }
+        }
+    }
+
+    func applyCloudResumePayloads(_ payloads: [CloudResumePayload], syncDate: Date) async {
+        guard !payloads.isEmpty else { return }
+
+        let incomingByHash = Dictionary(uniqueKeysWithValues: payloads.map { ($0.fileHash, $0) })
+        let existingByHash = Dictionary(uniqueKeysWithValues: savedResumes.map { ($0.fileHash, $0) })
+        let removedHashes = Set(existingByHash.keys).subtracting(incomingByHash.keys)
+
+        for removedHash in removedHashes {
+            if let removed = existingByHash[removedHash] {
+                try? fileManager.removeItem(at: resumeURL(fileName: removed.storageFileName))
+            }
+        }
+
+        var updatedResumes: [StoredResumeSummary] = []
+        updatedResumes.reserveCapacity(payloads.count)
+
+        for payload in payloads {
+            let storageFileName = existingByHash[payload.fileHash]?.storageFileName ?? "\(UUID().uuidString).pdf"
+            let destinationURL = resumeURL(fileName: storageFileName)
+
+            do {
+                try ensureDirectoryExists(at: resumesDirectoryURL)
+                if !fileManager.fileExists(atPath: destinationURL.path) {
+                    try payload.pdfData.write(to: destinationURL, options: .atomic)
+                }
+            } catch {
+                continue
+            }
+
+            uploadTracking[payload.fileHash] = UploadTrackingRecord(
+                fileName: payload.originalFileName,
+                count: payload.uploadCount,
+                lastUploadedAt: payload.lastUsedAt
+            )
+
+            updatedResumes.append(
+                StoredResumeSummary(
+                    id: payload.resumeID,
+                    displayName: payload.displayName,
+                    originalFileName: payload.originalFileName,
+                    storageFileName: storageFileName,
+                    fileHash: payload.fileHash,
+                    createdAt: payload.createdAt,
+                    lastUsedAt: payload.lastUsedAt,
+                    uploadCount: payload.uploadCount,
+                    isPrimary: payload.isPrimary
+                )
+            )
+        }
+
+        savedResumes = updatedResumes
+        persistResumes(syncDate: syncDate)
+    }
+
     private func normalizeStoredState() {
         savedResumes = savedResumes.filter { fileManager.fileExists(atPath: resumeURL(fileName: $0.storageFileName).path) }
 
@@ -454,9 +566,10 @@ final class ProfileWorkspaceService: ObservableObject {
         objectWillChange.send()
     }
 
-    private func persistResumes() {
+    private func persistResumes(syncDate: Date = .now) {
         sortResumes()
         Self.storeValue(savedResumes, forKey: DefaultsKey.resumes, in: defaults)
+        defaults.set(syncDate, forKey: DefaultsKey.resumesRevisionAt)
         persistUploadTracking()
         objectWillChange.send()
     }
@@ -524,6 +637,11 @@ final class ProfileWorkspaceService: ObservableObject {
         try await Task.detached(priority: .userInitiated) {
             try loadProfileResumeResource(from: url)
         }.value
+    }
+
+    private func ensureResumeRevisionExists() {
+        guard defaults.object(forKey: DefaultsKey.resumesRevisionAt) == nil else { return }
+        defaults.set(resumeSyncRevisionDate == .distantPast ? Date() : resumeSyncRevisionDate, forKey: DefaultsKey.resumesRevisionAt)
     }
 
     private var baseDirectoryURL: URL {

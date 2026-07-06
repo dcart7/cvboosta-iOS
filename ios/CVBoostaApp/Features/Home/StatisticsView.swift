@@ -1003,14 +1003,11 @@ enum StatisticsSnapshotBuilder {
     }
 }
 
-struct StatisticsTrendChartView: View, Equatable {
+struct StatisticsTrendChartView: View {
     let points: [StatisticsTrendPoint]
     let axisDates: [Date]
     let benchmarkScore: Int
-
-    static func == (lhs: StatisticsTrendChartView, rhs: StatisticsTrendChartView) -> Bool {
-        lhs.points == rhs.points && lhs.axisDates == rhs.axisDates && lhs.benchmarkScore == rhs.benchmarkScore
-    }
+    @State private var selectedPointID: Int?
 
     var body: some View {
         Chart {
@@ -1025,18 +1022,27 @@ struct StatisticsTrendChartView: View, Equatable {
                     width: .fixed(barWidth)
                 )
                 .foregroundStyle(barGradient(for: point))
-                .opacity(latestPoint?.id == point.id ? 1 : 0.88)
+                .opacity(activePoint?.id == point.id ? 1 : 0.86)
             }
 
-            if let latest = latestPoint {
+            if let activePoint {
+                RuleMark(x: .value("Selected Scan", activePoint.id + 1))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 5]))
+                    .foregroundStyle(Color.white.opacity(0.14))
+                    .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
+                        trendTooltip(for: activePoint)
+                            .padding(.top, 4)
+                    }
+
                 PointMark(
-                    x: .value("Scan", latest.id + 1),
-                    y: .value("ATS", latest.score)
+                    x: .value("Selected Scan", activePoint.id + 1),
+                    y: .value("Selected ATS", activePoint.score)
                 )
-                .symbolSize(54)
+                .symbolSize(64)
                 .foregroundStyle(BoostaColor.accent)
             }
         }
+        .chartXScale(domain: 0...(points.count + 1))
         .chartYScale(domain: 0...100)
         .chartYAxis {
             AxisMarks(position: .leading, values: [0, 50, 100]) { value in
@@ -1065,6 +1071,28 @@ struct StatisticsTrendChartView: View, Equatable {
                 }
             }
         }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                if let plotFrame = proxy.plotFrame {
+                    let plotArea = geometry[plotFrame]
+
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .frame(width: plotArea.width, height: plotArea.height)
+                        .position(x: plotArea.midX, y: plotArea.midY)
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    let relativeX = value.location.x - plotArea.origin.x
+                                    guard relativeX >= 0, relativeX <= plotArea.width else { return }
+                                    guard let scanNumber = proxy.value(atX: relativeX, as: Int.self) else { return }
+                                    selectedPointID = nearestPointID(to: scanNumber)
+                                }
+                        )
+                }
+            }
+        }
         .chartPlotStyle { plot in
             plot
                 .background(BoostaColor.surfaceMuted.opacity(0.12))
@@ -1077,10 +1105,22 @@ struct StatisticsTrendChartView: View, Equatable {
         .transaction { transaction in
             transaction.animation = .easeOut(duration: 0.32)
         }
+        .onAppear {
+            if selectedPointID == nil {
+                selectedPointID = latestPoint?.id
+            }
+        }
     }
 
     private var latestPoint: StatisticsTrendPoint? {
         points.last
+    }
+
+    private var activePoint: StatisticsTrendPoint? {
+        if let selectedPointID, let selectedPoint = points.first(where: { $0.id == selectedPointID }) {
+            return selectedPoint
+        }
+        return latestPoint
     }
 
     private var axisPointIDs: [Int] {
@@ -1103,16 +1143,41 @@ struct StatisticsTrendChartView: View, Equatable {
         }
     }
 
+    private func nearestPointID(to scanNumber: Int) -> Int? {
+        points.min { lhs, rhs in
+            abs((lhs.id + 1) - scanNumber) < abs((rhs.id + 1) - scanNumber)
+        }?.id
+    }
+
     private func barGradient(for point: StatisticsTrendPoint) -> LinearGradient {
-        let isLatest = latestPoint?.id == point.id
-        let topColor = isLatest ? BoostaColor.accent : BoostaColor.accentSecondary
-        let bottomColor = isLatest ? BoostaColor.accentSecondary.opacity(0.88) : BoostaColor.accent.opacity(0.74)
+        let isActive = activePoint?.id == point.id
+        let topColor = isActive ? BoostaColor.accent : BoostaColor.accentSecondary
+        let bottomColor = isActive ? BoostaColor.accentSecondary.opacity(0.88) : BoostaColor.accent.opacity(0.74)
 
         return LinearGradient(
             colors: [bottomColor, topColor],
             startPoint: .bottom,
             endPoint: .top
         )
+    }
+
+    private func trendTooltip(for point: StatisticsTrendPoint) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(point.score) ATS")
+                .font(BoostaType.caption.weight(.semibold))
+                .foregroundStyle(BoostaColor.primaryText)
+            Text(StatisticsSnapshotBuilder.chartLabel(for: point.date))
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.secondaryText)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
     }
 }
 

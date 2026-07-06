@@ -1,15 +1,22 @@
 import Foundation
 
-final class TrackerSyncService {
+actor TrackerSyncService {
     static let shared = TrackerSyncService()
 
+    private enum RemoteAvailability {
+        case unknown
+        case available
+        case unavailable
+    }
+
     private let apiClient: AuthenticatedAPIClient
+    private var remoteAvailability: RemoteAvailability = .unknown
 
     init(apiClient: AuthenticatedAPIClient = .shared) {
         self.apiClient = apiClient
     }
 
-    func createApplication(id: UUID, draft: NewApplicationDraft) async throws {
+    func createApplication(id: UUID, draft: NewApplicationDraft) async -> Bool {
         let payload = TrackerApplicationCreatePayload(
             id: id,
             company: draft.company,
@@ -29,10 +36,12 @@ final class TrackerSyncService {
             interviewReflectionSubmittedAt: nil
         )
 
-        let _: TrackerMutationResponse = try await apiClient.postJSON(path: "/tracker/applications", body: payload)
+        return await persistRemotely {
+            let _: TrackerMutationResponse = try await apiClient.postJSON(path: "/tracker/applications", body: payload)
+        }
     }
 
-    func updateApplication(id: UUID, draft: NewApplicationDraft) async throws {
+    func updateApplication(id: UUID, draft: NewApplicationDraft) async -> Bool {
         let payload = TrackerApplicationPatchPayload(
             company: draft.company,
             role: draft.role,
@@ -45,65 +54,102 @@ final class TrackerSyncService {
             folderID: draft.folderID
         )
 
-        let _: TrackerMutationResponse = try await apiClient.patchJSON(
-            path: "/tracker/applications/\(id.uuidString)",
-            body: payload
-        )
+        return await persistRemotely {
+            let _: TrackerMutationResponse = try await apiClient.patchJSON(
+                path: "/tracker/applications/\(id.uuidString)",
+                body: payload
+            )
+        }
     }
 
-    func updateStatus(id: UUID, status: ApplicationStatus) async throws {
+    func updateStatus(id: UUID, status: ApplicationStatus) async -> Bool {
         let payload = TrackerApplicationPatchPayload(status: status.rawValue)
-        let _: TrackerMutationResponse = try await apiClient.patchJSON(
-            path: "/tracker/applications/\(id.uuidString)",
-            body: payload
-        )
+        return await persistRemotely {
+            let _: TrackerMutationResponse = try await apiClient.patchJSON(
+                path: "/tracker/applications/\(id.uuidString)",
+                body: payload
+            )
+        }
     }
 
-    func deleteApplication(id: UUID) async throws {
-        try await apiClient.delete(path: "/tracker/applications/\(id.uuidString)")
+    func deleteApplication(id: UUID) async -> Bool {
+        await persistRemotely {
+            try await apiClient.delete(path: "/tracker/applications/\(id.uuidString)")
+        }
     }
 
-    func saveInterviewReflection(id: UUID, reflection: InterviewReflectionDraft) async throws {
+    func saveInterviewReflection(id: UUID, reflection: InterviewReflectionDraft) async -> Bool {
         let payload = TrackerApplicationPatchPayload(
             interviewReflectionRating: reflection.rating,
             interviewReflectionOutcome: reflection.outcome,
             interviewReflectionNotes: reflection.notes,
             interviewReflectionSubmittedAt: .now
         )
-        let _: TrackerMutationResponse = try await apiClient.patchJSON(
-            path: "/tracker/applications/\(id.uuidString)",
-            body: payload
-        )
+        return await persistRemotely {
+            let _: TrackerMutationResponse = try await apiClient.patchJSON(
+                path: "/tracker/applications/\(id.uuidString)",
+                body: payload
+            )
+        }
     }
 
-    func assignFolder(_ folderID: UUID?, to applicationID: UUID) async throws {
+    func assignFolder(_ folderID: UUID?, to applicationID: UUID) async -> Bool {
         let payload = TrackerApplicationPatchPayload(folderID: folderID)
-        let _: TrackerMutationResponse = try await apiClient.patchJSON(
-            path: "/tracker/applications/\(applicationID.uuidString)",
-            body: payload
-        )
+        return await persistRemotely {
+            let _: TrackerMutationResponse = try await apiClient.patchJSON(
+                path: "/tracker/applications/\(applicationID.uuidString)",
+                body: payload
+            )
+        }
     }
 
-    func createFolder(id: UUID, draft: FolderCreationDraft) async throws {
+    func createFolder(id: UUID, draft: FolderCreationDraft) async -> Bool {
         let payload = TrackerFolderCreatePayload(
             id: id,
             name: draft.folder.name,
             emoji: draft.folder.emoji,
             applicationIDs: Array(draft.applicationIDs)
         )
-        let _: TrackerFolderMutationResponse = try await apiClient.postJSON(path: "/tracker/folders", body: payload)
+        return await persistRemotely {
+            let _: TrackerFolderMutationResponse = try await apiClient.postJSON(path: "/tracker/folders", body: payload)
+        }
     }
 
-    func updateFolder(id: UUID, draft: FolderDraft) async throws {
+    func updateFolder(id: UUID, draft: FolderDraft) async -> Bool {
         let payload = TrackerFolderPatchPayload(name: draft.name, emoji: draft.emoji)
-        let _: TrackerFolderMutationResponse = try await apiClient.patchJSON(
-            path: "/tracker/folders/\(id.uuidString)",
-            body: payload
-        )
+        return await persistRemotely {
+            let _: TrackerFolderMutationResponse = try await apiClient.patchJSON(
+                path: "/tracker/folders/\(id.uuidString)",
+                body: payload
+            )
+        }
     }
 
-    func deleteFolder(id: UUID) async throws {
-        try await apiClient.delete(path: "/tracker/folders/\(id.uuidString)")
+    func deleteFolder(id: UUID) async -> Bool {
+        await persistRemotely {
+            try await apiClient.delete(path: "/tracker/folders/\(id.uuidString)")
+        }
+    }
+
+    private func persistRemotely(_ operation: () async throws -> Void) async -> Bool {
+        if case .unavailable = remoteAvailability {
+            return false
+        }
+
+        do {
+            try await operation()
+            remoteAvailability = .available
+            return true
+        } catch let APIError.server(statusCode, _) where [404, 405, 410, 501].contains(statusCode) {
+            remoteAvailability = .unavailable
+            return false
+        } catch APIError.transport(_) {
+            return false
+        } catch let APIError.server(statusCode, _) where statusCode == 401 || statusCode == 403 {
+            return false
+        } catch {
+            return false
+        }
     }
 }
 

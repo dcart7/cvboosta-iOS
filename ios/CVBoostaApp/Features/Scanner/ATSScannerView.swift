@@ -554,8 +554,8 @@ private struct ReviewMetricCard: View {
                 .foregroundStyle(tint)
                 .lineLimit(2)
         }
-        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
         .padding(BoostaSpace.sm)
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
         .background(BoostaColor.surfaceInteractive)
         .overlay(
             RoundedRectangle(cornerRadius: BoostaRadius.md, style: .continuous)

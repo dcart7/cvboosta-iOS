@@ -318,7 +318,7 @@ struct StreakCenterView: View {
     }
 
     private func restoreYesterday() {
-        restoredDayStamp = StreakEngine.dayStamp(for: Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now)
+        SharedStreakState.restoreYesterday()
         usedRecoveryThisSession = true
         WidgetSyncService.shared.syncStreakState(
             user: authViewModel.me?.user,
@@ -328,7 +328,7 @@ struct StreakCenterView: View {
     }
 
     private func freezeToday() {
-        frozenDayStamp = StreakEngine.dayStamp(for: .now)
+        SharedStreakState.freezeToday()
         usedRecoveryThisSession = true
         WidgetSyncService.shared.syncStreakState(
             user: authViewModel.me?.user,

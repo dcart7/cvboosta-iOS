@@ -21,8 +21,6 @@ struct ApplicationTrackerView: View {
     @State private var statusChangeTarget: ApplicationRecord?
     @State private var selectedScope: TrackerListScope = .active
     @State private var selectedFolderID: UUID?
-    @State private var revealedApplicationID: UUID?
-
     private let widgetSyncService = WidgetSyncService.shared
     private let trackerSyncService = TrackerSyncService.shared
 
@@ -253,14 +251,10 @@ struct ApplicationTrackerView: View {
                 presentPendingInterviewReflectionIfNeeded()
             }
             .onChange(of: selectedScope) { _, _ in
-                revealedApplicationID = nil
                 guard let selectedFolderID else { return }
                 if !folders.contains(where: { $0.id == selectedFolderID }) {
                     self.selectedFolderID = nil
                 }
-            }
-            .onChange(of: selectedFolderID) { _, _ in
-                revealedApplicationID = nil
             }
         }
     }
@@ -363,119 +357,117 @@ struct ApplicationTrackerView: View {
     private func applicationCard(_ app: ApplicationRecord) -> some View {
         let priority = priority(for: app)
 
-        return TrackerTelegramSwipeRow(
-            isOpen: revealedApplicationID == app.id,
-            onOpenChange: { isOpen in
-                withAnimation(BoostaMotion.smooth) {
-                    revealedApplicationID = isOpen ? app.id : nil
+        return NavigationLink {
+            TrackedApplicationWorkspaceView(
+                application: app,
+                folderLabel: folderLabel(for: app),
+                isEmbedded: false,
+                showsNavigationTitle: true,
+                onEdit: {
+                    editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+                },
+                onChangeStatus: {
+                    statusChangeTarget = app
+                },
+                onArchiveToggle: {
+                    updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+                },
+                onMoveFolder: {
+                    folderAssignmentTarget = app
+                },
+                onAdvance: {
+                    updateStatus(id: app.id, to: nextStatus(after: app.status))
                 }
-            },
-            actions: trackerDrawerActions(for: app)
-        ) {
-            NavigationLink {
-                TrackedApplicationWorkspaceView(
-                    application: app,
-                    folderLabel: folderLabel(for: app),
-                    isEmbedded: false,
-                    showsNavigationTitle: true,
-                    onEdit: {
-                        editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
-                    },
-                    onChangeStatus: {
-                        statusChangeTarget = app
-                    },
-                    onArchiveToggle: {
-                        updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
-                    },
-                    onMoveFolder: {
-                        folderAssignmentTarget = app
-                    },
-                    onAdvance: {
-                        updateStatus(id: app.id, to: nextStatus(after: app.status))
-                    }
-                )
-            } label: {
-                GlassCard {
-                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(app.company)
-                                    .font(BoostaType.bodyStrong)
-                                Text(app.role)
-                                    .font(BoostaType.body)
-                                    .foregroundStyle(BoostaColor.secondaryText)
-                                if let folderLabel = folderLabel(for: app) {
-                                    ApplicationBadge(title: folderLabel, tint: BoostaColor.accentSecondary)
-                                }
-                            }
-
-                            Spacer()
-
-                            VStack(alignment: .trailing, spacing: 8) {
-                                ApplicationBadge(title: app.status.rawValue.capitalized, tint: statusColor(for: app.status))
-                                ApplicationBadge(title: priority.title, tint: priority.color)
-                            }
-                        }
-
-                        HStack {
-                            Text("Applied: \(app.appliedAt.formatted(date: .abbreviated, time: .omitted))")
-                            Spacer()
-                            if let score = app.atsScore {
-                                Text("ATS: \(score)")
-                            }
-                        }
-                        .font(BoostaType.caption)
-                        .foregroundStyle(BoostaColor.secondaryText)
-
-                        if let interviewAt = app.interviewAt, app.status == .interview {
-                            Text("Interview: \(interviewAt.formatted(date: .abbreviated, time: .shortened))")
-                                .font(BoostaType.caption)
-                                .foregroundStyle(BoostaColor.accentSecondary)
-                        }
-
-                        Text("Next step: \(nextStep(for: app))")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.primaryText)
-
-                        if let notes = app.notes, !notes.isEmpty {
-                            Text(notes)
-                                .font(BoostaType.caption)
+            )
+        } label: {
+            GlassCard {
+                VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(app.company)
+                                .font(BoostaType.bodyStrong)
+                            Text(app.role)
+                                .font(BoostaType.body)
                                 .foregroundStyle(BoostaColor.secondaryText)
-                                .lineLimit(2)
+                            if let folderLabel = folderLabel(for: app) {
+                                ApplicationBadge(title: folderLabel, tint: BoostaColor.accentSecondary)
+                            }
                         }
 
-                        Label("Tap to open workspace", systemImage: "arrow.right.circle")
-                            .font(BoostaType.caption)
-                            .foregroundStyle(BoostaColor.accent)
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 8) {
+                            ApplicationBadge(title: app.status.rawValue.capitalized, tint: statusColor(for: app.status))
+                            ApplicationBadge(title: priority.title, tint: priority.color)
+                        }
                     }
+
+                    HStack {
+                        Text("Applied: \(app.appliedAt.formatted(date: .abbreviated, time: .omitted))")
+                        Spacer()
+                        if let score = app.atsScore {
+                            Text("ATS: \(score)")
+                        }
+                    }
+                    .font(BoostaType.caption)
+                    .foregroundStyle(BoostaColor.secondaryText)
+
+                    if let interviewAt = app.interviewAt, app.status == .interview {
+                        Text("Interview: \(interviewAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.accentSecondary)
+                    }
+
+                    Text("Next step: \(nextStep(for: app))")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.primaryText)
+
+                    if let notes = app.notes, !notes.isEmpty {
+                        Text(notes)
+                            .font(BoostaType.caption)
+                            .foregroundStyle(BoostaColor.secondaryText)
+                            .lineLimit(2)
+                    }
+
+                    Label("Swipe for actions • tap to open workspace", systemImage: "arrow.right.circle")
+                        .font(BoostaType.caption)
+                        .foregroundStyle(BoostaColor.accent)
                 }
-            }
-            .buttonStyle(BoostaDepthButtonStyle())
-            .contextMenu {
-                trackerQuickActionsMenu(for: app)
             }
         }
-    }
-
-    private func trackerDrawerActions(for app: ApplicationRecord) -> [TrackerSwipeDrawerAction] {
-        [
-            TrackerSwipeDrawerAction(title: "Folder", systemImage: "folder.badge.plus", tint: BoostaColor.accentSecondary) {
+        .buttonStyle(BoostaDepthButtonStyle())
+        .contextMenu {
+            trackerQuickActionsMenu(for: app)
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
                 folderAssignmentTarget = app
-            },
-            TrackerSwipeDrawerAction(title: "Edit", systemImage: "pencil", tint: BoostaColor.accent) {
-                editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
-            },
-            TrackerSwipeDrawerAction(
-                title: app.status.isArchiveBucket ? "Restore" : "Archive",
-                systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox",
-                tint: app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText
-            ) {
-                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
-            },
-            TrackerSwipeDrawerAction(title: "Delete", systemImage: "trash", tint: BoostaColor.danger, role: .destructive) {
-                deleteApplication(id: app.id)
+            } label: {
+                Label("Folder", systemImage: "folder.badge.plus")
             }
-        ]
+            .tint(BoostaColor.accentSecondary)
+
+            Button {
+                editingContext = ApplicationEditingContext(id: app.id, draft: makeDraft(from: app))
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(BoostaColor.accent)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button {
+                updateStatus(id: app.id, to: app.status.isArchiveBucket ? .saved : .archived)
+            } label: {
+                Label(app.status.isArchiveBucket ? "Restore" : "Archive", systemImage: app.status.isArchiveBucket ? "arrow.uturn.backward" : "archivebox")
+            }
+            .tint(app.status.isArchiveBucket ? BoostaColor.accent : BoostaColor.secondaryText)
+
+            Button(role: .destructive) {
+                deleteApplication(id: app.id)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 
     @ViewBuilder
@@ -585,46 +577,41 @@ struct ApplicationTrackerView: View {
         let recordID = UUID()
 
         Task {
-            do {
-                try await trackerSyncService.createApplication(id: recordID, draft: draft)
+            let isAccountBacked = await trackerSyncService.createApplication(id: recordID, draft: draft)
 
-                await MainActor.run {
-                    let record = ApplicationRecord(
-                        id: recordID,
-                        company: draft.company,
-                        role: draft.role,
-                        status: draft.status,
-                        appliedAt: draft.appliedAt,
-                        source: "iOS",
-                        interviewAt: draft.interviewAt,
-                        notes: draft.notes,
-                        resumeUsed: draft.resumeUsed,
-                        jobLink: draft.jobLink,
-                        folderID: draft.folderID,
-                        atsScore: nil,
-                        isAccountBacked: true
-                    )
-                    modelContext.insert(record)
+            await MainActor.run {
+                let record = ApplicationRecord(
+                    id: recordID,
+                    company: draft.company,
+                    role: draft.role,
+                    status: draft.status,
+                    appliedAt: draft.appliedAt,
+                    source: "iOS",
+                    interviewAt: draft.interviewAt,
+                    notes: draft.notes,
+                    resumeUsed: draft.resumeUsed,
+                    jobLink: draft.jobLink,
+                    folderID: draft.folderID,
+                    atsScore: nil,
+                    isAccountBacked: isAccountBacked
+                )
+                modelContext.insert(record)
 
-                    do {
-                        try modelContext.save()
-                        syncWidgetSnapshot()
-                        celebrateStreak(with: record.status)
-                        presentPipelineLiveActivityIfNeeded(for: record)
-                        showAddSheet = false
-                        HapticsService.success()
-                    } catch {
-                        errorMessage = "Saved to account, but local refresh needs one more sync."
-                        HapticsService.error()
-                    }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                do {
+                    try modelContext.save()
+                    syncWidgetSnapshot()
+                    celebrateStreak(with: record.status)
+                    presentPipelineLiveActivityIfNeeded(for: record)
+                    showAddSheet = false
+                    HapticsService.success()
+                } catch {
+                    errorMessage = "Application saved, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -634,42 +621,37 @@ struct ApplicationTrackerView: View {
         errorMessage = nil
 
         Task {
-            do {
-                try await trackerSyncService.updateApplication(id: id, draft: draft)
+            let isAccountBacked = await trackerSyncService.updateApplication(id: id, draft: draft)
 
-                await MainActor.run {
-                    record.company = draft.company
-                    record.role = draft.role
-                    record.status = draft.status
-                    record.appliedAt = draft.appliedAt
-                    record.interviewAt = draft.interviewAt
-                    record.notes = draft.notes
-                    record.resumeUsed = draft.resumeUsed
-                    record.jobLink = draft.jobLink
-                    record.folderID = draft.folderID
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.company = draft.company
+                record.role = draft.role
+                record.status = draft.status
+                record.appliedAt = draft.appliedAt
+                record.interviewAt = draft.interviewAt
+                record.notes = draft.notes
+                record.resumeUsed = draft.resumeUsed
+                record.jobLink = draft.jobLink
+                record.folderID = draft.folderID
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        syncWidgetSnapshot()
-                        if record.status != .archived {
-                            celebrateStreak(with: record.status)
-                        }
-                        presentPipelineLiveActivityIfNeeded(for: record)
-                        editingContext = nil
-                        HapticsService.success()
-                    } catch {
-                        errorMessage = "Saved to account, but local refresh needs one more sync."
-                        HapticsService.error()
+                do {
+                    try modelContext.save()
+                    syncWidgetSnapshot()
+                    if record.status != .archived {
+                        celebrateStreak(with: record.status)
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    presentPipelineLiveActivityIfNeeded(for: record)
+                    editingContext = nil
+                    HapticsService.success()
+                } catch {
+                    errorMessage = "Application updated, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -679,35 +661,30 @@ struct ApplicationTrackerView: View {
         errorMessage = nil
 
         Task {
-            do {
-                try await trackerSyncService.updateStatus(id: id, status: status)
+            let isAccountBacked = await trackerSyncService.updateStatus(id: id, status: status)
 
-                await MainActor.run {
-                    record.status = status
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.status = status
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        statusChangeTarget = nil
-                        syncWidgetSnapshot()
-                        presentPipelineLiveActivityIfNeeded(for: record)
-                        if status.isArchiveBucket {
-                            HapticsService.warning()
-                        } else {
-                            HapticsService.success()
-                        }
-                    } catch {
-                        errorMessage = "Saved to account, but local refresh needs one more sync."
-                        HapticsService.error()
+                do {
+                    try modelContext.save()
+                    statusChangeTarget = nil
+                    syncWidgetSnapshot()
+                    presentPipelineLiveActivityIfNeeded(for: record)
+                    if status.isArchiveBucket {
+                        HapticsService.warning()
+                    } else {
+                        HapticsService.success()
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                } catch {
+                    errorMessage = "Status updated, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -717,29 +694,24 @@ struct ApplicationTrackerView: View {
         errorMessage = nil
 
         Task {
-            do {
-                try await trackerSyncService.deleteApplication(id: id)
+            let isAccountBacked = await trackerSyncService.deleteApplication(id: id)
 
-                await MainActor.run {
-                    modelContext.delete(record)
+            await MainActor.run {
+                modelContext.delete(record)
 
-                    do {
-                        try modelContext.save()
-                        syncWidgetSnapshot(applications.filter { $0.id != id })
-                        editingContext = nil
-                        HapticsService.warning()
-                    } catch {
-                        errorMessage = "Deleted from account, but local refresh needs one more sync."
-                        HapticsService.error()
-                    }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                do {
+                    try modelContext.save()
+                    syncWidgetSnapshot(applications.filter { $0.id != id })
+                    editingContext = nil
+                    HapticsService.warning()
+                } catch {
+                    errorMessage = "Application removed, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -749,37 +721,32 @@ struct ApplicationTrackerView: View {
         errorMessage = nil
 
         Task {
-            do {
-                try await trackerSyncService.saveInterviewReflection(id: id, reflection: reflection)
+            let isAccountBacked = await trackerSyncService.saveInterviewReflection(id: id, reflection: reflection)
 
-                await MainActor.run {
-                    record.interviewReflectionRating = reflection.rating
-                    record.interviewReflectionOutcome = reflection.outcome
-                    record.interviewReflectionNotes = reflection.notes
-                    record.interviewReflectionSubmittedAt = .now
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.interviewReflectionRating = reflection.rating
+                record.interviewReflectionOutcome = reflection.outcome
+                record.interviewReflectionNotes = reflection.notes
+                record.interviewReflectionSubmittedAt = .now
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        interviewReflectionTarget = nil
-                        if #available(iOS 16.1, *) {
-                            Task {
-                                await LiveActivityManager.shared.clearPostInterviewReflection()
-                            }
+                do {
+                    try modelContext.save()
+                    interviewReflectionTarget = nil
+                    if #available(iOS 16.1, *) {
+                        Task {
+                            await LiveActivityManager.shared.clearPostInterviewReflection()
                         }
-                        HapticsService.success()
-                    } catch {
-                        errorMessage = "Saved to account, but local refresh needs one more sync."
-                        HapticsService.error()
                     }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    HapticsService.success()
+                } catch {
+                    errorMessage = "Reflection saved, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -808,29 +775,24 @@ struct ApplicationTrackerView: View {
         errorMessage = nil
 
         Task {
-            do {
-                try await trackerSyncService.assignFolder(folderID, to: applicationID)
+            let isAccountBacked = await trackerSyncService.assignFolder(folderID, to: applicationID)
 
-                await MainActor.run {
-                    record.folderID = folderID
-                    record.isAccountBacked = true
+            await MainActor.run {
+                record.folderID = folderID
+                record.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        folderAssignmentTarget = nil
-                        HapticsService.selection()
-                    } catch {
-                        errorMessage = "Saved to account, but local refresh needs one more sync."
-                        HapticsService.error()
-                    }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                do {
+                    try modelContext.save()
+                    folderAssignmentTarget = nil
+                    HapticsService.selection()
+                } catch {
+                    errorMessage = "Folder updated, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -840,39 +802,34 @@ struct ApplicationTrackerView: View {
         let folderID = UUID()
 
         Task {
-            do {
-                try await trackerSyncService.createFolder(id: folderID, draft: draft)
+            let isAccountBacked = await trackerSyncService.createFolder(id: folderID, draft: draft)
 
-                await MainActor.run {
-                    let folder = ApplicationFolder(
-                        id: folderID,
-                        name: draft.folder.name,
-                        emoji: draft.folder.emoji,
-                        isAccountBacked: true
-                    )
-                    modelContext.insert(folder)
+            await MainActor.run {
+                let folder = ApplicationFolder(
+                    id: folderID,
+                    name: draft.folder.name,
+                    emoji: draft.folder.emoji,
+                    isAccountBacked: isAccountBacked
+                )
+                modelContext.insert(folder)
 
-                    for application in applications where draft.applicationIDs.contains(application.id) {
-                        application.folderID = folder.id
-                        application.isAccountBacked = true
-                    }
-
-                    do {
-                        try modelContext.save()
-                        selectedFolderID = folder.id
-                        HapticsService.success()
-                    } catch {
-                        errorMessage = "Saved to account, but local refresh needs one more sync."
-                        HapticsService.error()
-                    }
+                for application in applications where draft.applicationIDs.contains(application.id) {
+                    application.folderID = folder.id
+                    application.isAccountBacked = isAccountBacked
                 }
 
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                do {
+                    try modelContext.save()
+                    selectedFolderID = folder.id
+                    HapticsService.success()
+                } catch {
+                    errorMessage = "Folder saved, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -882,29 +839,24 @@ struct ApplicationTrackerView: View {
         errorMessage = nil
 
         Task {
-            do {
-                try await trackerSyncService.updateFolder(id: id, draft: draft)
+            let isAccountBacked = await trackerSyncService.updateFolder(id: id, draft: draft)
 
-                await MainActor.run {
-                    folder.name = draft.name
-                    folder.emoji = draft.emoji
-                    folder.isAccountBacked = true
+            await MainActor.run {
+                folder.name = draft.name
+                folder.emoji = draft.emoji
+                folder.isAccountBacked = isAccountBacked
 
-                    do {
-                        try modelContext.save()
-                        HapticsService.selection()
-                    } catch {
-                        errorMessage = "Saved to account, but local refresh needs one more sync."
-                        HapticsService.error()
-                    }
-                }
-
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                do {
+                    try modelContext.save()
+                    HapticsService.selection()
+                } catch {
+                    errorMessage = "Folder updated, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -914,34 +866,29 @@ struct ApplicationTrackerView: View {
         errorMessage = nil
 
         Task {
-            do {
-                try await trackerSyncService.deleteFolder(id: id)
+            let isAccountBacked = await trackerSyncService.deleteFolder(id: id)
 
-                await MainActor.run {
-                    for application in applications where application.folderID == id {
-                        application.folderID = nil
-                        application.isAccountBacked = true
-                    }
-                    modelContext.delete(folder)
-
-                    do {
-                        try modelContext.save()
-                        if selectedFolderID == id {
-                            selectedFolderID = nil
-                        }
-                        HapticsService.warning()
-                    } catch {
-                        errorMessage = "Deleted from account, but local refresh needs one more sync."
-                        HapticsService.error()
-                    }
+            await MainActor.run {
+                for application in applications where application.folderID == id {
+                    application.folderID = nil
+                    application.isAccountBacked = isAccountBacked
                 }
+                modelContext.delete(folder)
 
-                await authViewModel.refreshSharedState()
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
+                do {
+                    try modelContext.save()
+                    if selectedFolderID == id {
+                        selectedFolderID = nil
+                    }
+                    HapticsService.warning()
+                } catch {
+                    errorMessage = "Folder removed, but local refresh needs one more pass."
                     HapticsService.error()
                 }
+            }
+
+            if isAccountBacked {
+                await authViewModel.refreshSharedState()
             }
         }
     }
@@ -1377,155 +1324,6 @@ struct TrackerFolderChip: View {
             .clipShape(Capsule())
         }
         .buttonStyle(BoostaDepthButtonStyle())
-    }
-}
-
-struct TrackerSwipeDrawerAction: Identifiable {
-    let id = UUID()
-    let title: String
-    let systemImage: String
-    let tint: Color
-    var role: ButtonRole? = nil
-    let action: () -> Void
-}
-
-struct TrackerTelegramSwipeRow<Content: View>: View {
-    let isOpen: Bool
-    let onOpenChange: (Bool) -> Void
-    let actions: [TrackerSwipeDrawerAction]
-    let cornerRadius: CGFloat
-    let content: () -> Content
-
-    @GestureState private var dragTranslation: CGFloat = 0
-
-    init(
-        isOpen: Bool,
-        onOpenChange: @escaping (Bool) -> Void,
-        actions: [TrackerSwipeDrawerAction],
-        cornerRadius: CGFloat = BoostaRadius.md,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.isOpen = isOpen
-        self.onOpenChange = onOpenChange
-        self.actions = actions
-        self.cornerRadius = cornerRadius
-        self.content = content
-    }
-
-    private var drawerWidth: CGFloat {
-        CGFloat(actions.count) * 78
-    }
-
-    private var contentOffset: CGFloat {
-        let base = isOpen ? -drawerWidth : 0
-        return max(-drawerWidth, min(0, base + dragTranslation))
-    }
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-
-                HStack(spacing: 0) {
-                    ForEach(actions) { action in
-                        TrackerSwipeDrawerButton(action: action) {
-                            closeDrawer()
-                            Task { @MainActor in
-                                action.action()
-                            }
-                        }
-                    }
-                }
-                .frame(width: drawerWidth)
-                .frame(maxHeight: .infinity)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.06),
-                            Color.white.opacity(0.03)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-            }
-
-            content()
-                .offset(x: contentOffset)
-                .overlay {
-                    if isOpen {
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                closeDrawer()
-                            }
-                    }
-                }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .simultaneousGesture(dragGesture)
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .local)
-            .updating($dragTranslation) { value, state, _ in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                state = value.translation.width
-            }
-            .onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-
-                let base = isOpen ? -drawerWidth : 0
-                let projected = max(-drawerWidth, min(0, base + value.predictedEndTranslation.width))
-                let shouldOpen = projected < -(drawerWidth * 0.34)
-
-                if shouldOpen != isOpen {
-                    HapticsService.selection()
-                }
-
-                withAnimation(BoostaMotion.smooth) {
-                    onOpenChange(shouldOpen)
-                }
-            }
-    }
-
-    private func closeDrawer() {
-        withAnimation(BoostaMotion.smooth) {
-            onOpenChange(false)
-        }
-    }
-}
-
-private struct TrackerSwipeDrawerButton: View {
-    let action: TrackerSwipeDrawerAction
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(role: action.role) {
-            onTap()
-        } label: {
-            VStack(spacing: 8) {
-                Image(systemName: action.systemImage)
-                    .font(.system(size: 18, weight: .semibold))
-                Text(action.title)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 6)
-            .background(action.tint)
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 1)
-            }
-        }
-        .buttonStyle(BoostaDepthButtonStyle(pressedScale: 0.97, pressedOpacity: 0.94, verticalOffset: 0))
-        .accessibilityLabel(action.title)
     }
 }
 

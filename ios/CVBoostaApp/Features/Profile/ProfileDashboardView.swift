@@ -140,6 +140,11 @@ struct ProfileDashboardView: View {
         .onAppear {
             seedDraftsIfNeeded()
         }
+        .onChange(of: notificationsEnabled) { _, isEnabled in
+            Task {
+                await PushNotificationService.shared.applyUserPreference(isEnabled: isEnabled)
+            }
+        }
         .task(id: selectedAvatarItem) {
             await loadSelectedAvatar()
         }

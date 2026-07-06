@@ -19,9 +19,9 @@ struct MetricPill: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.metricPillMinHeight, alignment: .leading)
         .padding(.horizontal, BoostaSpace.sm)
-        .padding(.vertical, BoostaSpace.sm)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: WorkspaceLayoutMetrics.metricPillMinHeight, alignment: .leading)
         .background(BoostaColor.surfaceInteractive)
         .clipShape(RoundedRectangle(cornerRadius: BoostaRadius.sm, style: .continuous))
     }

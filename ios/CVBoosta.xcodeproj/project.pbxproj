@@ -69,6 +69,7 @@
 		B60657164012C785BBCCA612 /* ATSResponseParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF76411B4D790EB18DB72BE /* ATSResponseParsingTests.swift */; };
 		B8081D06BF9D8CD22DF01C5E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA31832DAB32F2F0428FDA6 /* OnboardingView.swift */; };
 		B9095B6DA3D10E22D753047D /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2A9218B2C8FB4577724DE3 /* JSONValue.swift */; };
+		BF2508C3189F98650E84CB51 /* WorkspaceCloudState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1554D082802C1F7AEE7EF5A8 /* WorkspaceCloudState.swift */; };
 		C6724C80800F64DB795246DF /* TypographyTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F01EA905668C7DAA562A63 /* TypographyTokens.swift */; };
 		C8FC740FAFCBBFEEDDA0C3BC /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6FEAA043E841C4669C6C7E /* WelcomeView.swift */; };
 		C9D4D2E2018B77DE5807CCF2 /* CVBoostaLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1461E22841145EB23F015DCE /* CVBoostaLiveActivity.swift */; };
@@ -95,6 +96,7 @@
 		F6D364C1EA25CF6388A7E7CB /* StreakCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66363A82A704EED4F2259A30 /* StreakCenterView.swift */; };
 		F72C26EACFDA572428720F4E /* ATSScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27F1E6788856182BDFC2EB9 /* ATSScannerView.swift */; };
 		FA64AC120EDF6D8B05F7F860 /* ResumeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC92A83BB7F7127FA9CDA40 /* ResumeService.swift */; };
+		FAB5431569FA1D8CBC43D99B /* WorkspaceCloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EACB82DF23EE6799CCFC055 /* WorkspaceCloudSyncService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -140,6 +142,7 @@
 		14738B86F46E79C7FA758A2C /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		14D52DBD214D37858610C815 /* TrackedApplicationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackedApplicationWorkspaceView.swift; sourceTree = "<group>"; };
 		1542EAD33DCB06451ED938F1 /* CVBoostaApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CVBoostaApp.entitlements; sourceTree = "<group>"; };
+		1554D082802C1F7AEE7EF5A8 /* WorkspaceCloudState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCloudState.swift; sourceTree = "<group>"; };
 		1820FD891E24369ACC67E5A7 /* SettingsWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWorkspaceView_iPad.swift; sourceTree = "<group>"; };
 		18871EDEE83B3D1FBCF14E6C /* ATSScannerWorkspaceView_iPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSScannerWorkspaceView_iPad.swift; sourceTree = "<group>"; };
 		1FB0485E439E8BE8A7857AD1 /* AuthExperienceComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthExperienceComponents.swift; sourceTree = "<group>"; };
@@ -151,6 +154,7 @@
 		3AF76411B4D790EB18DB72BE /* ATSResponseParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATSResponseParsingTests.swift; sourceTree = "<group>"; };
 		3C7E4C512D498E4C73AB248E /* SpacingTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacingTokens.swift; sourceTree = "<group>"; };
 		3DCB7740EAEB083B2B175255 /* CVBoostaWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CVBoostaWidgetExtension.entitlements; sourceTree = "<group>"; };
+		3EACB82DF23EE6799CCFC055 /* WorkspaceCloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCloudSyncService.swift; sourceTree = "<group>"; };
 		44F59D1CC3B0DC908E22D7E5 /* EntranceAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntranceAnimator.swift; sourceTree = "<group>"; };
 		51158DDAF6A7A264CDFD7D33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		54BC9517B088B54807EB0DB3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -339,6 +343,7 @@
 				81CE450774353F59B8A313EC /* LatestScanReport.swift */,
 				678708556F0848D2FE043D46 /* ResumeProfile.swift */,
 				C461E1368094D7C87A817584 /* SavedTailoringSuggestion.swift */,
+				1554D082802C1F7AEE7EF5A8 /* WorkspaceCloudState.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -400,6 +405,7 @@
 				8109D81CD0D902AB52F62BF3 /* TrackerWorkspaceService.swift */,
 				DEEE2C3751FEABF09BADBC00 /* UserService.swift */,
 				9992BBEA9E48B91E8D1C3434 /* WidgetSyncService.swift */,
+				3EACB82DF23EE6799CCFC055 /* WorkspaceCloudSyncService.swift */,
 				07D635202B0B1BB875254A0C /* WorkspaceSessionService.swift */,
 			);
 			path = Services;
@@ -723,6 +729,8 @@
 				CFFC982EA13AC3FB9D41C88F /* UserService.swift in Sources */,
 				C8FC740FAFCBBFEEDDA0C3BC /* WelcomeView.swift in Sources */,
 				2EEF4EDF7F4B1C816A820E97 /* WidgetSyncService.swift in Sources */,
+				BF2508C3189F98650E84CB51 /* WorkspaceCloudState.swift in Sources */,
+				FAB5431569FA1D8CBC43D99B /* WorkspaceCloudSyncService.swift in Sources */,
 				04BD185C0FE8E00FB80464DB /* WorkspaceSessionService.swift in Sources */,
 				62228BC180A66ED6994EA95E /* iPadWorkspaceView.swift in Sources */,
 			);
