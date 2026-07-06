@@ -28,9 +28,20 @@ Important notes:
 
 - [Blog](https://cvboosta.com/blog): Master index for ATS, resume, and application strategy content.
 - [Resume Keywords by Role](https://cvboosta.com/resume-keywords): Large role-based keyword library for job-title-specific ATS guidance.
+- [ATS Resume Guides](https://cvboosta.com/ats): Parser-specific ATS guidance covering formatting, keyword placement, standard headings, and date parsing.
+- [ATS Comparisons](https://cvboosta.com/ats-comparisons): Public comparison pages for the parsing behavior of common ATS platforms.
+- [Skill Frequency Pages](https://cvboosta.com/skills): Pages that analyze how individual skills strengthen resume matching across role families.
+- [Resume Tools Library](https://cvboosta.com/tools): Tool explanation pages for resume scoring, readability, keyword placement, and recruiter scan previews.
+- [Resume Skills Datasets](https://cvboosta.com/datasets): Dataset-style pages focused on role language, missing skills, and ATS-friendly phrasing.
 - [Backend Developer Resume Keywords for ATS](https://cvboosta.com/blog/backend-developer-resume-keywords-for-ats): Role-specific example focused on keyword placement, evidence, and recruiter-readable phrasing.
 - [Workday ATS Resume Format (2026)](https://cvboosta.com/blog/workday-ats-resume-format-2026): Example formatting guide for parsing-safe resume structure.
 - [Application Checklist Before You Click Submit](https://cvboosta.com/blog/application-checklist-before-click-submit): Final application QA checklist.
+
+## Crawler Discovery
+
+- [XML Sitemap](https://cvboosta.com/sitemap.xml): Canonical list of public content URLs, including SEO library pages.
+- [Robots](https://cvboosta.com/robots.txt): Crawl directives and sitemap declaration.
+- [Compact LLM Context](https://cvboosta.com/llms.txt): Smaller discovery file for tools with tighter context limits.
 
 ## Policies and Trust
 

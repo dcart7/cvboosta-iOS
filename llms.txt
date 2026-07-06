@@ -16,7 +16,17 @@ Use the homepage and pricing page for the clearest product summary. Use the abou
 
 - [Blog](https://cvboosta.com/blog): ATS, resume, and job-search guidance.
 - [Resume Keywords by Role](https://cvboosta.com/resume-keywords): Role-specific keyword pages and ATS-oriented keyword guidance.
+- [ATS Resume Guides](https://cvboosta.com/ats): Parser-specific ATS pages covering formatting, section headings, date parsing, and keyword matching.
+- [ATS Comparisons](https://cvboosta.com/ats-comparisons): Comparison pages for common applicant tracking systems and parsing differences.
+- [Skill Frequency Pages](https://cvboosta.com/skills): Search-intent pages about how skills appear across different resume targets.
+- [Resume Tools Library](https://cvboosta.com/tools): Pages explaining CVBoosta-style resume optimization tools and score logic.
+- [Resume Skills Datasets](https://cvboosta.com/datasets): Industry and function datasets for high-signal resume skills and ATS wording.
 - [Full LLM Context](https://cvboosta.com/llms-full.txt): Expanded context for tools that can load a larger file.
+
+## Crawler Discovery
+
+- [XML Sitemap](https://cvboosta.com/sitemap.xml): Canonical crawl entry point for public content URLs.
+- [Robots](https://cvboosta.com/robots.txt): Crawl policy and sitemap declaration.
 
 ## Policies
 

@@ -11,3 +11,7 @@ def default_database_url() -> str:
 
 def resolved_database_url(override: str | None = None) -> str:
     return override or os.getenv("DATABASE_URL") or default_database_url()
+
+
+def site_base_url() -> str:
+    return (os.getenv("SITE_BASE_URL") or "https://cvboosta.com").rstrip("/")
