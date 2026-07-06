@@ -526,11 +526,22 @@ struct HomeWorkspaceView_iPad: View {
     private func openHistoryPDF(for item: HistoryListItem) async {
         do {
             let detail = try await resumeService.historyDetail(id: item.id)
+            let watermarkText = await MainActor.run {
+                SubscriptionService.shared.isPremium ? nil : SharedHistoryPDFBuilder.freeWatermarkText
+            }
             let url = try SharedHistoryPDFBuilder.makeResumePDF(
                 item: item,
-                detail: detail
+                detail: detail,
+                watermarkText: watermarkText
             )
-            previewDocument = HistoryPDFPreviewDocument(id: item.id, title: item.role ?? "CV Optimization", fileURL: url)
+            previewDocument = HistoryPDFPreviewDocument(
+                id: item.id,
+                title: item.role ?? "CV Optimization",
+                fileURL: url,
+                resumeName: SharedHistoryPDFBuilder.resumeName(for: item, detail: detail),
+                optimizedText: detail.optimizedCV,
+                watermarkText: watermarkText
+            )
             historyErrorMessage = nil
         } catch {
             historyErrorMessage = "Could not open browser-generated PDF in the app."

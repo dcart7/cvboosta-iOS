@@ -68,6 +68,7 @@ struct LoginView: View {
                                 placeholder: "Your password",
                                 text: $password,
                                 secure: true,
+                                showsVisibilityToggle: true,
                                 textContentType: .password,
                                 autocapitalization: .never,
                                 errorText: passwordError

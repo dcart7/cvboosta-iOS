@@ -29,6 +29,8 @@ struct AuthBackgroundView: View {
 }
 
 struct BrandMarkView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var size: CGFloat = 76
     var glow: Bool = true
 
@@ -39,19 +41,32 @@ struct BrandMarkView: View {
                 .frame(width: size * 1.08, height: size * 1.08)
                 .blur(radius: glow ? 12 : 0)
 
-            BoostaColor.auroraGradient
-                .frame(width: size, height: size)
-                .mask(
-                    Image("BrandMark")
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .compositingGroup()
-                        .colorInvert()
-                        .luminanceToAlpha()
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.98),
+                            colorScheme == .dark ? BoostaColor.surfaceInteractiveStrong : BoostaColor.surfaceElevated
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
+                .frame(width: size, height: size)
+                .overlay(
+                    RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                        .stroke(BoostaColor.glassStrongStroke, lineWidth: 1)
+                )
+
+            Image("BrandMark")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .padding(size * 0.08)
+                .frame(width: size, height: size)
         }
-        .shadow(color: glow ? BoostaColor.accent.opacity(0.22) : .clear, radius: 22, x: 0, y: 10)
+        .frame(width: size, height: size)
+        .shadow(color: glow ? BoostaColor.accent.opacity(colorScheme == .dark ? 0.20 : 0.14) : .clear, radius: 22, x: 0, y: 10)
     }
 }
 
@@ -211,16 +226,32 @@ struct AuthTrustRow: View {
 
 struct AuthSocialProofRow: View {
     var body: some View {
-        HStack(spacing: 8) {
-            proofChip("1,200+ applicants")
-            proofChip("ATS optimized in 2 min")
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                proofChip("star.fill", text: "4.9/5 candidate rating", tint: BoostaColor.warning)
+                proofChip("person.2.fill", text: "1,200+ applicants", tint: BoostaColor.accentSecondary)
+                proofChip("clock.fill", text: "ATS optimized in 2 min", tint: BoostaColor.success)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                proofChip("star.fill", text: "4.9/5 candidate rating", tint: BoostaColor.warning)
+                proofChip("person.2.fill", text: "1,200+ applicants", tint: BoostaColor.accentSecondary)
+                proofChip("clock.fill", text: "ATS optimized in 2 min", tint: BoostaColor.success)
+            }
         }
     }
 
-    private func proofChip(_ text: String) -> some View {
-        Text(text)
-            .font(BoostaType.caption)
-            .foregroundStyle(BoostaColor.primaryText)
+    private func proofChip(_ systemImage: String, text: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(tint)
+
+            Text(text)
+                .font(BoostaType.caption)
+                .foregroundStyle(BoostaColor.primaryText)
+                .lineLimit(1)
+        }
             .padding(.horizontal, BoostaSpace.sm)
             .padding(.vertical, 8)
             .background(BoostaColor.surface)

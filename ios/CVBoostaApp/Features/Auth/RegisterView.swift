@@ -161,6 +161,7 @@ struct RegisterView: View {
                         placeholder: "Minimum 8 characters",
                         text: $password,
                         secure: true,
+                        showsVisibilityToggle: true,
                         textContentType: .newPassword,
                         autocapitalization: .never,
                         errorText: passwordError
@@ -172,6 +173,7 @@ struct RegisterView: View {
                         placeholder: "Confirm password",
                         text: $confirmPassword,
                         secure: true,
+                        showsVisibilityToggle: true,
                         textContentType: .newPassword,
                         autocapitalization: .never,
                         errorText: confirmPasswordError

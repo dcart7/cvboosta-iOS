@@ -155,9 +155,12 @@ struct TextInputField: View {
     @Binding var text: String
     var keyboardType: UIKeyboardType = .default
     var secure: Bool = false
+    var showsVisibilityToggle: Bool = false
     var textContentType: UITextContentType? = nil
     var autocapitalization: TextInputAutocapitalization = .sentences
     var errorText: String? = nil
+
+    @State private var revealsSecureText = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: BoostaSpace.xs) {
@@ -165,12 +168,28 @@ struct TextInputField: View {
                 .font(BoostaType.caption)
                 .foregroundStyle(BoostaColor.secondaryText)
 
-            Group {
-                if secure {
-                    SecureField(placeholder, text: $text)
-                } else {
-                    TextField(placeholder, text: $text)
-                        .keyboardType(keyboardType)
+            HStack(spacing: BoostaSpace.xs) {
+                Group {
+                    if secure && !revealsSecureText {
+                        SecureField(placeholder, text: $text)
+                    } else {
+                        TextField(placeholder, text: $text)
+                    }
+                }
+                .keyboardType(keyboardType)
+
+                if secure && showsVisibilityToggle {
+                    Button {
+                        revealsSecureText.toggle()
+                        HapticsService.selection()
+                    } label: {
+                        Image(systemName: revealsSecureText ? "eye.slash" : "eye")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(BoostaColor.secondaryText)
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(revealsSecureText ? "Hide password" : "Show password")
                 }
             }
             .textInputAutocapitalization(autocapitalization)

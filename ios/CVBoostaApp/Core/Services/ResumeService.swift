@@ -123,6 +123,7 @@ private struct ResumeExportRequest {
     let resumeName: String
     let optimizedText: String
     let format: ResumeExportFormat
+    let watermarkText: String?
 }
 
 struct ResumeExportFile {
@@ -163,7 +164,8 @@ final class ResumeExportController: ObservableObject {
     func export(
         resumeName: String,
         optimizedText: String,
-        format: ResumeExportFormat
+        format: ResumeExportFormat,
+        watermarkText: String? = nil
     ) {
         guard !isExporting else { return }
 
@@ -179,7 +181,8 @@ final class ResumeExportController: ObservableObject {
         lastRequest = ResumeExportRequest(
             resumeName: resumeName,
             optimizedText: optimizedText,
-            format: format
+            format: format,
+            watermarkText: watermarkText
         )
 
         Task {
@@ -187,7 +190,8 @@ final class ResumeExportController: ObservableObject {
                 let file = try await resumeService.exportResume(
                     resumeName: resumeName,
                     optimizedText: optimizedText,
-                    format: format
+                    format: format,
+                    watermarkText: watermarkText
                 )
                 await MainActor.run {
                     self.isExporting = false
@@ -210,7 +214,8 @@ final class ResumeExportController: ObservableObject {
         export(
             resumeName: lastRequest.resumeName,
             optimizedText: lastRequest.optimizedText,
-            format: lastRequest.format
+            format: lastRequest.format,
+            watermarkText: lastRequest.watermarkText
         )
     }
 
@@ -296,7 +301,8 @@ final class ResumeService {
     func exportResume(
         resumeName: String,
         optimizedText: String,
-        format: ResumeExportFormat
+        format: ResumeExportFormat,
+        watermarkText: String? = nil
     ) async throws -> ResumeExportFile {
         let cleanedText = Self.sanitizeResumeText(optimizedText)
         guard !cleanedText.isEmpty else {
@@ -305,7 +311,7 @@ final class ResumeService {
 
         let document = Self.extractDocument(from: cleanedText, fallbackTitle: resumeName)
         let data = try await Task.detached(priority: .userInitiated) {
-            try Self.makeExportData(document: document, format: format)
+            try Self.makeExportData(document: document, format: format, watermarkText: watermarkText)
         }.value
 
         let fileURL = try await Task.detached(priority: .utility) {
@@ -615,25 +621,36 @@ private extension ResumeService {
         return details
     }
 
-    static func makeExportData(document: ResumeDocument, format: ResumeExportFormat) throws -> Data {
+    static func makeExportData(
+        document: ResumeDocument,
+        format: ResumeExportFormat,
+        watermarkText: String? = nil
+    ) throws -> Data {
         switch format {
         case .pdf:
-            return try makePDFData(from: attributedDocument(for: document))
+            return try makePDFData(
+                from: attributedDocument(for: document, watermarkText: watermarkText),
+                watermarkText: watermarkText
+            )
         case .docx:
-            let attributed = attributedDocument(for: document)
+            let attributed = attributedDocument(for: document, watermarkText: watermarkText)
             return try attributed.data(
                 from: NSRange(location: 0, length: attributed.length),
                 documentAttributes: [.documentType: NSAttributedString.DocumentType(rawValue: "org.openxmlformats.wordprocessingml.document")]
             )
         case .txt:
-            guard let data = document.cleanedText.data(using: .utf8) else {
+            let exportText = watermarkedPlainText(document.cleanedText, watermarkText: watermarkText)
+            guard let data = exportText.data(using: .utf8) else {
                 throw APIError.server(statusCode: 500, message: "Could not encode TXT export.")
             }
             return data
         }
     }
 
-    static func attributedDocument(for document: ResumeDocument) -> NSAttributedString {
+    static func attributedDocument(
+        for document: ResumeDocument,
+        watermarkText: String? = nil
+    ) -> NSAttributedString {
         let titleStyle = NSMutableParagraphStyle()
         titleStyle.lineSpacing = 2
         titleStyle.paragraphSpacing = 18
@@ -668,6 +685,13 @@ private extension ResumeService {
             .paragraphStyle: detailStyle
         ]
 
+        let watermarkBadgeStyle = NSMutableParagraphStyle()
+        watermarkBadgeStyle.paragraphSpacing = 4
+
+        let watermarkNoteStyle = NSMutableParagraphStyle()
+        watermarkNoteStyle.paragraphSpacing = 12
+        watermarkNoteStyle.lineSpacing = 2
+
         let headingAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 12.5, weight: .semibold),
             .foregroundColor: UIColor(red: 0.10, green: 0.46, blue: 0.92, alpha: 1),
@@ -686,9 +710,35 @@ private extension ResumeService {
             .paragraphStyle: bulletStyle
         ]
 
-        let output = NSMutableAttributedString(
-            string: document.title + "\n",
-            attributes: titleAttributes
+        let watermarkBadgeAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 10.5, weight: .semibold),
+            .foregroundColor: UIColor(red: 0.10, green: 0.46, blue: 0.92, alpha: 1),
+            .paragraphStyle: watermarkBadgeStyle
+        ]
+
+        let watermarkNoteAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 10.5, weight: .regular),
+            .foregroundColor: UIColor(red: 0.39, green: 0.44, blue: 0.52, alpha: 1),
+            .paragraphStyle: watermarkNoteStyle
+        ]
+
+        let output = NSMutableAttributedString()
+
+        if let watermarkText, !watermarkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            output.append(NSAttributedString(string: watermarkText + "\n", attributes: watermarkBadgeAttributes))
+            output.append(
+                NSAttributedString(
+                    string: "Upgrade to Premium for watermark-free resume downloads.\n\n",
+                    attributes: watermarkNoteAttributes
+                )
+            )
+        }
+
+        output.append(
+            NSAttributedString(
+                string: document.title + "\n",
+                attributes: titleAttributes
+            )
         )
 
         if !document.headerDetails.isEmpty {
@@ -723,7 +773,10 @@ private extension ResumeService {
         return output
     }
 
-    static func makePDFData(from attributed: NSAttributedString) throws -> Data {
+    static func makePDFData(
+        from attributed: NSAttributedString,
+        watermarkText: String? = nil
+    ) throws -> Data {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let textRect = pageRect.insetBy(dx: 42, dy: 48)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
@@ -745,6 +798,9 @@ private extension ResumeService {
                 guard glyphRange.length > 0 || pageIndex == 0 else { break }
 
                 context.beginPage()
+                if let watermarkText, !watermarkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    drawPDFWatermark(watermarkText, in: pageRect)
+                }
                 layoutManager.drawBackground(forGlyphRange: glyphRange, at: textRect.origin)
                 layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: textRect.origin)
 
@@ -752,6 +808,35 @@ private extension ResumeService {
                 pageIndex += 1
             }
         }
+    }
+
+    static func watermarkedPlainText(_ text: String, watermarkText: String?) -> String {
+        guard let watermarkText, !watermarkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return text
+        }
+
+        return "\(watermarkText)\nUpgrade to Premium for watermark-free resume downloads.\n\n\(text)"
+    }
+
+    static func drawPDFWatermark(_ watermarkText: String, in pageRect: CGRect) {
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+
+        context.saveGState()
+        context.translateBy(x: pageRect.midX, y: pageRect.midY)
+        context.rotate(by: -.pi / 5.8)
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 42, weight: .bold),
+            .foregroundColor: UIColor(red: 0.10, green: 0.46, blue: 0.92, alpha: 0.08),
+            .paragraphStyle: paragraph
+        ]
+
+        let rect = CGRect(x: -240, y: -28, width: 480, height: 56)
+        (watermarkText as NSString).draw(in: rect, withAttributes: attributes)
+        context.restoreGState()
     }
 
     static func writeExportData(

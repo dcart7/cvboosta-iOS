@@ -6,16 +6,47 @@ struct HistoryPDFPreviewDocument: Identifiable {
     let id: Int
     let title: String
     let fileURL: URL
+    let resumeName: String
+    let optimizedText: String
+    let watermarkText: String?
 }
 
 enum SharedHistoryPDFBuilder {
-    static func makeResumePDF(item: HistoryListItem, detail: HistoryDetailResponse) throws -> URL {
+    static let freeWatermarkText = "Generated with CVBoosta Free"
+
+    static func resumeName(for item: HistoryListItem, detail: HistoryDetailResponse) -> String {
+        let parts = [
+            item.role?.trimmingCharacters(in: .whitespacesAndNewlines) ?? detail.role?.trimmingCharacters(in: .whitespacesAndNewlines),
+            item.company?.trimmingCharacters(in: .whitespacesAndNewlines) ?? detail.company?.trimmingCharacters(in: .whitespacesAndNewlines)
+        ]
+        .compactMap { value -> String? in
+            guard let value, !value.isEmpty else { return nil }
+            return value
+        }
+
+        if !parts.isEmpty {
+            return parts.joined(separator: " - ")
+        }
+
+        let fallbackRole = detail.role?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return fallbackRole.isEmpty ? "CVBoosta Resume" : fallbackRole
+    }
+
+    static func makeResumePDF(
+        item: HistoryListItem,
+        detail: HistoryDetailResponse,
+        watermarkText: String? = nil
+    ) throws -> URL {
         let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cvboosta-history-\(UUID().uuidString).pdf")
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
 
         try renderer.writePDF(to: outputURL) { context in
-            let layout = PDFLayout(context: context, pageRect: pageRect)
+            let layout = PDFLayout(
+                context: context,
+                pageRect: pageRect,
+                watermarkText: watermarkText
+            )
             layout.beginPage(withHeaderFor: item, detail: detail, pageIndex: 1)
 
             layout.drawSummaryCard(item: item, detail: detail)
@@ -40,6 +71,7 @@ enum SharedHistoryPDFBuilder {
 
 struct HistoryPDFPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var exportController = ResumeExportController()
 
     let document: HistoryPDFPreviewDocument
 
@@ -47,6 +79,7 @@ struct HistoryPDFPreviewSheet: View {
         NavigationStack {
             PDFKitView(url: document.fileURL)
                 .navigationTitle(document.title)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close") { dismiss() }
@@ -56,6 +89,75 @@ struct HistoryPDFPreviewSheet: View {
                         ShareLink(item: document.fileURL)
                     }
                 }
+                .safeAreaInset(edge: .bottom) {
+                    VStack(alignment: .leading, spacing: BoostaSpace.xs) {
+                        if let watermarkText = document.watermarkText {
+                            Text("\(watermarkText). Upgrade to Premium for watermark-free resume downloads.")
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        PrimaryButton(
+                            title: exportController.primaryActionTitle,
+                            isLoading: exportController.isExporting
+                        ) {
+                            exportController.presentOptions()
+                        }
+
+                        if let successMessage = exportController.successMessage {
+                            Text(successMessage)
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.success)
+                        }
+
+                        if let errorMessage = exportController.errorMessage {
+                            Text(errorMessage)
+                                .font(BoostaType.caption)
+                                .foregroundStyle(BoostaColor.danger)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            SecondaryButton(title: "Retry Export") {
+                                exportController.retryLastExport()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, BoostaSpace.md)
+                    .padding(.top, BoostaSpace.sm)
+                    .padding(.bottom, BoostaSpace.md)
+                    .background(
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .overlay(alignment: .top) {
+                                Divider()
+                            }
+                    )
+                }
+        }
+        .confirmationDialog(
+            "Download Resume",
+            isPresented: $exportController.isExportOptionsPresented,
+            titleVisibility: .visible
+        ) {
+            ForEach(ResumeExportFormat.allCases) { format in
+                Button(format.title) {
+                    exportController.export(
+                        resumeName: document.resumeName,
+                        optimizedText: document.optimizedText,
+                        format: format,
+                        watermarkText: document.watermarkText
+                    )
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose the format that matches your application flow.")
+        }
+        .sheet(item: $exportController.shareItem, onDismiss: {
+            exportController.cleanupSharedFile()
+        }) { item in
+            ShareSheet(items: [item.url])
         }
     }
 }
@@ -79,6 +181,7 @@ private struct PDFKitView: UIViewRepresentable {
 private final class PDFLayout {
     let context: UIGraphicsPDFRendererContext
     let pageRect: CGRect
+    let watermarkText: String?
     let margin: CGFloat = 40
     let headerHeight: CGFloat = 86
     let footerHeight: CGFloat = 30
@@ -98,14 +201,16 @@ private final class PDFLayout {
     var contentWidth: CGFloat { pageRect.width - margin * 2 }
     var bottomLimit: CGFloat { pageRect.height - margin - footerHeight }
 
-    init(context: UIGraphicsPDFRendererContext, pageRect: CGRect) {
+    init(context: UIGraphicsPDFRendererContext, pageRect: CGRect, watermarkText: String?) {
         self.context = context
         self.pageRect = pageRect
+        self.watermarkText = watermarkText
     }
 
     func beginPage(withHeaderFor item: HistoryListItem, detail: HistoryDetailResponse, pageIndex: Int) {
         context.beginPage()
         self.pageIndex = pageIndex
+        drawWatermarkIfNeeded()
         drawPageHeader(item: item, detail: detail)
         drawPageFooter()
         currentY = margin + headerHeight + 18
@@ -261,6 +366,28 @@ private final class PDFLayout {
     private func drawPageFooter() {
         drawText("Generated by CVBoosta", at: CGPoint(x: margin, y: pageRect.height - margin + 6), font: smallFont, color: secondaryText)
         drawText("Page \(pageIndex)", at: CGPoint(x: pageRect.width - margin - 50, y: pageRect.height - margin + 6), font: smallFont, color: secondaryText)
+    }
+
+    private func drawWatermarkIfNeeded() {
+        guard let watermarkText, !watermarkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        context.cgContext.saveGState()
+        context.cgContext.translateBy(x: pageRect.midX, y: pageRect.midY)
+        context.cgContext.rotate(by: -.pi / 5.8)
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+
+        (watermarkText as NSString).draw(
+            in: CGRect(x: -240, y: -28, width: 480, height: 56),
+            withAttributes: [
+                .font: UIFont.systemFont(ofSize: 42, weight: .bold),
+                .foregroundColor: accent.withAlphaComponent(0.08),
+                .paragraphStyle: paragraph
+            ]
+        )
+
+        context.cgContext.restoreGState()
     }
 
     private func drawCircularProgress(in rect: CGRect, progress: CGFloat) {
